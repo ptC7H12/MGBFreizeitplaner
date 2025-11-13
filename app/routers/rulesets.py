@@ -122,6 +122,12 @@ async def import_ruleset_github(
                 status_code=303
             )
 
+        # GitHub-URLs automatisch zu Raw-URLs konvertieren
+        # Von: https://github.com/user/repo/blob/branch/path/file.yaml
+        # Zu: https://raw.githubusercontent.com/user/repo/branch/path/file.yaml
+        if "github.com" in github_url and "/blob/" in github_url:
+            github_url = github_url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+
         # YAML-Datei von GitHub herunterladen
         async with httpx.AsyncClient() as client:
             response = await client.get(github_url, timeout=10.0)
