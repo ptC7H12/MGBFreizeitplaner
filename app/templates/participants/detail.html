@@ -81,8 +81,47 @@
                     </svg>
                     Rechnung herunterladen
                 </a>
+                <button onclick="showQRCode()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition">
+                    <svg class="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    QR-Code anzeigen
+                </button>
             </div>
         </div>
+
+        <!-- QR-Code Modal -->
+        <div id="qrModal" class="hidden fixed z-10 inset-0 overflow-y-auto">
+            <div class="flex items-center justify-center min-h-screen px-4">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="document.getElementById('qrModal').classList.add('hidden')"></div>
+                <div class="bg-white rounded-lg overflow-hidden shadow-xl transform transition-all max-w-lg w-full">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 text-center">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Zahlungs-QR-Code</h3>
+                        <p class="text-sm text-gray-600 mb-4">
+                            Scannen Sie diesen QR-Code mit Ihrer Banking-App für eine einfache SEPA-Überweisung.
+                        </p>
+                        <img src="/participants/{{ participant.id }}/payment-qr" alt="Zahlungs QR-Code" class="mx-auto border-2 border-gray-300 rounded-lg" style="max-width: 300px;">
+                        <p class="text-xs text-gray-500 mt-4">
+                            Betrag: {{ "%.2f"|format(outstanding if outstanding > 0 else participant.final_price) }} €
+                        </p>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <a href="/participants/{{ participant.id }}/payment-qr" download="zahlung_qr_{{ participant.id }}.png" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 sm:ml-3 sm:w-auto sm:text-sm">
+                            QR-Code herunterladen
+                        </a>
+                        <button type="button" onclick="document.getElementById('qrModal').classList.add('hidden')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm">
+                            Schließen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        function showQRCode() {
+            document.getElementById('qrModal').classList.remove('hidden');
+        }
+        </script>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
                 <p class="text-sm text-gray-600">Preis</p>
