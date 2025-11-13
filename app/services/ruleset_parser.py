@@ -76,6 +76,35 @@ class RulesetParser:
         return True, None
 
     @staticmethod
+    def export_ruleset_to_yaml(ruleset) -> str:
+        """
+        Exportiert ein Ruleset-Objekt zurück in YAML-Format
+
+        Args:
+            ruleset: Ruleset-Objekt aus der Datenbank
+
+        Returns:
+            YAML-String
+        """
+        data = {
+            "name": ruleset.name,
+            "type": ruleset.ruleset_type,
+            "description": ruleset.description,
+            "valid_from": ruleset.valid_from.strftime("%Y-%m-%d"),
+            "valid_until": ruleset.valid_until.strftime("%Y-%m-%d"),
+            "age_groups": ruleset.age_groups,
+        }
+
+        # Optionale Felder nur hinzufügen wenn vorhanden
+        if ruleset.role_discounts:
+            data["role_discounts"] = ruleset.role_discounts
+
+        if ruleset.family_discount:
+            data["family_discount"] = ruleset.family_discount
+
+        return yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+    @staticmethod
     def create_example_yaml() -> str:
         """Erstellt ein Beispiel-YAML für ein Regelwerk"""
         example = {
