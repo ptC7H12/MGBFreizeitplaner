@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="/participants" class="text-blue-600 hover:text-blue-800 text-sm">← Zurück zur Übersicht</a>
+</div>
+
+<div class="bg-white shadow rounded-lg overflow-hidden">
+    <div class="px-6 py-4 bg-blue-50 border-b border-gray-200">
+        <h2 class="text-2xl font-bold text-gray-900">{{ participant.full_name }}</h2>
+        {% if participant.role %}
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 mt-2">
+            {{ participant.role.display_name }}
+        </span>
+        {% endif %}
+    </div>
+
+    <div class="px-6 py-4">
+        <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Vorname</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ participant.first_name }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Nachname</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ participant.last_name }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Geburtsdatum</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ participant.birth_date.strftime('%d.%m.%Y') }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Familie</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                    {% if participant.family %}
+                    <a href="/families/{{ participant.family.id }}" class="text-blue-600 hover:text-blue-800">
+                        {{ participant.family.name }}
+                    </a>
+                    {% else %}
+                    -
+                    {% endif %}
+                </dd>
+            </div>
+            {% if participant.email %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">E-Mail</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ participant.email }}</dd>
+            </div>
+            {% endif %}
+            {% if participant.phone %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Telefon</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ participant.phone }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
+
+    <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Finanzübersicht</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <p class="text-sm text-gray-600">Preis</p>
+                <p class="text-xl font-bold text-blue-600">{{ "%.2f"|format(participant.final_price) }} €</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Bezahlt</p>
+                <p class="text-xl font-bold text-green-600">{{ "%.2f"|format(total_paid) }} €</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Offen</p>
+                <p class="text-xl font-bold {% if outstanding > 0 %}text-orange-600{% else %}text-gray-600{% endif %}">
+                    {{ "%.2f"|format(outstanding) }} €
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

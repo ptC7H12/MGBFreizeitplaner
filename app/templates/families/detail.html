@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="/families" class="text-blue-600 hover:text-blue-800 text-sm">← Zurück zur Übersicht</a>
+</div>
+
+<div class="bg-white shadow rounded-lg overflow-hidden mb-6">
+    <div class="px-6 py-4 bg-green-50 border-b border-gray-200">
+        <h2 class="text-2xl font-bold text-gray-900">{{ family.name }}</h2>
+    </div>
+
+    <div class="px-6 py-4">
+        <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+            {% if family.contact_person %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Ansprechpartner</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ family.contact_person }}</dd>
+            </div>
+            {% endif %}
+            {% if family.email %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">E-Mail</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ family.email }}</dd>
+            </div>
+            {% endif %}
+            {% if family.phone %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Telefon</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ family.phone }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
+
+    <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Finanzübersicht</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <p class="text-sm text-gray-600">Gesamtpreis</p>
+                <p class="text-xl font-bold text-blue-600">{{ "%.2f"|format(total_price) }} €</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Bezahlt</p>
+                <p class="text-xl font-bold text-green-600">{{ "%.2f"|format(total_paid) }} €</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600">Offen</p>
+                <p class="text-xl font-bold {% if outstanding > 0 %}text-orange-600{% else %}text-gray-600{% endif %}">
+                    {{ "%.2f"|format(outstanding) }} €
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Teilnehmer der Familie -->
+<div class="bg-white shadow rounded-lg">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-xl font-semibold text-gray-900">Teilnehmer</h3>
+    </div>
+
+    {% if family.participants %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Geburtsdatum</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rolle</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preis</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aktionen</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for participant in family.participants %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {{ participant.full_name }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ participant.birth_date.strftime('%d.%m.%Y') }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if participant.role %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                            {{ participant.role.display_name }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {{ "%.2f"|format(participant.final_price) }} €
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <a href="/participants/{{ participant.id }}" class="text-blue-600 hover:text-blue-800">Anzeigen</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="px-6 py-8 text-center text-gray-500">
+        Keine Teilnehmer in dieser Familie
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
