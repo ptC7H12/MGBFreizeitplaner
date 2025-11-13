@@ -15,6 +15,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import Ruleset, Event
 from app.services.ruleset_parser import RulesetParser
+from app.services.role_manager import RoleManager
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
@@ -102,6 +103,13 @@ async def import_ruleset_upload(
         db.commit()
         db.refresh(ruleset)
 
+        # Rollen automatisch aus role_discounts erstellen
+        if data.get("role_discounts"):
+            RoleManager.create_roles_from_ruleset(db, event_id, data.get("role_discounts"))
+            flash(request, f"Regelwerk importiert und {len(data.get('role_discounts'))} Rollen erstellt", "success")
+        else:
+            flash(request, "Regelwerk erfolgreich importiert", "success")
+
         return RedirectResponse(url=f"/rulesets/{ruleset.id}", status_code=303)
 
     except Exception as e:
@@ -170,6 +178,13 @@ async def import_ruleset_github(
         db.commit()
         db.refresh(ruleset)
 
+        # Rollen automatisch aus role_discounts erstellen
+        if data.get("role_discounts"):
+            RoleManager.create_roles_from_ruleset(db, event_id, data.get("role_discounts"))
+            flash(request, f"Regelwerk von GitHub importiert und {len(data.get('role_discounts'))} Rollen erstellt", "success")
+        else:
+            flash(request, "Regelwerk erfolgreich von GitHub importiert", "success")
+
         return RedirectResponse(url=f"/rulesets/{ruleset.id}", status_code=303)
 
     except httpx.HTTPError as e:
@@ -223,6 +238,13 @@ async def import_ruleset_manual(
         db.add(ruleset)
         db.commit()
         db.refresh(ruleset)
+
+        # Rollen automatisch aus role_discounts erstellen
+        if data.get("role_discounts"):
+            RoleManager.create_roles_from_ruleset(db, event_id, data.get("role_discounts"))
+            flash(request, f"Regelwerk manuell importiert und {len(data.get('role_discounts'))} Rollen erstellt", "success")
+        else:
+            flash(request, "Regelwerk erfolgreich manuell importiert", "success")
 
         return RedirectResponse(url=f"/rulesets/{ruleset.id}", status_code=303)
 

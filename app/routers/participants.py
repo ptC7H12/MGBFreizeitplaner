@@ -125,7 +125,7 @@ async def list_participants(
     participants = query.order_by(Participant.last_name).all()
 
     # Für Filter-Dropdown (auch nach event_id gefiltert)
-    roles = db.query(Role).filter(Role.is_active == True).all()
+    roles = db.query(Role).filter(Role.is_active == True, Role.event_id == event_id).all()
     families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
 
     return templates.TemplateResponse(
@@ -150,7 +150,7 @@ async def create_participant_form(
     event_id: int = Depends(get_current_event_id)
 ):
     """Formular zum Erstellen eines neuen Teilnehmers"""
-    roles = db.query(Role).filter(Role.is_active == True).all()
+    roles = db.query(Role).filter(Role.is_active == True, Role.event_id == event_id).all()
     event = db.query(Event).filter(Event.id == event_id).first()
     families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
 
@@ -382,7 +382,7 @@ async def edit_participant_form(
     if not participant:
         return RedirectResponse(url="/participants", status_code=303)
 
-    roles = db.query(Role).filter(Role.is_active == True).all()
+    roles = db.query(Role).filter(Role.is_active == True, Role.event_id == event_id).all()
     event = db.query(Event).filter(Event.id == event_id).first()
     families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
 
