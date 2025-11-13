@@ -10,6 +10,7 @@ from io import BytesIO
 from app.config import settings
 from app.database import get_db
 from app.models import Payment, Participant, Family
+from app.dependencies import get_current_event_id
 from app.services.invoice_generator import InvoiceGenerator
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -20,11 +21,12 @@ templates = Jinja2Templates(directory=str(settings.templates_dir))
 async def list_payments(
     request: Request,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     participant_id: Optional[int] = None,
     family_id: Optional[int] = None
 ):
     """Liste aller Zahlungen mit Filter"""
-    query = db.query(Payment)
+    query = db.query(Payment).filter(Payment.event_id == event_id)
 
     if participant_id:
         query = query.filter(Payment.participant_id == participant_id)
@@ -47,12 +49,13 @@ async def list_payments(
 async def create_payment_form(
     request: Request,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     participant_id: Optional[int] = None,
     family_id: Optional[int] = None
 ):
     """Formular zum Erstellen einer neuen Zahlung"""
-    participants = db.query(Participant).filter(Participant.is_active == True).all()
-    families = db.query(Family).all()
+    participants = db.query(Participant).filter(Participant.event_id == event_id, Participant.is_active == True).all()
+    families = db.query(Family).filter(Family.event_id == event_id).all()
 
     return templates.TemplateResponse(
         "payments/create.html",
@@ -71,6 +74,7 @@ async def create_payment_form(
 async def create_payment(
     request: Request,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     amount: float = Form(...),
     payment_date: str = Form(...),
     payment_method: Optional[str] = Form(None),
@@ -90,6 +94,7 @@ async def create_payment(
 
         # Neue Zahlung erstellen
         payment = Payment(
+            event_id=event_id,
             amount=amount,
             payment_date=payment_date_obj,
             payment_method=payment_method if payment_method else None,
@@ -117,9 +122,9 @@ async def create_payment(
 
 
 @router.post("/{payment_id}/delete")
-async def delete_payment(payment_id: int, db: Session = Depends(get_db)):
+async def delete_payment(payment_id: int, db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
     """Löscht eine Zahlung"""
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    payment = db.query(Payment).filter(Payment.id == payment_id, Payment.event_id == event_id).first()
 
     if not payment:
         raise HTTPException(status_code=404, detail="Zahlung nicht gefunden")
