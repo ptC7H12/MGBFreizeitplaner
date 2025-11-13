@@ -22,8 +22,8 @@ class Event(Base):
     end_date = Column(Date, nullable=False)
     location = Column(String(200), nullable=True)
 
-    # Multi-Tenancy
-    code = Column(String(20), unique=True, nullable=False, index=True)  # Eindeutiger Code für Zugriff
+    # Multi-Tenancy (für lokalen Betrieb optional)
+    code = Column(String(20), unique=True, nullable=True, index=True)  # Optional: Code für Multi-Tenancy
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Timestamps
