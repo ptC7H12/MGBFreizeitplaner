@@ -4,17 +4,59 @@ Ein Web-basiertes Kassensystem für Kinder-, Jugend- und Familienfreizeiten mit 
 
 ## Features
 
-- **Teilnehmerverwaltung**: Erfassung von Teilnehmern mit allen relevanten Daten
-- **Familienverwaltung**: Gruppierung von Teilnehmern zu Familien mit automatischer Preisberechnung
-- **Regelwerk-System**: Flexible YAML-basierte Preisregeln für verschiedene Freizeiten
-- **Finanz-Tracking**: Einnahmen und Ausgaben im Blick behalten
-- **Responsive UI**: Modern mit Tailwind CSS und HTMX
+### Teilnehmerverwaltung
+- **Vollständige CRUD-Operationen**: Erstellen, Anzeigen, Bearbeiten und Löschen von Teilnehmern
+- **Umfassende Datenerfassung**: Persönliche Daten, medizinische Hinweise, Allergien, Bildung & Teilhabe
+- **Live-Preisvorschau**: Automatische Preisberechnung beim Eingeben der Daten (HTMX)
+- **Manuelle Preisanpassungen**: Rabatte und individuelle Preisüberschreibungen möglich
+- **Pydantic-Validierung**: Automatische Validierung aller Eingaben (E-Mail, Datum, Beträge)
+
+### Familienverwaltung
+- **Familien-Gruppierung**: Mehrere Teilnehmer zu Familien zusammenfassen
+- **Automatischer Familienrabatt**: Geschwisterrabatt wird automatisch berechnet
+- **Sammelrechnungen**: Rechnungserstellung für ganze Familien
+- **Zahlungsübersicht**: Gesamtübersicht über Familienzahlungen
+
+### Regelwerk-System
+- **YAML-basierte Preisregeln**: Flexible Definition von Preisstrukturen
+- **Altersklassen**: Automatische Preiszuweisung nach Alter
+- **Rollenrabatte**: Rabatte für Betreuer, Küchenpersonal, etc.
+- **Familienrabatte**: Gestaffelte Rabatte für mehrere Kinder
+- **YAML Export/Import**: Regelwerke exportieren, manuell bearbeiten und re-importieren
+- **Live-Editor**: Regelwerke direkt im Browser als YAML bearbeiten
+
+### Finanz-Tracking
+- **Zahlungsverwaltung**: Erfassung von Teilnehmer- und Familienzahlungen
+- **Ausgabenverwaltung**: Tracking aller Ausgaben mit Kategorien und Belegnummern
+- **Dashboard**: Übersicht über Einnahmen, Ausgaben und offene Beträge
+- **PDF-Rechnungen**: Automatische Rechnungsgenerierung mit ReportLab
+- **Zahlungsstatus**: Echtzeit-Übersicht über bezahlte und offene Beträge
+
+### Einstellungssystem
+- **Event-spezifische Konfiguration**: Separate Einstellungen pro Veranstaltung
+- **Bankdaten-Verwaltung**: Konfigurierbare IBAN, BIC, Kontoinhaber
+- **Rechnungs-Anpassung**: Eigene Organisation, Adresse, Fußzeilen
+- **IBAN/BIC-Validierung**: Automatische Prüfung der Bankdaten-Formate
+
+### Fehlerbehandlung & Logging
+- **Zentralisiertes Error-Handling**: Einheitliche Fehlerbehandlung über alle Router
+- **Flash-Message-System**: Session-basierte Benutzer-Benachrichtigungen
+- **Strukturiertes Logging**: Detailliertes Logging aller Operationen
+- **Benutzerfreundliche Fehlermeldungen**: Verständliche Meldungen statt technischer Fehler
+
+### Benutzeroberfläche
+- **Responsive Design**: Tailwind CSS für mobile und Desktop-Nutzung
+- **HTMX**: Dynamische Updates ohne Full-Page-Reload
+- **Flash-Messages**: Visuelles Feedback für alle Aktionen (Erfolg, Fehler, Warnung)
+- **Moderne Icons**: Heroicons für klare visuelle Kommunikation
 
 ## Tech-Stack
 
 - **Backend**: Python 3.11+ mit FastAPI
 - **Frontend**: HTMX + Tailwind CSS (Server-Side Rendering)
 - **Datenbank**: SQLite mit SQLAlchemy ORM
+- **Validierung**: Pydantic für Input-Validierung
+- **PDF-Generierung**: ReportLab für Rechnungen
 - **Deployment**: Docker + Docker Compose
 
 ## Installation
@@ -135,59 +177,82 @@ http://localhost:8000
 
 ---
 
-## 📦 Releases erstellen
+## Erste Schritte
 
-Für Maintainer:
+Nach der Installation:
 
-**Windows Standalone-Version (mit embedded Python):**
-```bash
-python build_standalone_windows.py
-```
-Erstellt Windows-Standalone-Paket (~60 MB) - keine Python-Installation erforderlich!
-
-**Portable-Version (für alle Plattformen):**
-```bash
-python build_portable.py
-```
-Erstellt Portable-Pakete (~5 MB) - Python-Installation erforderlich.
-
-Beide Skripte erstellen ZIP-Archive im `releases/` Ordner.
-
-**Empfehlung:**
-- Windows: Beide Versionen bereitstellen (Standalone für Endanwender, Portable für Tech-Savvy)
-- macOS/Linux: Nur Portable-Version (kleiner, Python meist vorhanden)
+1. **Regelwerk erstellen**: Navigiere zu "Regelwerke" und importiere ein YAML-Regelwerk oder erstelle ein neues
+2. **Event anlegen**: Erstelle deine erste Veranstaltung (z.B. "Kinderfreizeit 2024")
+3. **Einstellungen konfigurieren**: Unter "Einstellungen" Bankdaten und Organisation eingeben
+4. **Teilnehmer erfassen**: Füge Teilnehmer hinzu - Preise werden automatisch berechnet
+5. **Zahlungen erfassen**: Verfolge eingehende Zahlungen und erstelle Rechnungen
 
 ## Projektstruktur
 
 ```
 MGBFreizeitplaner/
 ├── app/
-│   ├── models/          # SQLAlchemy Datenmodelle
-│   ├── routers/         # FastAPI Router (Endpoints)
-│   ├── services/        # Business Logic (Preisberechnung, etc.)
-│   ├── templates/       # Jinja2 HTML-Templates
-│   ├── static/          # CSS, JS, Bilder
-│   ├── config.py        # Konfiguration
-│   ├── database.py      # Datenbank-Setup
-│   └── main.py          # FastAPI Hauptanwendung
+│   ├── models/              # SQLAlchemy Datenmodelle
+│   │   ├── event.py         # Veranstaltungen
+│   │   ├── participant.py   # Teilnehmer
+│   │   ├── family.py        # Familien
+│   │   ├── payment.py       # Zahlungen
+│   │   ├── expense.py       # Ausgaben
+│   │   ├── ruleset.py       # Regelwerke
+│   │   └── setting.py       # Einstellungen
+│   ├── routers/             # FastAPI Router (Endpoints)
+│   │   ├── participants.py  # Teilnehmer-Verwaltung
+│   │   ├── families.py      # Familien-Verwaltung
+│   │   ├── payments.py      # Zahlungs-Verwaltung
+│   │   ├── expenses.py      # Ausgaben-Verwaltung
+│   │   ├── rulesets.py      # Regelwerk-Verwaltung
+│   │   └── settings.py      # Einstellungs-Verwaltung
+│   ├── services/            # Business Logic
+│   │   ├── price_calculator.py    # Preisberechnung
+│   │   ├── ruleset_parser.py      # YAML-Parsing
+│   │   └── invoice_generator.py   # PDF-Rechnungen
+│   ├── utils/               # Hilfsfunktionen
+│   │   ├── error_handler.py # Zentrales Error-Handling
+│   │   └── flash.py         # Flash-Message-System
+│   ├── templates/           # Jinja2 HTML-Templates
+│   │   ├── base.html        # Basis-Layout
+│   │   ├── components/      # Wiederverwendbare Komponenten
+│   │   ├── participants/    # Teilnehmer-Templates
+│   │   ├── families/        # Familien-Templates
+│   │   ├── payments/        # Zahlungs-Templates
+│   │   ├── expenses/        # Ausgaben-Templates
+│   │   ├── rulesets/        # Regelwerk-Templates
+│   │   └── settings/        # Einstellungs-Templates
+│   ├── static/              # CSS, JS, Bilder
+│   ├── schemas.py           # Pydantic Validierungs-Schemas
+│   ├── config.py            # Konfiguration
+│   ├── database.py          # Datenbank-Setup
+│   └── main.py              # FastAPI Hauptanwendung
 ├── rulesets/
-│   └── examples/        # Beispiel-Regelwerke
-├── tests/               # Tests (TODO)
-├── docker-compose.yml   # Docker Compose Konfiguration
-├── Dockerfile           # Docker Image Definition
-├── requirements.txt     # Python Dependencies
-└── README.md           # Diese Datei
+│   └── examples/            # Beispiel-Regelwerke
+├── tests/                   # Tests
+├── docker-compose.yml       # Docker Compose Konfiguration
+├── Dockerfile               # Docker Image Definition
+├── requirements.txt         # Python Dependencies
+└── README.md               # Diese Datei
 ```
 
 ## Datenmodell
 
 - **Event**: Freizeit/Veranstaltung (z.B. Kinderfreizeit 2024)
-- **Participant**: Teilnehmer mit allen persönlichen Daten
-- **Family**: Familie zur Gruppierung von Teilnehmern
-- **Role**: Rolle (Kind, Betreuer, Küche, etc.)
-- **Ruleset**: Regelwerk für Preisberechnungen
-- **Payment**: Zahlungen von Teilnehmern/Familien
-- **Expense**: Ausgaben für die Freizeit
+- **Participant**: Teilnehmer mit allen persönlichen Daten, Rolle und berechneten Preisen
+- **Family**: Familie zur Gruppierung von Teilnehmern mit automatischem Familienrabatt
+- **Role**: Rolle (Kind, Betreuer, Küche, etc.) mit optionalen Rabatten
+- **Ruleset**: Regelwerk für Preisberechnungen (YAML-basiert)
+- **Payment**: Zahlungen von Teilnehmern oder Familien
+- **Expense**: Ausgaben für die Freizeit mit Kategorien
+- **Setting**: Event-spezifische Einstellungen (Bankdaten, Rechnungs-Layout)
+
+Beziehungen:
+- Ein Event hat viele Participants, Families, Payments, Expenses und ein Setting
+- Ein Participant gehört zu einem Event, einer Role und optional einer Family
+- Eine Family hat viele Participants und Payments
+- Payments können zu Participants oder Families gehören
 
 ## Regelwerk-System
 
@@ -227,26 +292,99 @@ family_discount:
   third_plus_child_percent: 20
 ```
 
+### Regelwerk-Operationen
+
+- **Import**: YAML-Datei hochladen und importieren
+- **Export**: Regelwerk als YAML-Datei exportieren
+- **Edit**: Regelwerk direkt im Browser als YAML bearbeiten
+- **Validierung**: Automatische Prüfung der YAML-Struktur beim Import/Edit
+
 ## API-Endpunkte
 
 ### Dashboard
-- `GET /dashboard` - Hauptdashboard mit Statistiken
+- `GET /` - Hauptdashboard mit Statistiken
 
 ### Teilnehmer
-- `GET /participants` - Liste aller Teilnehmer
+- `GET /participants` - Liste aller Teilnehmer (mit Filter)
 - `GET /participants/{id}` - Teilnehmer-Details
 - `GET /participants/create` - Formular für neuen Teilnehmer
+- `POST /participants/create` - Teilnehmer erstellen
+- `GET /participants/{id}/edit` - Teilnehmer bearbeiten
+- `POST /participants/{id}/edit` - Teilnehmer aktualisieren
+- `POST /participants/{id}/delete` - Teilnehmer löschen
+- `POST /participants/calculate-price` - HTMX-Preisvorschau
 
 ### Familien
 - `GET /families` - Liste aller Familien
 - `GET /families/{id}` - Familien-Details
+- `GET /families/create` - Formular für neue Familie
+- `POST /families/create` - Familie erstellen
+- `GET /families/{id}/edit` - Familie bearbeiten
+- `POST /families/{id}/edit` - Familie aktualisieren
+- `POST /families/{id}/delete` - Familie löschen
+- `GET /families/{id}/invoice` - Familien-Rechnung generieren
+
+### Zahlungen
+- `GET /payments` - Liste aller Zahlungen (mit Filter)
+- `GET /payments/create` - Formular für neue Zahlung
+- `POST /payments/create` - Zahlung erfassen
+- `POST /payments/{id}/delete` - Zahlung löschen
+
+### Ausgaben
+- `GET /expenses` - Liste aller Ausgaben (mit Filter)
+- `GET /expenses/create` - Formular für neue Ausgabe
+- `POST /expenses/create` - Ausgabe erfassen
+- `GET /expenses/{id}/edit` - Ausgabe bearbeiten
+- `POST /expenses/{id}/edit` - Ausgabe aktualisieren
+- `POST /expenses/{id}/delete` - Ausgabe löschen
 
 ### Regelwerke
 - `GET /rulesets` - Liste aller Regelwerke
 - `GET /rulesets/{id}` - Regelwerk-Details
+- `GET /rulesets/import` - Import-Formular
+- `POST /rulesets/import` - YAML-Regelwerk importieren
+- `GET /rulesets/{id}/export` - Regelwerk als YAML exportieren
+- `GET /rulesets/{id}/edit` - Regelwerk-Editor
+- `POST /rulesets/{id}/edit` - Regelwerk aktualisieren
+- `POST /rulesets/{id}/delete` - Regelwerk löschen
+
+### Einstellungen
+- `GET /settings` - Einstellungen anzeigen
+- `GET /settings/edit` - Einstellungen bearbeiten
+- `POST /settings/edit` - Einstellungen aktualisieren
 
 ### System
 - `GET /health` - Health-Check für Docker
+
+## Validierung
+
+Das System verwendet Pydantic für umfassende Input-Validierung:
+
+### Teilnehmer
+- Namen dürfen nicht leer sein
+- E-Mail-Adressen werden auf korrektes Format geprüft
+- Geburtsdatum muss zwischen 1900 und heute liegen
+- Rabatte müssen zwischen 0% und 100% liegen
+- Manuelle Preise müssen >= 0 sein
+
+### Familien
+- Familienname darf nicht leer sein
+- E-Mail-Validierung wie bei Teilnehmern
+
+### Zahlungen
+- Betrag muss > 0 sein
+- Datum darf nicht in der Zukunft liegen
+- Entweder Teilnehmer ODER Familie muss ausgewählt sein
+
+### Ausgaben
+- Titel darf nicht leer sein
+- Betrag muss > 0 sein
+- Datum darf nicht in der Zukunft liegen
+
+### Einstellungen
+- IBAN: 15-34 Zeichen, muss mit Ländercode beginnen
+- BIC: 8 oder 11 Zeichen, korrektes Format
+- Organisation und Kontoinhaber dürfen nicht leer sein
 
 ## Entwicklung
 
@@ -263,37 +401,83 @@ rm freizeit_kassen.db
 python -m app.main  # Startet die App und erstellt neue DB
 ```
 
-## Roadmap / TODO
+### Tests ausführen
 
-### Phase 1: Grundgerüst ✅
-- [x] Projekt-Struktur
-- [x] FastAPI-App mit Basis-Routing
-- [x] SQLAlchemy-Modelle
-- [x] Basis-Templates
-- [x] Docker-Setup
+```bash
+pytest
+```
 
-### Phase 2: Teilnehmerverwaltung (TODO)
-- [ ] CRUD für Teilnehmer
-- [ ] Formular-Validierung
-- [ ] Listen-Ansichten mit Filtern
+### Code-Qualität prüfen
 
-### Phase 3: Regelwerk-System (TODO)
-- [ ] YAML-Import-Funktion
-- [ ] Validierungs-Logik
-- [ ] Admin-Interface
+```bash
+# Linting
+flake8 app/
 
-### Phase 4: Preis-Kalkulation (TODO)
-- [ ] Automatische Preisberechnung
-- [ ] Familienpreis-Berechnung
+# Type-Checking
+mypy app/
+```
 
-### Phase 5: Finanz-Tracking (TODO)
-- [ ] Zahlungserfassung
-- [ ] Ausgaben-Verwaltung
-- [ ] Export-Funktionen
+## 📦 Releases erstellen
 
-### Phase 6: Familienverwaltung (TODO)
-- [ ] Familien-CRUD
-- [ ] Sammelrechnungen
+Für Maintainer:
+
+**Windows Standalone-Version (mit embedded Python):**
+```bash
+python build_standalone_windows.py
+```
+Erstellt Windows-Standalone-Paket (~60 MB) - keine Python-Installation erforderlich!
+
+**Portable-Version (für alle Plattformen):**
+```bash
+python build_portable.py
+```
+Erstellt Portable-Pakete (~5 MB) - Python-Installation erforderlich.
+
+Beide Skripte erstellen ZIP-Archive im `releases/` Ordner.
+
+**Empfehlung:**
+- Windows: Beide Versionen bereitstellen (Standalone für Endanwender, Portable für Tech-Savvy)
+- macOS/Linux: Nur Portable-Version (kleiner, Python meist vorhanden)
+
+## Changelog
+
+### v1.0.0 - Produktiv-Release
+- ✅ Vollständige Teilnehmerverwaltung mit CRUD
+- ✅ Familienverwaltung mit Gruppenrabatt
+- ✅ YAML-basiertes Regelwerk-System mit Import/Export/Edit
+- ✅ Automatische Preisberechnung mit Live-Preview
+- ✅ Zahlungsverwaltung für Teilnehmer und Familien
+- ✅ Ausgabenverwaltung mit Kategorien
+- ✅ PDF-Rechnungsgenerierung
+- ✅ Konfigurierbares Einstellungssystem
+- ✅ Zentralisiertes Error-Handling mit Flash-Messages
+- ✅ Pydantic Input-Validierung über alle Formulare
+- ✅ Responsive UI mit Tailwind CSS und HTMX
+- ✅ Docker-Support
+- ✅ Logging-System
+
+### v0.1.0 - Grundgerüst
+- Projekt-Struktur
+- FastAPI-App mit Basis-Routing
+- SQLAlchemy-Modelle
+- Basis-Templates
+- Docker-Setup
+
+## Bekannte Einschränkungen
+
+- SQLite ist für einzelne Events ausreichend, bei sehr großen Freizeiten (>1000 Teilnehmer) sollte PostgreSQL in Betracht gezogen werden
+- Keine Multi-User-Authentifizierung (geplant für v2.0)
+- Keine Backup-Automatisierung (manuelle Datenbank-Sicherung empfohlen)
+
+## Geplante Features (v2.0)
+
+- [ ] Benutzer-Authentifizierung und Rollen
+- [ ] Multi-Tenancy (mehrere Organisationen)
+- [ ] Email-Benachrichtigungen
+- [ ] CSV/Excel Import/Export
+- [ ] Erweiterte Statistiken und Reports
+- [ ] Mahnwesen für offene Zahlungen
+- [ ] API für externe Integrationen
 
 ## Lizenz
 
@@ -303,6 +487,15 @@ python -m app.main  # Startet die App und erstellt neue DB
 
 Bei Fragen oder Problemen bitte ein Issue erstellen.
 
-## Version
+## Mitwirken
 
-**v0.1.0** - Grundgerüst (Phase 1)
+Contributions sind willkommen! Bitte:
+1. Fork das Repository
+2. Erstelle einen Feature-Branch (`git checkout -b feature/AmazingFeature`)
+3. Committe deine Änderungen (`git commit -m 'Add some AmazingFeature'`)
+4. Push zum Branch (`git push origin feature/AmazingFeature`)
+5. Öffne einen Pull Request
+
+## Autoren
+
+MGBFreizeitplaner wurde entwickelt für Kinder-, Jugend- und Familienfreizeiten.
