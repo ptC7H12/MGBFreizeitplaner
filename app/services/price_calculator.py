@@ -28,17 +28,22 @@ class PriceCalculator:
         # Basispreis aus Altersgruppen ermitteln
         base_price = PriceCalculator._get_base_price_by_age(age, ruleset_data.get("age_groups", []))
 
-        # Rollenrabatt anwenden
+        # Rollenrabatt ermitteln
         role_discount_percent = PriceCalculator._get_role_discount(
             role_name, ruleset_data.get("role_discounts", {})
         )
-        price_after_role_discount = base_price * (1 - role_discount_percent / 100)
 
-        # Familienrabatt anwenden
+        # Familienrabatt ermitteln
         family_discount_percent = PriceCalculator._get_family_discount(
             family_children_count, ruleset_data.get("family_discount", {})
         )
-        final_price = price_after_role_discount * (1 - family_discount_percent / 100)
+
+        # Alle Rabatte vom Basispreis berechnen (nicht gestapelt!)
+        role_discount_amount = base_price * (role_discount_percent / 100)
+        family_discount_amount = base_price * (family_discount_percent / 100)
+
+        # Endpreis = Basispreis - Summe aller Rabatte
+        final_price = base_price - role_discount_amount - family_discount_amount
 
         return round(final_price, 2)
 

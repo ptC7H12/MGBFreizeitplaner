@@ -6,7 +6,9 @@ from app.models.role import Role
 from app.models.ruleset import Ruleset
 from app.models.payment import Payment
 from app.models.expense import Expense
+from app.models.income import Income
 from app.models.setting import Setting
+from app.models.task import Task
 
 __all__ = [
     "Event",
@@ -16,5 +18,7 @@ __all__ = [
     "Ruleset",
     "Payment",
     "Expense",
+    "Income",
     "Setting",
+    "Task",
 ]

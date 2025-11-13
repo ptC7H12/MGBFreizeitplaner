@@ -5,20 +5,24 @@ from pathlib import Path
 from app.database import SessionLocal, init_db
 from app.models import Event, Family, Participant, Role, Ruleset, Payment, Expense
 from app.services.ruleset_parser import RulesetParser
+from app.services.role_manager import RoleManager
 
 
-def seed_roles(db):
-    """Erstellt Standard-Rollen"""
+def seed_roles(db, event):
+    """Erstellt Standard-Rollen für ein Event"""
     roles = [
-        {"name": "kind", "display_name": "Kind", "color": "#3B82F6"},
-        {"name": "jugendlicher", "display_name": "Jugendlicher", "color": "#8B5CF6"},
-        {"name": "betreuer", "display_name": "Betreuer", "color": "#10B981"},
-        {"name": "kueche", "display_name": "Küchenpersonal", "color": "#F59E0B"},
-        {"name": "leitung", "display_name": "Freizeitleitung", "color": "#EF4444"},
+        {"name": "kind", "display_name": "Kind", "color": "#3B82F6", "event_id": event.id},
+        {"name": "jugendlicher", "display_name": "Jugendlicher", "color": "#8B5CF6", "event_id": event.id},
+        {"name": "betreuer", "display_name": "Betreuer", "color": "#10B981", "event_id": event.id},
+        {"name": "kueche", "display_name": "Küchenpersonal", "color": "#F59E0B", "event_id": event.id},
+        {"name": "leitung", "display_name": "Freizeitleitung", "color": "#EF4444", "event_id": event.id},
     ]
 
     for role_data in roles:
-        existing = db.query(Role).filter(Role.name == role_data["name"]).first()
+        existing = db.query(Role).filter(
+            Role.name == role_data["name"],
+            Role.event_id == event.id
+        ).first()
         if not existing:
             role = Role(**role_data)
             db.add(role)
@@ -38,12 +42,12 @@ def seed_event(db):
             start_date=date(2024, 7, 15),
             end_date=date(2024, 7, 28),
             location="Freizeitheim Waldblick",
-            code=None,  # Kein Code für lokalen Betrieb
+            code=Event.generate_code(),
             is_active=True
         )
         db.add(event)
         db.commit()
-        print(f"✓ Event erstellt: {event.name}")
+        print(f"✓ Event erstellt: {event.name} (Code: {event.code})")
     return event
 
 
@@ -77,10 +81,10 @@ def seed_ruleset(db, event):
 
 def seed_families_and_participants(db, event, ruleset):
     """Erstellt Beispiel-Familien und Teilnehmer"""
-    # Rollen abrufen
-    role_kind = db.query(Role).filter(Role.name == "kind").first()
-    role_betreuer = db.query(Role).filter(Role.name == "betreuer").first()
-    role_kueche = db.query(Role).filter(Role.name == "kueche").first()
+    # Rollen abrufen (event-spezifisch)
+    role_kind = db.query(Role).filter(Role.name == "kind", Role.event_id == event.id).first()
+    role_betreuer = db.query(Role).filter(Role.name == "betreuer", Role.event_id == event.id).first()
+    role_kueche = db.query(Role).filter(Role.name == "kueche", Role.event_id == event.id).first()
 
     # Familie 1: Familie Müller
     family1 = db.query(Family).filter(Family.name == "Müller", Family.event_id == event.id).first()
@@ -302,11 +306,11 @@ def main():
     db = SessionLocal()
 
     try:
-        print("📝 Erstelle Rollen...")
-        seed_roles(db)
-
-        print("\n📅 Erstelle Event...")
+        print("📅 Erstelle Event...")
         event = seed_event(db)
+
+        print("\n📝 Erstelle Rollen...")
+        seed_roles(db, event)
 
         print("\n📋 Erstelle Regelwerk...")
         ruleset = seed_ruleset(db, event)

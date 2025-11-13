@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Regelwerke aus Verzeichnis</h1>
+                <p class="mt-1 text-sm text-gray-600">
+                    Wählen Sie ein Regelwerk aus den gefundenen Dateien zum Importieren aus
+                </p>
+            </div>
+            <a href="/rulesets/import" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Zurück
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+        <div class="flex">
+            <svg class="h-5 w-5 text-blue-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+            </svg>
+            <div>
+                <p class="text-sm text-blue-700">
+                    <strong>{{ total_rulesets }}</strong> Regelwerk{% if total_rulesets != 1 %}e{% endif %} gefunden,
+                    <strong>{{ valid_rulesets_count }}</strong> davon gültig
+                </p>
+            </div>
+        </div>
+    </div>
+
+    {% if all_rulesets %}
+        <!-- Rulesets by Directory -->
+        {% for directory, rulesets in all_rulesets.items() %}
+        <div class="bg-white shadow rounded-lg mb-6">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <svg class="h-5 w-5 text-gray-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    </svg>
+                    {{ directory }}
+                </h2>
+                <p class="mt-1 text-sm text-gray-600">{{ rulesets|length }} Datei{% if rulesets|length != 1 %}en{% endif %}</p>
+            </div>
+
+            <div class="divide-y divide-gray-200">
+                {% for ruleset in rulesets %}
+                <div class="px-6 py-4 hover:bg-gray-50 {% if not ruleset.is_valid %}bg-red-50{% endif %}">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center">
+                                {% if ruleset.is_valid %}
+                                <svg class="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                {% else %}
+                                <svg class="h-5 w-5 text-red-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                </svg>
+                                {% endif %}
+                                <h3 class="text-sm font-medium text-gray-900 truncate">
+                                    {{ ruleset.name }}
+                                </h3>
+                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                    {{ ruleset.type }}
+                                </span>
+                            </div>
+
+                            {% if ruleset.description %}
+                            <p class="mt-1 text-sm text-gray-600">{{ ruleset.description }}</p>
+                            {% endif %}
+
+                            <div class="mt-2 flex items-center text-xs text-gray-500 space-x-4">
+                                <span class="flex items-center">
+                                    <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    {{ ruleset.relative_path }}
+                                </span>
+                                <span>
+                                    Gültig: {{ ruleset.valid_from }} bis {{ ruleset.valid_until }}
+                                </span>
+                                <span>
+                                    {{ ruleset.age_groups_count }} Altersgruppen
+                                </span>
+                                {% if ruleset.has_role_discounts %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                    Rollen-Rabatte
+                                </span>
+                                {% endif %}
+                                {% if ruleset.has_family_discount %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                    Familienrabatt
+                                </span>
+                                {% endif %}
+                            </div>
+
+                            {% if ruleset.error %}
+                            <div class="mt-2 text-sm text-red-600">
+                                <strong>Fehler:</strong> {{ ruleset.error }}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="ml-4 flex-shrink-0">
+                            {% if ruleset.is_valid %}
+                            <form method="POST" action="/rulesets/import/from-file" class="inline">
+                                <input type="hidden" name="file_path" value="{{ ruleset.file_path }}">
+                                <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Importieren
+                                </button>
+                            </form>
+                            {% else %}
+                            <button disabled class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-400 bg-gray-100 cursor-not-allowed">
+                                Ungültig
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <!-- No Rulesets Found -->
+        <div class="bg-white shadow rounded-lg p-12 text-center">
+            <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <h3 class="mt-4 text-lg font-medium text-gray-900">Keine Regelwerke gefunden</h3>
+            <p class="mt-2 text-sm text-gray-600">
+                Es wurden keine YAML-Dateien in den konfigurierten Verzeichnissen gefunden.
+            </p>
+            <div class="mt-6">
+                <a href="/rulesets/import" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                    Andere Import-Methode wählen
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
