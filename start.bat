@@ -28,6 +28,30 @@ REM Check Python version
 for /f "tokens=2" %%i in ('python --version 2^>^&1') do set PYTHON_VERSION=%%i
 echo [INFO] Python Version: %PYTHON_VERSION%
 
+REM Check if Python version is supported (3.11 or 3.12)
+for /f "tokens=1,2 delims=." %%a in ("%PYTHON_VERSION%") do (
+    set PYTHON_MAJOR=%%a
+    set PYTHON_MINOR=%%b
+)
+
+if "%PYTHON_MAJOR%.%PYTHON_MINOR%" == "3.13" (
+    echo.
+    echo [WARNUNG] Python 3.13 wird noch nicht vollstaendig unterstuetzt!
+    echo.
+    echo Einige Pakete haben keine vorgefertigten Versionen fuer Python 3.13
+    echo und benoetigen Rust zum Kompilieren.
+    echo.
+    echo Bitte installiere Python 3.11 oder 3.12 stattdessen:
+    echo https://www.python.org/downloads/
+    echo.
+    echo Empfohlene Versionen:
+    echo - Python 3.11.x (stabil)
+    echo - Python 3.12.x (aktuell)
+    echo.
+    pause
+    exit /b 1
+)
+
 REM Check if virtual environment exists
 if not exist "venv\" (
     echo.
