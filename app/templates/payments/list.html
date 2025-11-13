@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mb-6 flex justify-between items-center">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">Zahlungen</h1>
+        <p class="mt-2 text-sm text-gray-600">Übersicht aller erfassten Zahlungen</p>
+    </div>
+    <a href="/payments/create" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition">
+        <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/>
+        </svg>
+        Neue Zahlung
+    </a>
+</div>
+
+<!-- Statistik-Karten -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Zahlungen gesamt</dt>
+            <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ payments|length }}</dd>
+        </div>
+    </div>
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Gesamtbetrag</dt>
+            <dd class="mt-1 text-3xl font-semibold text-green-600">
+                {{ "%.2f"|format(payments|sum(attribute='amount')) }} €
+            </dd>
+        </div>
+    </div>
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Durchschnitt</dt>
+            <dd class="mt-1 text-3xl font-semibold text-blue-600">
+                {% if payments|length > 0 %}
+                    {{ "%.2f"|format(payments|sum(attribute='amount') / payments|length) }} €
+                {% else %}
+                    0.00 €
+                {% endif %}
+            </dd>
+        </div>
+    </div>
+</div>
+
+<!-- Zahlungstabelle -->
+<div class="bg-white shadow rounded-lg overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Alle Zahlungen</h2>
+    </div>
+
+    {% if payments %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datum</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Betrag</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Methode</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zuordnung</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Referenz</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktionen</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for payment in payments %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {{ payment.payment_date.strftime('%d.%m.%Y') }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                        {{ "%.2f"|format(payment.amount) }} €
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {% if payment.payment_method %}
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                {{ payment.payment_method }}
+                            </span>
+                        {% else %}
+                            <span class="text-gray-400">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                        {% if payment.participant %}
+                            <a href="/participants/{{ payment.participant.id }}" class="text-blue-600 hover:text-blue-800">
+                                {{ payment.participant.full_name }}
+                            </a>
+                            <span class="text-gray-500 text-xs block">Teilnehmer</span>
+                        {% elif payment.family %}
+                            <a href="/families/{{ payment.family.id }}" class="text-green-600 hover:text-green-800">
+                                {{ payment.family.name }}
+                            </a>
+                            <span class="text-gray-500 text-xs block">Familie</span>
+                        {% else %}
+                            <span class="text-gray-400">Keine Zuordnung</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        {{ payment.reference if payment.reference else '-' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <form method="post" action="/payments/{{ payment.id }}/delete"
+                              onsubmit="return confirm('Zahlung wirklich löschen?')" class="inline">
+                            <button type="submit" class="text-red-600 hover:text-red-800">
+                                Löschen
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% if payment.notes %}
+                <tr class="bg-gray-50">
+                    <td colspan="6" class="px-6 py-2 text-sm text-gray-600">
+                        <strong>Notiz:</strong> {{ payment.notes }}
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="px-6 py-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">Keine Zahlungen</h3>
+        <p class="mt-1 text-sm text-gray-500">Erfassen Sie die erste Zahlung.</p>
+        <div class="mt-6">
+            <a href="/payments/create" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/>
+                </svg>
+                Neue Zahlung
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
