@@ -8,10 +8,80 @@ from typing import Optional
 
 from app.config import settings
 from app.database import get_db
-from app.models import Participant, Role, Event, Family
+from app.models import Participant, Role, Event, Family, Ruleset
+from app.services.price_calculator import PriceCalculator
 
 router = APIRouter(prefix="/participants", tags=["participants"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
+
+
+def _calculate_price_for_participant(
+    db: Session,
+    event_id: int,
+    role_id: int,
+    birth_date: date,
+    family_id: Optional[int]
+) -> float:
+    """
+    Hilfsfunktion zur Berechnung des Teilnehmerpreises
+
+    Args:
+        db: Datenbank-Session
+        event_id: ID der Veranstaltung
+        role_id: ID der Rolle
+        birth_date: Geburtsdatum des Teilnehmers
+        family_id: Optional ID der Familie
+
+    Returns:
+        Berechneter Preis in Euro
+    """
+    # Event und Rolle laden
+    event = db.query(Event).filter(Event.id == event_id).first()
+    role = db.query(Role).filter(Role.id == role_id).first()
+
+    if not event or not role:
+        return 0.0
+
+    # Aktives Regelwerk für das Event finden
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.is_active == True,
+        Ruleset.valid_from <= event.start_date,
+        Ruleset.valid_until >= event.start_date
+    ).first()
+
+    if not ruleset:
+        return 0.0
+
+    # Alter zum Event-Start berechnen
+    age = event.start_date.year - birth_date.year
+    if (event.start_date.month, event.start_date.day) < (birth_date.month, birth_date.day):
+        age -= 1
+
+    # Position in Familie ermitteln (für Familienrabatt)
+    family_children_count = 1
+    if family_id:
+        # Anzahl der Kinder in der Familie zählen (nach Geburtsdatum sortiert)
+        siblings = db.query(Participant).filter(
+            Participant.family_id == family_id,
+            Participant.is_active == True
+        ).order_by(Participant.birth_date).all()
+
+        # Position des neuen Kindes bestimmen
+        family_children_count = len(siblings) + 1
+
+    # Preis berechnen
+    calculated_price = PriceCalculator.calculate_participant_price(
+        age=age,
+        role_name=role.name.lower(),
+        ruleset_data={
+            "age_groups": ruleset.age_groups,
+            "role_discounts": ruleset.role_discounts,
+            "family_discount": ruleset.family_discount
+        },
+        family_children_count=family_children_count
+    )
+
+    return calculated_price
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -109,6 +179,15 @@ async def create_participant(
         # Datum parsen
         birth_date_obj = datetime.strptime(birth_date, "%Y-%m-%d").date()
 
+        # Automatische Preisberechnung
+        calculated_price = _calculate_price_for_participant(
+            db=db,
+            event_id=event_id,
+            role_id=role_id,
+            birth_date=birth_date_obj,
+            family_id=family_id
+        )
+
         # Neuen Teilnehmer erstellen
         participant = Participant(
             first_name=first_name,
@@ -128,7 +207,7 @@ async def create_participant(
             event_id=event_id,
             role_id=role_id,
             family_id=family_id if family_id else None,
-            calculated_price=0.0  # TODO: Automatische Preisberechnung in Phase 4
+            calculated_price=calculated_price
         )
 
         db.add(participant)
@@ -141,6 +220,60 @@ async def create_participant(
         db.rollback()
         # Fehler anzeigen (TODO: Besseres Error-Handling)
         return RedirectResponse(url="/participants/create?error=1", status_code=303)
+
+
+@router.post("/calculate-price", response_class=HTMLResponse)
+async def calculate_price_preview(
+    request: Request,
+    db: Session = Depends(get_db),
+    birth_date: str = Form(...),
+    event_id: int = Form(...),
+    role_id: int = Form(...),
+    family_id: Optional[int] = Form(None)
+):
+    """
+    HTMX-Endpunkt für Live-Preis-Vorschau
+    Berechnet den Preis basierend auf Geburtsdatum, Event, Rolle und Familie
+    """
+    try:
+        # Datum parsen
+        birth_date_obj = datetime.strptime(birth_date, "%Y-%m-%d").date()
+
+        # Preis berechnen
+        calculated_price = _calculate_price_for_participant(
+            db=db,
+            event_id=event_id,
+            role_id=role_id,
+            birth_date=birth_date_obj,
+            family_id=family_id
+        )
+
+        # Event und Rolle laden für Detailinfo
+        event = db.query(Event).filter(Event.id == event_id).first()
+        role = db.query(Role).filter(Role.id == role_id).first()
+
+        # Alter berechnen
+        age = None
+        if event:
+            age = event.start_date.year - birth_date_obj.year
+            if (event.start_date.month, event.start_date.day) < (birth_date_obj.month, birth_date_obj.day):
+                age -= 1
+
+        # HTML-Fragment zurückgeben
+        return templates.TemplateResponse(
+            "participants/_price_preview.html",
+            {
+                "request": request,
+                "calculated_price": calculated_price,
+                "age": age,
+                "event_name": event.name if event else None,
+                "role_name": role.name if role else None
+            }
+        )
+
+    except Exception as e:
+        # Bei Fehler leeres Fragment zurückgeben
+        return HTMLResponse(content=f'<div class="text-sm text-gray-500">Preis wird berechnet...</div>')
 
 
 @router.get("/{participant_id}", response_class=HTMLResponse)
@@ -224,6 +357,15 @@ async def update_participant(
         # Datum parsen
         birth_date_obj = datetime.strptime(birth_date, "%Y-%m-%d").date()
 
+        # Preis neu berechnen (wenn sich relevante Daten geändert haben)
+        calculated_price = _calculate_price_for_participant(
+            db=db,
+            event_id=event_id,
+            role_id=role_id,
+            birth_date=birth_date_obj,
+            family_id=family_id
+        )
+
         # Teilnehmer aktualisieren
         participant.first_name = first_name
         participant.last_name = last_name
@@ -242,6 +384,7 @@ async def update_participant(
         participant.event_id = event_id
         participant.role_id = role_id
         participant.family_id = family_id if family_id else None
+        participant.calculated_price = calculated_price
 
         db.commit()
 
