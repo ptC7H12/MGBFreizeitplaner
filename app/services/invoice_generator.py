@@ -6,9 +6,10 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.pdfgen import canvas
 from sqlalchemy.orm import Session
+from app.services.qrcode_service import QRCodeService
 
 
 class InvoiceGenerator:
@@ -277,6 +278,30 @@ class InvoiceGenerator:
             {footer_text}
             """
             story.append(Paragraph(payment_text, normal_style))
+            story.append(Spacer(1, 0.5*cm))
+
+            # QR-Code für SEPA-Zahlung generieren
+            try:
+                qr_code_bytes = QRCodeService.generate_sepa_qr_code(
+                    recipient_name=settings.bank_account_holder,
+                    iban=settings.bank_iban,
+                    amount=outstanding,
+                    purpose=invoice_number,
+                    bic=settings.bank_bic
+                )
+
+                # QR-Code als Bild einfügen
+                qr_image = Image(BytesIO(qr_code_bytes), width=4*cm, height=4*cm)
+                story.append(Paragraph("<b>QR-Code für Banking-App:</b>", normal_style))
+                story.append(Spacer(1, 0.2*cm))
+                story.append(qr_image)
+                story.append(Paragraph(
+                    f"Scannen Sie diesen QR-Code mit Ihrer Banking-App um die Überweisung von {outstanding:.2f} € direkt auszuführen.",
+                    normal_style
+                ))
+            except Exception as e:
+                # Falls QR-Code-Generierung fehlschlägt, einfach überspringen
+                print(f"Warnung: QR-Code konnte nicht generiert werden: {e}")
         else:
             story.append(Paragraph("Status: Vollständig bezahlt", heading_style))
             story.append(Paragraph(footer_text, normal_style))
@@ -464,6 +489,30 @@ class InvoiceGenerator:
             {footer_text}
             """
             story.append(Paragraph(payment_text, normal_style))
+            story.append(Spacer(1, 0.5*cm))
+
+            # QR-Code für SEPA-Zahlung generieren
+            try:
+                qr_code_bytes = QRCodeService.generate_sepa_qr_code(
+                    recipient_name=settings.bank_account_holder,
+                    iban=settings.bank_iban,
+                    amount=outstanding,
+                    purpose=invoice_number,
+                    bic=settings.bank_bic
+                )
+
+                # QR-Code als Bild einfügen
+                qr_image = Image(BytesIO(qr_code_bytes), width=4*cm, height=4*cm)
+                story.append(Paragraph("<b>QR-Code für Banking-App:</b>", normal_style))
+                story.append(Spacer(1, 0.2*cm))
+                story.append(qr_image)
+                story.append(Paragraph(
+                    f"Scannen Sie diesen QR-Code mit Ihrer Banking-App um die Überweisung von {outstanding:.2f} € direkt auszuführen.",
+                    normal_style
+                ))
+            except Exception as e:
+                # Falls QR-Code-Generierung fehlschlägt, einfach überspringen
+                print(f"Warnung: QR-Code konnte nicht generiert werden: {e}")
         else:
             story.append(Paragraph("Status: Vollständig bezahlt", heading_style))
             story.append(Paragraph(footer_text, normal_style))
