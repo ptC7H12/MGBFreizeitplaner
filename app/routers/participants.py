@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
 from typing import Optional
+from pydantic import ValidationError
 
 from app.config import settings
 from app.database import get_db
@@ -15,6 +16,7 @@ from app.services.price_calculator import PriceCalculator
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
+from app.schemas import ParticipantCreateSchema, ParticipantUpdateSchema
 
 logger = logging.getLogger(__name__)
 
@@ -188,43 +190,57 @@ async def create_participant(
 ):
     """Erstellt einen neuen Teilnehmer"""
     try:
-        # Datum parsen
-        birth_date_obj = datetime.strptime(birth_date, "%Y-%m-%d").date()
+        # Pydantic-Validierung
+        participant_data = ParticipantCreateSchema(
+            first_name=first_name,
+            last_name=last_name,
+            birth_date=birth_date,
+            gender=gender,
+            email=email,
+            phone=phone,
+            address=address,
+            bildung_teilhabe_id=bildung_teilhabe_id,
+            allergies=allergies,
+            medical_notes=medical_notes,
+            notes=notes,
+            discount_percent=discount_percent,
+            discount_reason=discount_reason,
+            manual_price_override=manual_price_override,
+            role_id=role_id,
+            family_id=family_id
+        )
 
-        # Datums-Validierung
-        if birth_date_obj > date.today():
-            raise ValueError("Geburtsdatum darf nicht in der Zukunft liegen")
-        if birth_date_obj.year < 1900:
-            raise ValueError("Geburtsdatum muss nach 1900 liegen")
+        # Datum parsen (bereits validiert durch Pydantic)
+        birth_date_obj = datetime.strptime(participant_data.birth_date, "%Y-%m-%d").date()
 
         # Automatische Preisberechnung
         calculated_price = _calculate_price_for_participant(
             db=db,
             event_id=event_id,
-            role_id=role_id,
+            role_id=participant_data.role_id,
             birth_date=birth_date_obj,
-            family_id=family_id
+            family_id=participant_data.family_id
         )
 
         # Neuen Teilnehmer erstellen
         participant = Participant(
-            first_name=first_name,
-            last_name=last_name,
+            first_name=participant_data.first_name,
+            last_name=participant_data.last_name,
             birth_date=birth_date_obj,
-            gender=gender,
-            email=email if email else None,
-            phone=phone if phone else None,
-            address=address if address else None,
-            bildung_teilhabe_id=bildung_teilhabe_id if bildung_teilhabe_id else None,
-            allergies=allergies if allergies else None,
-            medical_notes=medical_notes if medical_notes else None,
-            notes=notes if notes else None,
-            discount_percent=discount_percent,
-            discount_reason=discount_reason if discount_reason else None,
-            manual_price_override=manual_price_override,
+            gender=participant_data.gender,
+            email=participant_data.email,
+            phone=participant_data.phone,
+            address=participant_data.address,
+            bildung_teilhabe_id=participant_data.bildung_teilhabe_id,
+            allergies=participant_data.allergies,
+            medical_notes=participant_data.medical_notes,
+            notes=participant_data.notes,
+            discount_percent=participant_data.discount_percent,
+            discount_reason=participant_data.discount_reason,
+            manual_price_override=participant_data.manual_price_override,
             event_id=event_id,  # Aus Session, nicht aus Formular!
-            role_id=role_id,
-            family_id=family_id if family_id else None,
+            role_id=participant_data.role_id,
+            family_id=participant_data.family_id,
             calculated_price=calculated_price
         )
 
@@ -235,10 +251,15 @@ async def create_participant(
         flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich erstellt", "success")
         return RedirectResponse(url=f"/participants/{participant.id}", status_code=303)
 
-    except ValueError as e:
-        logger.warning(f"Invalid date input for participant creation: {e}", exc_info=True)
-        flash(request, f"Ungültiges Datum: {str(e)}", "error")
-        return RedirectResponse(url="/participants/create?error=invalid_date", status_code=303)
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error creating participant: {e}", exc_info=True)
+        # Ersten Fehler extrahieren für benutzerfreundliche Nachricht
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url="/participants/create?error=validation", status_code=303)
 
     except IntegrityError as e:
         db.rollback()
@@ -411,42 +432,56 @@ async def update_participant(
         return RedirectResponse(url="/participants", status_code=303)
 
     try:
-        # Datum parsen
-        birth_date_obj = datetime.strptime(birth_date, "%Y-%m-%d").date()
+        # Pydantic-Validierung
+        participant_data = ParticipantUpdateSchema(
+            first_name=first_name,
+            last_name=last_name,
+            birth_date=birth_date,
+            gender=gender,
+            email=email,
+            phone=phone,
+            address=address,
+            bildung_teilhabe_id=bildung_teilhabe_id,
+            allergies=allergies,
+            medical_notes=medical_notes,
+            notes=notes,
+            discount_percent=discount_percent,
+            discount_reason=discount_reason,
+            manual_price_override=manual_price_override,
+            role_id=role_id,
+            family_id=family_id
+        )
 
-        # Datums-Validierung
-        if birth_date_obj > date.today():
-            raise ValueError("Geburtsdatum darf nicht in der Zukunft liegen")
-        if birth_date_obj.year < 1900:
-            raise ValueError("Geburtsdatum muss nach 1900 liegen")
+        # Datum parsen (bereits validiert durch Pydantic)
+        birth_date_obj = datetime.strptime(participant_data.birth_date, "%Y-%m-%d").date()
 
         # Preis neu berechnen (wenn sich relevante Daten geändert haben)
         calculated_price = _calculate_price_for_participant(
             db=db,
             event_id=event_id,
-            role_id=role_id,
+            role_id=participant_data.role_id,
             birth_date=birth_date_obj,
-            family_id=family_id
+            family_id=participant_data.family_id
         )
 
         # Teilnehmer aktualisieren
-        participant.first_name = first_name
-        participant.last_name = last_name
+        participant.first_name = participant_data.first_name
+        participant.last_name = participant_data.last_name
         participant.birth_date = birth_date_obj
-        participant.gender = gender
-        participant.email = email if email else None
-        participant.phone = phone if phone else None
-        participant.address = address if address else None
-        participant.bildung_teilhabe_id = bildung_teilhabe_id if bildung_teilhabe_id else None
-        participant.allergies = allergies if allergies else None
-        participant.medical_notes = medical_notes if medical_notes else None
-        participant.notes = notes if notes else None
-        participant.discount_percent = discount_percent
-        participant.discount_reason = discount_reason if discount_reason else None
-        participant.manual_price_override = manual_price_override
+        participant.gender = participant_data.gender
+        participant.email = participant_data.email
+        participant.phone = participant_data.phone
+        participant.address = participant_data.address
+        participant.bildung_teilhabe_id = participant_data.bildung_teilhabe_id
+        participant.allergies = participant_data.allergies
+        participant.medical_notes = participant_data.medical_notes
+        participant.notes = participant_data.notes
+        participant.discount_percent = participant_data.discount_percent
+        participant.discount_reason = participant_data.discount_reason
+        participant.manual_price_override = participant_data.manual_price_override
         # event_id bleibt unverändert (Sicherheit!)
-        participant.role_id = role_id
-        participant.family_id = family_id if family_id else None
+        participant.role_id = participant_data.role_id
+        participant.family_id = participant_data.family_id
         participant.calculated_price = calculated_price
 
         db.commit()
@@ -454,10 +489,14 @@ async def update_participant(
         flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich aktualisiert", "success")
         return RedirectResponse(url=f"/participants/{participant_id}", status_code=303)
 
-    except ValueError as e:
-        logger.warning(f"Invalid date input for participant update: {e}", exc_info=True)
-        flash(request, f"Ungültiges Datum: {str(e)}", "error")
-        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=invalid_date", status_code=303)
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error updating participant: {e}", exc_info=True)
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=validation", status_code=303)
 
     except IntegrityError as e:
         db.rollback()

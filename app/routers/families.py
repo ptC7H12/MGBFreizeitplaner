@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, DataError
 from typing import Optional
+from pydantic import ValidationError
 
 from app.config import settings
 from app.database import get_db
@@ -13,6 +14,7 @@ from app.models import Family, Participant
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
+from app.schemas import FamilyCreateSchema, FamilyUpdateSchema
 
 logger = logging.getLogger(__name__)
 
@@ -75,17 +77,23 @@ async def create_family(
 ):
     """Erstellt eine neue Familie"""
     try:
-        # Validierung
-        if not name or len(name.strip()) == 0:
-            raise ValueError("Familienname darf nicht leer sein")
+        # Pydantic-Validierung
+        family_data = FamilyCreateSchema(
+            name=name,
+            contact_person=contact_person,
+            email=email,
+            phone=phone,
+            address=address,
+            notes=notes
+        )
 
         family = Family(
-            name=name,
-            contact_person=contact_person if contact_person else None,
-            email=email if email else None,
-            phone=phone if phone else None,
-            address=address if address else None,
-            notes=notes if notes else None,
+            name=family_data.name,
+            contact_person=family_data.contact_person,
+            email=family_data.email,
+            phone=family_data.phone,
+            address=family_data.address,
+            notes=family_data.notes,
             event_id=event_id  # Aus Session!
         )
 
@@ -95,6 +103,15 @@ async def create_family(
 
         flash(request, f"Familie {family.name} wurde erfolgreich erstellt", "success")
         return RedirectResponse(url=f"/families/{family.id}", status_code=303)
+
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error creating family: {e}", exc_info=True)
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url="/families/create?error=validation", status_code=303)
 
     except ValueError as e:
         logger.warning(f"Invalid input for family creation: {e}", exc_info=True)
@@ -199,21 +216,36 @@ async def update_family(
         return RedirectResponse(url="/families", status_code=303)
 
     try:
-        # Validierung
-        if not name or len(name.strip()) == 0:
-            raise ValueError("Familienname darf nicht leer sein")
+        # Pydantic-Validierung
+        family_data = FamilyUpdateSchema(
+            name=name,
+            contact_person=contact_person,
+            email=email,
+            phone=phone,
+            address=address,
+            notes=notes
+        )
 
-        family.name = name
-        family.contact_person = contact_person if contact_person else None
-        family.email = email if email else None
-        family.phone = phone if phone else None
-        family.address = address if address else None
-        family.notes = notes if notes else None
+        family.name = family_data.name
+        family.contact_person = family_data.contact_person
+        family.email = family_data.email
+        family.phone = family_data.phone
+        family.address = family_data.address
+        family.notes = family_data.notes
 
         db.commit()
 
         flash(request, f"Familie {family.name} wurde erfolgreich aktualisiert", "success")
         return RedirectResponse(url=f"/families/{family_id}", status_code=303)
+
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error updating family: {e}", exc_info=True)
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url=f"/families/{family_id}/edit?error=validation", status_code=303)
 
     except ValueError as e:
         logger.warning(f"Invalid input for family update: {e}", exc_info=True)

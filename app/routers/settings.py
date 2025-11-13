@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, DataError
 from typing import Optional
+from pydantic import ValidationError
 
 from app.config import settings
 from app.database import get_db
@@ -13,6 +14,7 @@ from app.models import Setting, Event, Ruleset
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
+from app.schemas import SettingUpdateSchema
 
 logger = logging.getLogger(__name__)
 
@@ -112,37 +114,39 @@ async def update_settings(
         db.add(setting)
 
     try:
-        # Validierung
-        if not organization_name or len(organization_name.strip()) == 0:
-            raise ValueError("Organisationsname darf nicht leer sein")
-
-        if not bank_account_holder or len(bank_account_holder.strip()) == 0:
-            raise ValueError("Kontoinhaber darf nicht leer sein")
-
-        if not bank_iban or len(bank_iban.strip()) == 0:
-            raise ValueError("IBAN darf nicht leer sein")
-
-        # IBAN Format-Validierung (einfach)
-        iban_clean = bank_iban.replace(" ", "").replace("-", "").upper()
-        if len(iban_clean) < 15 or len(iban_clean) > 34:
-            raise ValueError("IBAN hat eine ungültige Länge (15-34 Zeichen)")
-
-        if not iban_clean.startswith(("DE", "AT", "CH", "FR", "IT", "NL", "BE", "ES")):
-            raise ValueError("IBAN muss mit einem gültigen Ländercode beginnen (z.B. DE)")
+        # Pydantic-Validierung
+        setting_data = SettingUpdateSchema(
+            organization_name=organization_name,
+            organization_address=organization_address,
+            bank_account_holder=bank_account_holder,
+            bank_iban=bank_iban,
+            bank_bic=bank_bic,
+            invoice_subject_prefix=invoice_subject_prefix,
+            invoice_footer_text=invoice_footer_text
+        )
 
         # Einstellungen aktualisieren
-        setting.organization_name = organization_name
-        setting.organization_address = organization_address if organization_address else None
-        setting.bank_account_holder = bank_account_holder
-        setting.bank_iban = bank_iban
-        setting.bank_bic = bank_bic if bank_bic else None
-        setting.invoice_subject_prefix = invoice_subject_prefix if invoice_subject_prefix else "Teilnahme an"
-        setting.invoice_footer_text = invoice_footer_text if invoice_footer_text else "Vielen Dank für Ihre Zahlung!"
+        setting.organization_name = setting_data.organization_name
+        setting.organization_address = setting_data.organization_address
+        setting.bank_account_holder = setting_data.bank_account_holder
+        setting.bank_iban = setting_data.bank_iban
+        setting.bank_bic = setting_data.bank_bic
+        setting.invoice_subject_prefix = setting_data.invoice_subject_prefix if setting_data.invoice_subject_prefix else "Teilnahme an"
+        setting.invoice_footer_text = setting_data.invoice_footer_text if setting_data.invoice_footer_text else "Vielen Dank für Ihre Zahlung!"
 
         db.commit()
 
         flash(request, "Einstellungen wurden erfolgreich aktualisiert", "success")
         return RedirectResponse(url="/settings", status_code=303)
+
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error updating settings: {e}", exc_info=True)
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url="/settings/edit?error=validation", status_code=303)
 
     except ValueError as e:
         logger.warning(f"Invalid input for settings update: {e}", exc_info=True)

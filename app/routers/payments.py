@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
 from typing import Optional
 from io import BytesIO
+from pydantic import ValidationError
 
 from app.config import settings
 from app.database import get_db
@@ -16,6 +17,7 @@ from app.dependencies import get_current_event_id
 from app.services.invoice_generator import InvoiceGenerator
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
+from app.schemas import PaymentCreateSchema, PaymentUpdateSchema
 
 logger = logging.getLogger(__name__)
 
@@ -91,47 +93,54 @@ async def create_payment(
 ):
     """Erstellt eine neue Zahlung"""
     try:
-        # Datum parsen
-        payment_date_obj = datetime.strptime(payment_date, "%Y-%m-%d").date()
+        # Pydantic-Validierung
+        payment_data = PaymentCreateSchema(
+            amount=amount,
+            payment_date=payment_date,
+            payment_method=payment_method,
+            reference=reference,
+            notes=notes,
+            participant_id=participant_id,
+            family_id=family_id
+        )
 
-        # Datums-Validierung
-        if payment_date_obj > date.today():
-            raise ValueError("Zahlungsdatum darf nicht in der Zukunft liegen")
-
-        # Betrag-Validierung
-        if amount <= 0:
-            raise ValueError("Zahlungsbetrag muss größer als 0 sein")
-
-        # Validierung: Entweder Teilnehmer oder Familie
-        if not participant_id and not family_id:
-            flash(request, "Bitte wählen Sie einen Teilnehmer oder eine Familie aus", "error")
-            return RedirectResponse(url="/payments/create?error=no_target", status_code=303)
+        # Datum parsen (bereits validiert durch Pydantic)
+        payment_date_obj = datetime.strptime(payment_data.payment_date, "%Y-%m-%d").date()
 
         # Neue Zahlung erstellen
         payment = Payment(
             event_id=event_id,
-            amount=amount,
+            amount=payment_data.amount,
             payment_date=payment_date_obj,
-            payment_method=payment_method if payment_method else None,
-            reference=reference if reference else None,
-            notes=notes if notes else None,
-            participant_id=participant_id if participant_id else None,
-            family_id=family_id if family_id else None
+            payment_method=payment_data.payment_method,
+            reference=payment_data.reference,
+            notes=payment_data.notes,
+            participant_id=payment_data.participant_id,
+            family_id=payment_data.family_id
         )
 
         db.add(payment)
         db.commit()
         db.refresh(payment)
 
-        flash(request, f"Zahlung über {amount}€ wurde erfolgreich erfasst", "success")
+        flash(request, f"Zahlung über {payment_data.amount}€ wurde erfolgreich erfasst", "success")
 
         # Redirect zurück zur Quelle (Teilnehmer oder Familie)
-        if participant_id:
-            return RedirectResponse(url=f"/participants/{participant_id}", status_code=303)
-        elif family_id:
-            return RedirectResponse(url=f"/families/{family_id}", status_code=303)
+        if payment_data.participant_id:
+            return RedirectResponse(url=f"/participants/{payment_data.participant_id}", status_code=303)
+        elif payment_data.family_id:
+            return RedirectResponse(url=f"/families/{payment_data.family_id}", status_code=303)
         else:
             return RedirectResponse(url="/payments", status_code=303)
+
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error creating payment: {e}", exc_info=True)
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url="/payments/create?error=validation", status_code=303)
 
     except ValueError as e:
         logger.warning(f"Invalid input for payment creation: {e}", exc_info=True)

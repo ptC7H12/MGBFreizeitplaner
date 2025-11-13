@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
 from typing import Optional
+from pydantic import ValidationError
 
 from app.config import settings
 from app.database import get_db
@@ -14,6 +15,7 @@ from app.models import Expense, Event
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
+from app.schemas import ExpenseCreateSchema, ExpenseUpdateSchema
 
 logger = logging.getLogger(__name__)
 
@@ -90,31 +92,31 @@ async def create_expense(
 ):
     """Erstellt eine neue Ausgabe"""
     try:
-        # Datum parsen
-        expense_date_obj = datetime.strptime(expense_date, "%Y-%m-%d").date()
+        # Pydantic-Validierung
+        expense_data = ExpenseCreateSchema(
+            title=title,
+            description=description,
+            amount=amount,
+            expense_date=expense_date,
+            category=category,
+            receipt_number=receipt_number,
+            paid_by=paid_by,
+            notes=notes
+        )
 
-        # Datums-Validierung
-        if expense_date_obj > date.today():
-            raise ValueError("Ausgabendatum darf nicht in der Zukunft liegen")
-
-        # Betrag-Validierung
-        if amount <= 0:
-            raise ValueError("Ausgabenbetrag muss größer als 0 sein")
-
-        # Titel-Validierung
-        if not title or len(title.strip()) == 0:
-            raise ValueError("Titel darf nicht leer sein")
+        # Datum parsen (bereits validiert durch Pydantic)
+        expense_date_obj = datetime.strptime(expense_data.expense_date, "%Y-%m-%d").date()
 
         # Neue Ausgabe erstellen
         expense = Expense(
-            title=title,
-            description=description if description else None,
-            amount=amount,
+            title=expense_data.title,
+            description=expense_data.description,
+            amount=expense_data.amount,
             expense_date=expense_date_obj,
-            category=category if category else None,
-            receipt_number=receipt_number if receipt_number else None,
-            paid_by=paid_by if paid_by else None,
-            notes=notes if notes else None,
+            category=expense_data.category,
+            receipt_number=expense_data.receipt_number,
+            paid_by=expense_data.paid_by,
+            notes=expense_data.notes,
             event_id=event_id
         )
 
@@ -122,8 +124,17 @@ async def create_expense(
         db.commit()
         db.refresh(expense)
 
-        flash(request, f"Ausgabe '{expense.title}' über {amount}€ wurde erfolgreich erfasst", "success")
+        flash(request, f"Ausgabe '{expense.title}' über {expense_data.amount}€ wurde erfolgreich erfasst", "success")
         return RedirectResponse(url="/expenses", status_code=303)
+
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error creating expense: {e}", exc_info=True)
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url="/expenses/create?error=validation", status_code=303)
 
     except ValueError as e:
         logger.warning(f"Invalid input for expense creation: {e}", exc_info=True)
@@ -188,35 +199,44 @@ async def update_expense(
         return RedirectResponse(url="/expenses", status_code=303)
 
     try:
-        # Datum parsen
-        expense_date_obj = datetime.strptime(expense_date, "%Y-%m-%d").date()
+        # Pydantic-Validierung
+        expense_data = ExpenseUpdateSchema(
+            title=title,
+            description=description,
+            amount=amount,
+            expense_date=expense_date,
+            category=category,
+            receipt_number=receipt_number,
+            paid_by=paid_by,
+            notes=notes
+        )
 
-        # Datums-Validierung
-        if expense_date_obj > date.today():
-            raise ValueError("Ausgabendatum darf nicht in der Zukunft liegen")
-
-        # Betrag-Validierung
-        if amount <= 0:
-            raise ValueError("Ausgabenbetrag muss größer als 0 sein")
-
-        # Titel-Validierung
-        if not title or len(title.strip()) == 0:
-            raise ValueError("Titel darf nicht leer sein")
+        # Datum parsen (bereits validiert durch Pydantic)
+        expense_date_obj = datetime.strptime(expense_data.expense_date, "%Y-%m-%d").date()
 
         # Ausgabe aktualisieren
-        expense.title = title
-        expense.description = description if description else None
-        expense.amount = amount
+        expense.title = expense_data.title
+        expense.description = expense_data.description
+        expense.amount = expense_data.amount
         expense.expense_date = expense_date_obj
-        expense.category = category if category else None
-        expense.receipt_number = receipt_number if receipt_number else None
-        expense.paid_by = paid_by if paid_by else None
-        expense.notes = notes if notes else None
+        expense.category = expense_data.category
+        expense.receipt_number = expense_data.receipt_number
+        expense.paid_by = expense_data.paid_by
+        expense.notes = expense_data.notes
 
         db.commit()
 
         flash(request, f"Ausgabe '{expense.title}' wurde erfolgreich aktualisiert", "success")
         return RedirectResponse(url="/expenses", status_code=303)
+
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error updating expense: {e}", exc_info=True)
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url=f"/expenses/{expense_id}/edit?error=validation", status_code=303)
 
     except ValueError as e:
         logger.warning(f"Invalid input for expense update: {e}", exc_info=True)
