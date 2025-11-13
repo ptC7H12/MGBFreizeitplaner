@@ -15,7 +15,7 @@
 </div>
 
 <!-- Statistik-Karten -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
     <div class="bg-white overflow-hidden shadow rounded-lg">
         <div class="px-4 py-5 sm:p-6">
             <dt class="text-sm font-medium text-gray-500 truncate">Ausgaben gesamt</dt>
@@ -32,8 +32,18 @@
     </div>
     <div class="bg-white overflow-hidden shadow rounded-lg">
         <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Kategorien</dt>
-            <dd class="mt-1 text-3xl font-semibold text-blue-600">{{ categories|length }}</dd>
+            <dt class="text-sm font-medium text-gray-500 truncate">Offene Ausgaben</dt>
+            <dd class="mt-1 text-3xl font-semibold text-yellow-600">
+                {{ "%.2f"|format(expenses|rejectattr('is_settled')|sum(attribute='amount')) }} €
+            </dd>
+        </div>
+    </div>
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Beglichen</dt>
+            <dd class="mt-1 text-3xl font-semibold text-green-600">
+                {{ "%.2f"|format(expenses|selectattr('is_settled')|sum(attribute='amount')) }} €
+            </dd>
         </div>
     </div>
 </div>
@@ -70,14 +80,14 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Titel</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategorie</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Betrag</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bezahlt von</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktionen</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 {% for expense in expenses %}
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-gray-50 {% if expense.is_settled %}bg-green-50{% endif %}">
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {{ expense.expense_date.strftime('%d.%m.%Y') }}
                     </td>
@@ -100,14 +110,24 @@
                         {{ "%.2f"|format(expense.amount) }} €
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {% if expense.event %}
-                            {{ expense.event.name }}
-                        {% else %}
-                            <span class="text-gray-400">-</span>
-                        {% endif %}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {{ expense.paid_by if expense.paid_by else '-' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <form method="post" action="/expenses/{{ expense.id }}/toggle-settled" class="inline">
+                            <button type="submit" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold {% if expense.is_settled %}bg-green-100 text-green-800 hover:bg-green-200{% else %}bg-yellow-100 text-yellow-800 hover:bg-yellow-200{% endif %} transition">
+                                {% if expense.is_settled %}
+                                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Beglichen
+                                {% else %}
+                                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Offen
+                                {% endif %}
+                            </button>
+                        </form>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
                         <a href="/expenses/{{ expense.id }}/edit" class="text-blue-600 hover:text-blue-800">

@@ -176,6 +176,23 @@ async def update_expense(
         return RedirectResponse(url=f"/expenses/{expense_id}/edit?error=1", status_code=303)
 
 
+@router.post("/{expense_id}/toggle-settled")
+async def toggle_settled(expense_id: int, db: Session = Depends(get_db)):
+    """Toggelt den Beglichen-Status einer Ausgabe"""
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+
+    if not expense:
+        raise HTTPException(status_code=404, detail="Ausgabe nicht gefunden")
+
+    try:
+        expense.is_settled = not expense.is_settled
+        db.commit()
+        return RedirectResponse(url="/expenses", status_code=303)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Fehler beim Aktualisieren")
+
+
 @router.post("/{expense_id}/delete")
 async def delete_expense(expense_id: int, db: Session = Depends(get_db)):
     """Löscht eine Ausgabe"""
