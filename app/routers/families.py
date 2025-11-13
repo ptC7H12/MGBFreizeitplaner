@@ -8,15 +8,20 @@ from typing import Optional
 from app.config import settings
 from app.database import get_db
 from app.models import Family, Participant
+from app.dependencies import get_current_event_id
 
 router = APIRouter(prefix="/families", tags=["families"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse)
-async def list_families(request: Request, db: Session = Depends(get_db)):
+async def list_families(
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Liste aller Familien"""
-    families = db.query(Family).order_by(Family.name).all()
+    families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
 
     # Für jede Familie: Anzahl Teilnehmer und Gesamtpreis berechnen
     family_data = []
@@ -54,6 +59,7 @@ async def create_family_form(request: Request, db: Session = Depends(get_db)):
 async def create_family(
     request: Request,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     name: str = Form(...),
     contact_person: Optional[str] = Form(None),
     email: Optional[str] = Form(None),
@@ -69,7 +75,8 @@ async def create_family(
             email=email if email else None,
             phone=phone if phone else None,
             address=address if address else None,
-            notes=notes if notes else None
+            notes=notes if notes else None,
+            event_id=event_id  # Aus Session!
         )
 
         db.add(family)
@@ -84,9 +91,17 @@ async def create_family(
 
 
 @router.get("/{family_id}", response_class=HTMLResponse)
-async def view_family(request: Request, family_id: int, db: Session = Depends(get_db)):
+async def view_family(
+    request: Request,
+    family_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Detailansicht einer Familie"""
-    family = db.query(Family).filter(Family.id == family_id).first()
+    family = db.query(Family).filter(
+        Family.id == family_id,
+        Family.event_id == event_id
+    ).first()
 
     if not family:
         return RedirectResponse(url="/families", status_code=303)
@@ -109,9 +124,17 @@ async def view_family(request: Request, family_id: int, db: Session = Depends(ge
 
 
 @router.get("/{family_id}/edit", response_class=HTMLResponse)
-async def edit_family_form(request: Request, family_id: int, db: Session = Depends(get_db)):
+async def edit_family_form(
+    request: Request,
+    family_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Formular zum Bearbeiten einer Familie"""
-    family = db.query(Family).filter(Family.id == family_id).first()
+    family = db.query(Family).filter(
+        Family.id == family_id,
+        Family.event_id == event_id
+    ).first()
 
     if not family:
         return RedirectResponse(url="/families", status_code=303)
@@ -131,6 +154,7 @@ async def update_family(
     request: Request,
     family_id: int,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     name: str = Form(...),
     contact_person: Optional[str] = Form(None),
     email: Optional[str] = Form(None),
@@ -139,7 +163,10 @@ async def update_family(
     notes: Optional[str] = Form(None)
 ):
     """Aktualisiert eine Familie"""
-    family = db.query(Family).filter(Family.id == family_id).first()
+    family = db.query(Family).filter(
+        Family.id == family_id,
+        Family.event_id == event_id
+    ).first()
 
     if not family:
         return RedirectResponse(url="/families", status_code=303)
@@ -162,9 +189,16 @@ async def update_family(
 
 
 @router.post("/{family_id}/delete")
-async def delete_family(family_id: int, db: Session = Depends(get_db)):
+async def delete_family(
+    family_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Löscht eine Familie"""
-    family = db.query(Family).filter(Family.id == family_id).first()
+    family = db.query(Family).filter(
+        Family.id == family_id,
+        Family.event_id == event_id
+    ).first()
 
     if not family:
         raise HTTPException(status_code=404, detail="Familie nicht gefunden")

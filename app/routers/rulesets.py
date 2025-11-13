@@ -13,15 +13,16 @@ from app.config import settings
 from app.database import get_db
 from app.models import Ruleset, Event
 from app.services.ruleset_parser import RulesetParser
+from app.dependencies import get_current_event_id
 
 router = APIRouter(prefix="/rulesets", tags=["rulesets"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse)
-async def list_rulesets(request: Request, db: Session = Depends(get_db)):
+async def list_rulesets(request: Request, db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
     """Liste aller Regelwerke"""
-    rulesets = db.query(Ruleset).order_by(Ruleset.valid_from.desc()).all()
+    rulesets = db.query(Ruleset).filter(Ruleset.event_id == event_id).order_by(Ruleset.valid_from.desc()).all()
 
     return templates.TemplateResponse(
         "rulesets/list.html",
@@ -33,18 +34,19 @@ async def list_rulesets(request: Request, db: Session = Depends(get_db)):
 async def import_ruleset_form(
     request: Request,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     error: Optional[str] = None,
     success: Optional[str] = None
 ):
     """Formular zum Importieren eines Regelwerks"""
-    events = db.query(Event).all()
+    event = db.query(Event).filter(Event.id == event_id).first()
 
     return templates.TemplateResponse(
         "rulesets/import.html",
         {
             "request": request,
             "title": "Regelwerk importieren",
-            "events": events,
+            "event": event,
             "error": error,
             "success": success
         }
@@ -55,8 +57,8 @@ async def import_ruleset_form(
 async def import_ruleset_upload(
     request: Request,
     db: Session = Depends(get_db),
-    file: UploadFile = File(...),
-    event_id: Optional[int] = Form(None)
+    event_id: int = Depends(get_current_event_id),
+    file: UploadFile = File(...)
 ):
     """Importiert ein Regelwerk aus einer hochgeladenen YAML-Datei"""
     try:
@@ -87,7 +89,7 @@ async def import_ruleset_upload(
             role_discounts=data.get("role_discounts"),
             family_discount=data.get("family_discount"),
             source_file=file.filename,
-            event_id=event_id if event_id else None
+            event_id=event_id
         )
 
         db.add(ruleset)
@@ -108,8 +110,8 @@ async def import_ruleset_upload(
 async def import_ruleset_github(
     request: Request,
     db: Session = Depends(get_db),
-    github_url: str = Form(...),
-    event_id: Optional[int] = Form(None)
+    event_id: int = Depends(get_current_event_id),
+    github_url: str = Form(...)
 ):
     """Importiert ein Regelwerk von einer GitHub-URL"""
     try:
@@ -149,7 +151,7 @@ async def import_ruleset_github(
             role_discounts=data.get("role_discounts"),
             family_discount=data.get("family_discount"),
             source_file=github_url,
-            event_id=event_id if event_id else None
+            event_id=event_id
         )
 
         db.add(ruleset)
@@ -175,8 +177,8 @@ async def import_ruleset_github(
 async def import_ruleset_manual(
     request: Request,
     db: Session = Depends(get_db),
-    yaml_content: str = Form(...),
-    event_id: Optional[int] = Form(None)
+    event_id: int = Depends(get_current_event_id),
+    yaml_content: str = Form(...)
 ):
     """Importiert ein Regelwerk aus manuell eingegebenem YAML"""
     try:
@@ -203,7 +205,7 @@ async def import_ruleset_manual(
             role_discounts=data.get("role_discounts"),
             family_discount=data.get("family_discount"),
             source_file="manual_input",
-            event_id=event_id if event_id else None
+            event_id=event_id
         )
 
         db.add(ruleset)
@@ -221,9 +223,17 @@ async def import_ruleset_manual(
 
 
 @router.get("/{ruleset_id}", response_class=HTMLResponse)
-async def view_ruleset(request: Request, ruleset_id: int, db: Session = Depends(get_db)):
+async def view_ruleset(
+    request: Request,
+    ruleset_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Detailansicht eines Regelwerks"""
-    ruleset = db.query(Ruleset).filter(Ruleset.id == ruleset_id).first()
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.id == ruleset_id,
+        Ruleset.event_id == event_id
+    ).first()
 
     if not ruleset:
         return RedirectResponse(url="/rulesets", status_code=303)
@@ -239,9 +249,16 @@ async def view_ruleset(request: Request, ruleset_id: int, db: Session = Depends(
 
 
 @router.post("/{ruleset_id}/toggle")
-async def toggle_ruleset(ruleset_id: int, db: Session = Depends(get_db)):
+async def toggle_ruleset(
+    ruleset_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Aktiviert/Deaktiviert ein Regelwerk"""
-    ruleset = db.query(Ruleset).filter(Ruleset.id == ruleset_id).first()
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.id == ruleset_id,
+        Ruleset.event_id == event_id
+    ).first()
 
     if not ruleset:
         raise HTTPException(status_code=404, detail="Regelwerk nicht gefunden")
@@ -256,9 +273,16 @@ async def toggle_ruleset(ruleset_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{ruleset_id}/delete")
-async def delete_ruleset(ruleset_id: int, db: Session = Depends(get_db)):
+async def delete_ruleset(
+    ruleset_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Löscht ein Regelwerk"""
-    ruleset = db.query(Ruleset).filter(Ruleset.id == ruleset_id).first()
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.id == ruleset_id,
+        Ruleset.event_id == event_id
+    ).first()
 
     if not ruleset:
         raise HTTPException(status_code=404, detail="Regelwerk nicht gefunden")

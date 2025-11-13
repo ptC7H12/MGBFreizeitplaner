@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Willkommen - Freizeit-Kassen-System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center">
+    <div class="max-w-4xl w-full mx-4">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <div class="flex items-center justify-center mb-4">
+                <svg class="h-16 w-16 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                </svg>
+            </div>
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">Freizeit-Kassen-System</h1>
+            <p class="text-lg text-gray-600">Wählen Sie eine Freizeit aus oder erstellen Sie eine neue</p>
+        </div>
+
+        <!-- Error Message -->
+        {% if error %}
+        <div class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded" role="alert">
+            {% if error == "invalid_code" %}
+                <strong>Code ungültig!</strong> Die eingegebene Freizeit wurde nicht gefunden.
+            {% elif error == "code_exists" %}
+                <strong>Code existiert bereits!</strong> Bitte wählen Sie einen anderen Code.
+            {% elif error == "create_failed" %}
+                <strong>Fehler!</strong> Freizeit konnte nicht erstellt werden.
+            {% else %}
+                <strong>Fehler!</strong> Etwas ist schiefgelaufen.
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Option 1: Code eingeben -->
+            <div class="bg-white shadow-lg rounded-lg p-8">
+                <div class="mb-6">
+                    <div class="flex items-center justify-center h-12 w-12 rounded-md bg-blue-600 text-white mx-auto mb-4">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                        </svg>
+                    </div>
+                    <h2 class="text-2xl font-bold text-center text-gray-900 mb-2">Bestehende Freizeit</h2>
+                    <p class="text-center text-gray-600">Geben Sie den Code Ihrer Freizeit ein</p>
+                </div>
+
+                <form method="post" action="/auth/select" class="space-y-6">
+                    <div>
+                        <label for="code" class="block text-sm font-medium text-gray-700 mb-2">
+                            Freizeit-Code
+                        </label>
+                        <input
+                            type="text"
+                            id="code"
+                            name="code"
+                            required
+                            maxlength="20"
+                            placeholder="z.B. ABC12345"
+                            class="w-full px-4 py-3 text-center text-lg font-bold uppercase tracking-wider border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            style="text-transform: uppercase;"
+                        >
+                        <p class="mt-2 text-sm text-gray-500">
+                            Den Code haben Sie bei der Erstellung der Freizeit erhalten
+                        </p>
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="w-full flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition"
+                    >
+                        <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        Freizeit öffnen
+                    </button>
+                </form>
+            </div>
+
+            <!-- Option 2: Neue Freizeit erstellen -->
+            <div class="bg-white shadow-lg rounded-lg p-8">
+                <div class="mb-6">
+                    <div class="flex items-center justify-center h-12 w-12 rounded-md bg-green-600 text-white mx-auto mb-4">
+                        <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <h2 class="text-2xl font-bold text-center text-gray-900 mb-2">Neue Freizeit</h2>
+                    <p class="text-center text-gray-600">Erstellen Sie eine neue Freizeit</p>
+                </div>
+
+                <form method="post" action="/auth/create" class="space-y-4">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">
+                            Name *
+                        </label>
+                        <input
+                            type="text"
+                            id="name"
+                            name="name"
+                            required
+                            placeholder="z.B. Sommerfreizeit 2024"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="event_type" class="block text-sm font-medium text-gray-700 mb-1">
+                            Typ *
+                        </label>
+                        <select
+                            id="event_type"
+                            name="event_type"
+                            required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        >
+                            <option value="kinder">Kinderfreizeit</option>
+                            <option value="jugend">Jugendfreizeit</option>
+                            <option value="familie">Familienfreizeit</option>
+                            <option value="sonstiges">Sonstiges</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="start_date" class="block text-sm font-medium text-gray-700 mb-1">
+                                Von *
+                            </label>
+                            <input
+                                type="date"
+                                id="start_date"
+                                name="start_date"
+                                required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            >
+                        </div>
+                        <div>
+                            <label for="end_date" class="block text-sm font-medium text-gray-700 mb-1">
+                                Bis *
+                            </label>
+                            <input
+                                type="date"
+                                id="end_date"
+                                name="end_date"
+                                required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            >
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="location" class="block text-sm font-medium text-gray-700 mb-1">
+                            Ort
+                        </label>
+                        <input
+                            type="text"
+                            id="location"
+                            name="location"
+                            placeholder="z.B. Zeltlager Berghausen"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="custom_code" class="block text-sm font-medium text-gray-700 mb-1">
+                            Eigener Code (optional)
+                        </label>
+                        <input
+                            type="text"
+                            id="custom_code"
+                            name="custom_code"
+                            maxlength="20"
+                            placeholder="Leer lassen für automatischen Code"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500 uppercase"
+                            style="text-transform: uppercase;"
+                        >
+                        <p class="mt-1 text-xs text-gray-500">
+                            Wenn leer, wird automatisch ein Code generiert
+                        </p>
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="w-full flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition"
+                    >
+                        <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                        </svg>
+                        Freizeit erstellen
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-12 text-center text-gray-600 text-sm">
+            <p>&copy; 2024 Freizeit-Kassen-System v0.2.0</p>
+        </div>
+    </div>
+
+    <script>
+        // Uppercase für Code-Eingabe
+        document.getElementById('code').addEventListener('input', function(e) {
+            this.value = this.value.toUpperCase();
+        });
+
+        document.getElementById('custom_code').addEventListener('input', function(e) {
+            this.value = this.value.toUpperCase();
+        });
+    </script>
+</body>
+</html>

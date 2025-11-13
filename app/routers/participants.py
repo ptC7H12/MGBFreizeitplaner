@@ -10,6 +10,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import Participant, Role, Event, Family, Ruleset
 from app.services.price_calculator import PriceCalculator
+from app.dependencies import get_current_event_id
 
 router = APIRouter(prefix="/participants", tags=["participants"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
@@ -88,12 +89,13 @@ def _calculate_price_for_participant(
 async def list_participants(
     request: Request,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     search: Optional[str] = None,
     role_id: Optional[int] = None,
     family_id: Optional[int] = None
 ):
     """Liste aller Teilnehmer mit Such- und Filterfunktionen"""
-    query = db.query(Participant)
+    query = db.query(Participant).filter(Participant.event_id == event_id)
 
     # Suchfilter
     if search:
@@ -114,9 +116,9 @@ async def list_participants(
 
     participants = query.order_by(Participant.last_name).all()
 
-    # Für Filter-Dropdown
+    # Für Filter-Dropdown (auch nach event_id gefiltert)
     roles = db.query(Role).filter(Role.is_active == True).all()
-    families = db.query(Family).order_by(Family.name).all()
+    families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
 
     return templates.TemplateResponse(
         "participants/list.html",
@@ -134,11 +136,15 @@ async def list_participants(
 
 
 @router.get("/create", response_class=HTMLResponse)
-async def create_participant_form(request: Request, db: Session = Depends(get_db)):
+async def create_participant_form(
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Formular zum Erstellen eines neuen Teilnehmers"""
     roles = db.query(Role).filter(Role.is_active == True).all()
-    events = db.query(Event).all()
-    families = db.query(Family).order_by(Family.name).all()
+    event = db.query(Event).filter(Event.id == event_id).first()
+    families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
 
     return templates.TemplateResponse(
         "participants/create.html",
@@ -146,7 +152,7 @@ async def create_participant_form(request: Request, db: Session = Depends(get_db
             "request": request,
             "title": "Neuer Teilnehmer",
             "roles": roles,
-            "events": events,
+            "event": event,
             "families": families
         }
     )
@@ -156,6 +162,7 @@ async def create_participant_form(request: Request, db: Session = Depends(get_db
 async def create_participant(
     request: Request,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     first_name: str = Form(...),
     last_name: str = Form(...),
     birth_date: str = Form(...),
@@ -170,7 +177,6 @@ async def create_participant(
     discount_percent: float = Form(0.0),
     discount_reason: Optional[str] = Form(None),
     manual_price_override: Optional[float] = Form(None),
-    event_id: int = Form(...),
     role_id: int = Form(...),
     family_id: Optional[int] = Form(None)
 ):
@@ -204,7 +210,7 @@ async def create_participant(
             discount_percent=discount_percent,
             discount_reason=discount_reason if discount_reason else None,
             manual_price_override=manual_price_override,
-            event_id=event_id,
+            event_id=event_id,  # Aus Session, nicht aus Formular!
             role_id=role_id,
             family_id=family_id if family_id else None,
             calculated_price=calculated_price
@@ -226,8 +232,8 @@ async def create_participant(
 async def calculate_price_preview(
     request: Request,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     birth_date: str = Form(...),
-    event_id: int = Form(...),
     role_id: int = Form(...),
     family_id: Optional[int] = Form(None)
 ):
@@ -277,9 +283,17 @@ async def calculate_price_preview(
 
 
 @router.get("/{participant_id}", response_class=HTMLResponse)
-async def view_participant(request: Request, participant_id: int, db: Session = Depends(get_db)):
+async def view_participant(
+    request: Request,
+    participant_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Detailansicht eines Teilnehmers"""
-    participant = db.query(Participant).filter(Participant.id == participant_id).first()
+    participant = db.query(Participant).filter(
+        Participant.id == participant_id,
+        Participant.event_id == event_id
+    ).first()
 
     if not participant:
         return RedirectResponse(url="/participants", status_code=303)
@@ -300,16 +314,24 @@ async def view_participant(request: Request, participant_id: int, db: Session = 
 
 
 @router.get("/{participant_id}/edit", response_class=HTMLResponse)
-async def edit_participant_form(request: Request, participant_id: int, db: Session = Depends(get_db)):
+async def edit_participant_form(
+    request: Request,
+    participant_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Formular zum Bearbeiten eines Teilnehmers"""
-    participant = db.query(Participant).filter(Participant.id == participant_id).first()
+    participant = db.query(Participant).filter(
+        Participant.id == participant_id,
+        Participant.event_id == event_id
+    ).first()
 
     if not participant:
         return RedirectResponse(url="/participants", status_code=303)
 
     roles = db.query(Role).filter(Role.is_active == True).all()
-    events = db.query(Event).all()
-    families = db.query(Family).order_by(Family.name).all()
+    event = db.query(Event).filter(Event.id == event_id).first()
+    families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
 
     return templates.TemplateResponse(
         "participants/edit.html",
@@ -318,7 +340,7 @@ async def edit_participant_form(request: Request, participant_id: int, db: Sessi
             "title": f"{participant.full_name} bearbeiten",
             "participant": participant,
             "roles": roles,
-            "events": events,
+            "event": event,
             "families": families
         }
     )
@@ -329,6 +351,7 @@ async def update_participant(
     request: Request,
     participant_id: int,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     first_name: str = Form(...),
     last_name: str = Form(...),
     birth_date: str = Form(...),
@@ -343,12 +366,14 @@ async def update_participant(
     discount_percent: float = Form(0.0),
     discount_reason: Optional[str] = Form(None),
     manual_price_override: Optional[float] = Form(None),
-    event_id: int = Form(...),
     role_id: int = Form(...),
     family_id: Optional[int] = Form(None)
 ):
     """Aktualisiert einen Teilnehmer"""
-    participant = db.query(Participant).filter(Participant.id == participant_id).first()
+    participant = db.query(Participant).filter(
+        Participant.id == participant_id,
+        Participant.event_id == event_id
+    ).first()
 
     if not participant:
         return RedirectResponse(url="/participants", status_code=303)
@@ -381,7 +406,7 @@ async def update_participant(
         participant.discount_percent = discount_percent
         participant.discount_reason = discount_reason if discount_reason else None
         participant.manual_price_override = manual_price_override
-        participant.event_id = event_id
+        # event_id bleibt unverändert (Sicherheit!)
         participant.role_id = role_id
         participant.family_id = family_id if family_id else None
         participant.calculated_price = calculated_price
@@ -396,9 +421,16 @@ async def update_participant(
 
 
 @router.post("/{participant_id}/delete")
-async def delete_participant(participant_id: int, db: Session = Depends(get_db)):
+async def delete_participant(
+    participant_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Löscht einen Teilnehmer"""
-    participant = db.query(Participant).filter(Participant.id == participant_id).first()
+    participant = db.query(Participant).filter(
+        Participant.id == participant_id,
+        Participant.event_id == event_id
+    ).first()
 
     if not participant:
         raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")

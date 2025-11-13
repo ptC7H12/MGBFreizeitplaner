@@ -9,6 +9,7 @@ from typing import Optional
 from app.config import settings
 from app.database import get_db
 from app.models import Expense, Event
+from app.dependencies import get_current_event_id
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
@@ -18,14 +19,15 @@ templates = Jinja2Templates(directory=str(settings.templates_dir))
 async def list_expenses(
     request: Request,
     db: Session = Depends(get_db),
-    event_id: Optional[int] = None,
+    event_id: int = Depends(get_current_event_id),
+    event_id_param: Optional[int] = None,
     category: Optional[str] = None
 ):
     """Liste aller Ausgaben mit Filter"""
-    query = db.query(Expense)
+    query = db.query(Expense).filter(Expense.event_id == event_id)
 
-    if event_id:
-        query = query.filter(Expense.event_id == event_id)
+    if event_id_param:
+        query = query.filter(Expense.event_id == event_id_param)
     if category:
         query = query.filter(Expense.category == category)
 
@@ -50,17 +52,17 @@ async def list_expenses(
 async def create_expense_form(
     request: Request,
     db: Session = Depends(get_db),
-    event_id: Optional[int] = None
+    event_id: int = Depends(get_current_event_id)
 ):
     """Formular zum Erstellen einer neuen Ausgabe"""
-    events = db.query(Event).all()
+    event = db.query(Event).filter(Event.id == event_id).first()
 
     return templates.TemplateResponse(
         "expenses/create.html",
         {
             "request": request,
             "title": "Neue Ausgabe",
-            "events": events,
+            "event": event,
             "preselected_event_id": event_id
         }
     )
@@ -70,6 +72,7 @@ async def create_expense_form(
 async def create_expense(
     request: Request,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     title: str = Form(...),
     description: Optional[str] = Form(None),
     amount: float = Form(...),
@@ -78,7 +81,6 @@ async def create_expense(
     receipt_number: Optional[str] = Form(None),
     paid_by: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
-    event_id: int = Form(...)
 ):
     """Erstellt eine neue Ausgabe"""
     try:
@@ -117,7 +119,7 @@ async def edit_expense_form(request: Request, expense_id: int, db: Session = Dep
     if not expense:
         return RedirectResponse(url="/expenses", status_code=303)
 
-    events = db.query(Event).all()
+    event = db.query(Event).filter(Event.id == event_id).first()
 
     return templates.TemplateResponse(
         "expenses/edit.html",
@@ -143,7 +145,6 @@ async def update_expense(
     receipt_number: Optional[str] = Form(None),
     paid_by: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
-    event_id: int = Form(...)
 ):
     """Aktualisiert eine Ausgabe"""
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
