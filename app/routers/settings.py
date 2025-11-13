@@ -22,14 +22,17 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
-@router.get("/", response_class=HTMLResponse)
-async def view_settings(
-    request: Request,
-    db: Session = Depends(get_db),
-    event_id: int = Depends(get_current_event_id)
-):
-    """Zeigt die Einstellungen für das aktuelle Event"""
-    # Einstellungen für das Event laden (oder Standard-Einstellungen erstellen)
+def _get_or_create_setting(db: Session, event_id: int) -> Setting:
+    """
+    Holt oder erstellt Event-Settings
+
+    Args:
+        db: Database Session
+        event_id: Event ID
+
+    Returns:
+        Setting-Objekt
+    """
     setting = db.query(Setting).filter(Setting.event_id == event_id).first()
 
     if not setting:
@@ -40,6 +43,18 @@ async def view_settings(
         db.refresh(setting)
         logger.info(f"Created default settings for event {event_id}")
 
+    return setting
+
+
+@router.get("/", response_class=HTMLResponse)
+async def view_settings(
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Zeigt die Einstellungen für das aktuelle Event"""
+    # Einstellungen für das Event laden (oder Standard-Einstellungen erstellen)
+    setting = _get_or_create_setting(db, event_id)
     event = db.query(Event).filter(Event.id == event_id).first()
 
     # Alle Rulesets für Dropdown
@@ -65,16 +80,7 @@ async def edit_settings_form(
 ):
     """Formular zum Bearbeiten der Einstellungen"""
     # Einstellungen für das Event laden (oder Standard-Einstellungen erstellen)
-    setting = db.query(Setting).filter(Setting.event_id == event_id).first()
-
-    if not setting:
-        # Keine Einstellungen vorhanden -> Standard-Einstellungen erstellen
-        setting = Setting(event_id=event_id)
-        db.add(setting)
-        db.commit()
-        db.refresh(setting)
-        logger.info(f"Created default settings for event {event_id}")
-
+    setting = _get_or_create_setting(db, event_id)
     event = db.query(Event).filter(Event.id == event_id).first()
 
     # Alle Rulesets für Dropdown

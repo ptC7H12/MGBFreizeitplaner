@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError, DataError
 from typing import Optional
 from pydantic import ValidationError
@@ -29,7 +29,15 @@ async def list_families(
     event_id: int = Depends(get_current_event_id)
 ):
     """Liste aller Familien"""
-    families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
+    # Eager Loading um N+1 Query Problem zu vermeiden
+    families = db.query(Family)\
+        .filter(Family.event_id == event_id)\
+        .options(
+            joinedload(Family.participants),
+            joinedload(Family.payments)
+        )\
+        .order_by(Family.name)\
+        .all()
 
     # Für jede Familie: Anzahl Teilnehmer und Gesamtpreis berechnen
     family_data = []
