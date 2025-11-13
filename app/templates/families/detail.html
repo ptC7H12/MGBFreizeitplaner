@@ -41,7 +41,23 @@
     </div>
 
     <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Finanzübersicht</h3>
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Finanzübersicht</h3>
+            <div class="flex space-x-2">
+                <a href="/payments/create?family_id={{ family.id }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition">
+                    <svg class="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/>
+                    </svg>
+                    Zahlung erfassen
+                </a>
+                <a href="/payments/invoice/family/{{ family.id }}" target="_blank" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition">
+                    <svg class="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"/>
+                    </svg>
+                    Sammelrechnung herunterladen
+                </a>
+            </div>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
                 <p class="text-sm text-gray-600">Gesamtpreis</p>

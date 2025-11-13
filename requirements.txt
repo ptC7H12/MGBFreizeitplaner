@@ -22,5 +22,8 @@ email-validator==2.1.0
 # HTTP Client
 httpx==0.26.0
 
+# PDF Generation
+reportlab==4.0.7
+
 # Development
 python-dotenv==1.0.0
