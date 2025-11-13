@@ -1,6 +1,6 @@
 """Expense (Ausgabe) Model"""
 from datetime import datetime, date
-from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Float, Boolean
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -20,6 +20,7 @@ class Expense(Base):
     category = Column(String(100), nullable=True)  # z.B. "Verpflegung", "Material", "Transport"
     receipt_number = Column(String(100), nullable=True)
     paid_by = Column(String(200), nullable=True)  # Wer hat die Ausgabe getätigt
+    is_reimbursed = Column(Boolean, default=False, nullable=False)  # Wurde die Ausgabe erstattet?
     notes = Column(Text, nullable=True)
 
     # Foreign Key

@@ -1,0 +1,244 @@
+"""Tasks Router - Offene Aufgaben"""
+from fastapi import APIRouter, Request, Depends, Form
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+from sqlalchemy import func, and_, or_
+from datetime import datetime, date, timedelta
+
+from app.config import settings
+from app.database import get_db
+from app.models import Participant, Payment, Expense, Event, Task
+from app.dependencies import get_current_event_id
+from app.utils.flash import flash
+
+router = APIRouter(prefix="/tasks", tags=["tasks"])
+templates = Jinja2Templates(directory=str(settings.templates_dir))
+
+
+def get_completed_tasks(db: Session, event_id: int) -> dict:
+    """Holt alle erledigten Tasks für ein Event als Set"""
+    completed = db.query(Task).filter(
+        Task.event_id == event_id,
+        Task.is_completed == True
+    ).all()
+
+    # Erstelle ein Set von (task_type, reference_id) Tupeln für schnelle Lookups
+    completed_set = {(task.task_type, task.reference_id) for task in completed}
+    return completed_set
+
+
+def is_task_completed(completed_tasks: set, task_type: str, reference_id: int) -> bool:
+    """Prüft, ob eine Aufgabe bereits erledigt wurde"""
+    return (task_type, reference_id) in completed_tasks
+
+
+@router.get("/", response_class=HTMLResponse)
+async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
+    """Liste aller offenen Aufgaben"""
+
+    # Hole Event-Details für Fälligkeitsdatum
+    event = db.query(Event).filter(Event.id == event_id).first()
+
+    # Hole bereits erledigte Tasks
+    completed_tasks = get_completed_tasks(db, event_id)
+
+    tasks = {
+        "bildung_teilhabe": [],
+        "expense_reimbursement": [],
+        "outstanding_payments": [],
+        "manual_price_override": [],
+        "overdue_payments": []
+    }
+
+    # 1. Bildung & Teilhabe IDs vorhanden (müssen beantragt werden)
+    participants_with_but = db.query(Participant).filter(
+        Participant.event_id == event_id,
+        Participant.bildung_teilhabe_id.isnot(None),
+        Participant.is_active == True
+    ).all()
+
+    for participant in participants_with_but:
+        if not is_task_completed(completed_tasks, "bildung_teilhabe", participant.id):
+            tasks["bildung_teilhabe"].append({
+                "id": participant.id,
+                "title": f"{participant.full_name}",
+                "description": f"BuT-Nummer: {participant.bildung_teilhabe_id}",
+                "link": f"/participants/{participant.id}",
+                "task_type": "bildung_teilhabe"
+            })
+
+    # 2. Rückzahlung von Ausgaben (nicht erstattete Ausgaben)
+    unreimbursed_expenses = db.query(Expense).filter(
+        Expense.event_id == event_id,
+        Expense.is_reimbursed == False,
+        Expense.paid_by.isnot(None)
+    ).all()
+
+    for expense in unreimbursed_expenses:
+        if not is_task_completed(completed_tasks, "expense_reimbursement", expense.id):
+            tasks["expense_reimbursement"].append({
+                "id": expense.id,
+                "title": f"{expense.title}",
+                "description": f"{expense.amount:.2f}€ - Bezahlt von: {expense.paid_by}",
+                "link": f"/expenses/{expense.id}",
+                "task_type": "expense_reimbursement",
+                "amount": expense.amount
+            })
+
+    # 3. Offene Zahlungseingänge (Teilnehmer mit ausstehenden Zahlungen)
+    participants_with_payments = db.query(
+        Participant.id,
+        Participant.first_name,
+        Participant.last_name,
+        Participant.calculated_price,
+        Participant.manual_price_override,
+        func.coalesce(func.sum(Payment.amount), 0).label("total_paid")
+    ).outerjoin(
+        Payment, Payment.participant_id == Participant.id
+    ).filter(
+        Participant.event_id == event_id,
+        Participant.is_active == True
+    ).group_by(
+        Participant.id
+    ).all()
+
+    for participant in participants_with_payments:
+        final_price = participant.manual_price_override if participant.manual_price_override is not None else participant.calculated_price
+        outstanding = final_price - participant.total_paid
+
+        if outstanding > 0.01:  # Nur wenn mehr als 1 Cent ausstehend
+            if not is_task_completed(completed_tasks, "outstanding_payment", participant.id):
+                tasks["outstanding_payments"].append({
+                    "id": participant.id,
+                    "title": f"{participant.first_name} {participant.last_name}",
+                    "description": f"Ausstehend: {outstanding:.2f}€ (von {final_price:.2f}€)",
+                    "link": f"/participants/{participant.id}",
+                    "task_type": "outstanding_payment",
+                    "amount": outstanding
+                })
+
+    # 7. Manuelle Preisanpassungen prüfen
+    participants_with_override = db.query(Participant).filter(
+        Participant.event_id == event_id,
+        Participant.manual_price_override.isnot(None),
+        Participant.is_active == True
+    ).all()
+
+    for participant in participants_with_override:
+        if not is_task_completed(completed_tasks, "manual_price_override", participant.id):
+            tasks["manual_price_override"].append({
+                "id": participant.id,
+                "title": f"{participant.full_name}",
+                "description": f"Manueller Preis: {participant.manual_price_override:.2f}€ (statt {participant.calculated_price:.2f}€)",
+                "link": f"/participants/{participant.id}",
+                "task_type": "manual_price_override"
+            })
+
+    # 9. Überfällige Zahlungen (Event hat bereits begonnen oder Frist überschritten)
+    if event and event.start_date:
+        # Annahme: Zahlungen sollten 14 Tage vor Event-Start eingegangen sein
+        payment_deadline = event.start_date - timedelta(days=14)
+
+        if date.today() >= payment_deadline:
+            # Verwende die bereits gesammelten ausstehenden Zahlungen
+            for task in tasks["outstanding_payments"]:
+                if not is_task_completed(completed_tasks, "overdue_payment", task["id"]):
+                    tasks["overdue_payments"].append({
+                        **task,
+                        "task_type": "overdue_payment",
+                        "description": f"{task['description']} - ÜBERFÄLLIG!"
+                    })
+
+    # Zähle Gesamtaufgaben
+    total_tasks = sum(len(task_list) for task_list in tasks.values())
+
+    return templates.TemplateResponse(
+        "tasks/list.html",
+        {
+            "request": request,
+            "title": "Offene Aufgaben",
+            "tasks": tasks,
+            "total_tasks": total_tasks,
+            "event": event
+        }
+    )
+
+
+@router.post("/complete")
+async def complete_task(
+    request: Request,
+    task_type: str = Form(...),
+    reference_id: int = Form(...),
+    note: str = Form(None),
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Markiert eine Aufgabe als erledigt"""
+
+    # Prüfe, ob Task bereits existiert
+    existing_task = db.query(Task).filter(
+        Task.event_id == event_id,
+        Task.task_type == task_type,
+        Task.reference_id == reference_id
+    ).first()
+
+    if existing_task:
+        # Aktualisiere bestehenden Task
+        existing_task.is_completed = True
+        existing_task.completed_at = datetime.utcnow()
+        if note:
+            existing_task.completion_note = note
+    else:
+        # Erstelle neuen Task
+        new_task = Task(
+            task_type=task_type,
+            reference_id=reference_id,
+            is_completed=True,
+            completion_note=note,
+            event_id=event_id
+        )
+        db.add(new_task)
+
+    # Spezielle Behandlung für expense_reimbursement
+    if task_type == "expense_reimbursement":
+        expense = db.query(Expense).filter(Expense.id == reference_id).first()
+        if expense:
+            expense.is_reimbursed = True
+
+    db.commit()
+    flash(request, "Aufgabe wurde als erledigt markiert", "success")
+
+    return RedirectResponse(url="/tasks", status_code=303)
+
+
+@router.post("/uncomplete")
+async def uncomplete_task(
+    request: Request,
+    task_type: str = Form(...),
+    reference_id: int = Form(...),
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Markiert eine Aufgabe als nicht erledigt (macht Completion rückgängig)"""
+
+    # Finde und lösche den Task
+    task = db.query(Task).filter(
+        Task.event_id == event_id,
+        Task.task_type == task_type,
+        Task.reference_id == reference_id
+    ).first()
+
+    if task:
+        db.delete(task)
+
+        # Spezielle Behandlung für expense_reimbursement
+        if task_type == "expense_reimbursement":
+            expense = db.query(Expense).filter(Expense.id == reference_id).first()
+            if expense:
+                expense.is_reimbursed = False
+
+        db.commit()
+        flash(request, "Aufgabe wurde wieder als offen markiert", "info")
+
+    return RedirectResponse(url="/tasks", status_code=303)

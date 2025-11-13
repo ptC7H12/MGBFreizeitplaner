@@ -9,7 +9,7 @@ import secrets
 
 from app.config import settings
 from app.database import init_db
-from app.routers import dashboard, participants, families, rulesets, payments, expenses, auth, settings as settings_router
+from app.routers import dashboard, participants, families, rulesets, payments, expenses, auth, settings as settings_router, tasks
 
 # Logging konfigurieren
 logging.basicConfig(
@@ -45,6 +45,7 @@ templates.env.globals['get_flashed_messages'] = get_flashed_messages
 # Router registrieren
 app.include_router(auth.router)
 app.include_router(dashboard.router)
+app.include_router(tasks.router)
 app.include_router(participants.router)
 app.include_router(families.router)
 app.include_router(rulesets.router)

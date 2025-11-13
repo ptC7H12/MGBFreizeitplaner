@@ -33,5 +33,5 @@ def get_db():
 
 def init_db():
     """Initialisiert die Datenbank und erstellt alle Tabellen"""
-    from app.models import participant, family, role, ruleset, payment, expense, event
+    from app.models import participant, family, role, ruleset, payment, expense, event, task
     Base.metadata.create_all(bind=engine)
