@@ -48,7 +48,7 @@ call venv\Scripts\activate.bat
 REM Check if dependencies are installed
 if not exist "venv\Lib\site-packages\fastapi\" (
     echo.
-    echo [INFO] Installiere Abhaengigkeiten (dies kann einige Minuten dauern)...
+    echo [INFO] Installiere Abhaengigkeiten (dies kann einige Minuten dauern)
     pip install -r requirements.txt
     if errorlevel 1 (
         echo [FEHLER] Installation der Abhaengigkeiten fehlgeschlagen!
@@ -71,7 +71,7 @@ if not exist ".env" (
 REM Start the application
 echo.
 echo ========================================
-echo   Starte Anwendung...
+echo   Starte Anwendung
 echo ========================================
 echo.
 echo Die Anwendung ist verfuegbar unter:
