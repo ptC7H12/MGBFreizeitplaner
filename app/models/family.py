@@ -1,6 +1,6 @@
 """Family (Familie) Model"""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -20,11 +20,15 @@ class Family(Base):
     address = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
 
+    # Foreign Key
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Beziehungen
+    event = relationship("Event", back_populates="families")
     participants = relationship("Participant", back_populates="family")
     payments = relationship("Payment", back_populates="family", cascade="all, delete-orphan")
 

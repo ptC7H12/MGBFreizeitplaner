@@ -2,12 +2,14 @@
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
 import logging
+import secrets
 
 from app.config import settings
 from app.database import init_db
-from app.routers import dashboard, participants, families, rulesets, payments, expenses
+from app.routers import dashboard, participants, families, rulesets, payments, expenses, auth
 
 # Logging konfigurieren
 logging.basicConfig(
@@ -23,6 +25,13 @@ app = FastAPI(
     debug=settings.debug
 )
 
+# Session Middleware hinzufügen
+# WICHTIG: In Produktion sollte der secret_key aus einer Umgebungsvariable kommen!
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.secret_key if hasattr(settings, 'secret_key') else secrets.token_urlsafe(32)
+)
+
 # Static Files mounten
 app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
 
@@ -30,6 +39,7 @@ app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="stat
 templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 # Router registrieren
+app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(participants.router)
 app.include_router(families.router)
@@ -65,11 +75,15 @@ async def health_check():
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
-    """Weiterleitung zum Dashboard"""
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {"request": request, "title": "Dashboard"}
-    )
+    """Weiterleitung zur Landing Page oder Dashboard"""
+    # Prüfen ob Event in Session vorhanden ist
+    event_id = request.session.get("event_id")
+    if event_id:
+        # Bereits eingeloggt -> zum Dashboard
+        return RedirectResponse(url="/dashboard", status_code=303)
+    else:
+        # Nicht eingeloggt -> zur Landing Page
+        return RedirectResponse(url="/auth/", status_code=303)
 
 
 if __name__ == "__main__":

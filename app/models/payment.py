@@ -20,6 +20,7 @@ class Payment(Base):
     notes = Column(Text, nullable=True)
 
     # Foreign Keys
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
     participant_id = Column(Integer, ForeignKey("participants.id"), nullable=True)
     family_id = Column(Integer, ForeignKey("families.id"), nullable=True)
 
@@ -28,6 +29,7 @@ class Payment(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Beziehungen
+    event = relationship("Event", back_populates="payments")
     participant = relationship("Participant", back_populates="payments")
     family = relationship("Family", back_populates="payments")
 
