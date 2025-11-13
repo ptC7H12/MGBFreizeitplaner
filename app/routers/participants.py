@@ -1,16 +1,24 @@
 """Participants (Teilnehmer) Router"""
+import logging
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
 from typing import Optional
+from pydantic import ValidationError
 
 from app.config import settings
 from app.database import get_db
 from app.models import Participant, Role, Event, Family, Ruleset
 from app.services.price_calculator import PriceCalculator
 from app.dependencies import get_current_event_id
+from app.utils.error_handler import handle_db_exception
+from app.utils.flash import flash
+from app.schemas import ParticipantCreateSchema, ParticipantUpdateSchema
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/participants", tags=["participants"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
@@ -182,37 +190,57 @@ async def create_participant(
 ):
     """Erstellt einen neuen Teilnehmer"""
     try:
-        # Datum parsen
-        birth_date_obj = datetime.strptime(birth_date, "%Y-%m-%d").date()
+        # Pydantic-Validierung
+        participant_data = ParticipantCreateSchema(
+            first_name=first_name,
+            last_name=last_name,
+            birth_date=birth_date,
+            gender=gender,
+            email=email,
+            phone=phone,
+            address=address,
+            bildung_teilhabe_id=bildung_teilhabe_id,
+            allergies=allergies,
+            medical_notes=medical_notes,
+            notes=notes,
+            discount_percent=discount_percent,
+            discount_reason=discount_reason,
+            manual_price_override=manual_price_override,
+            role_id=role_id,
+            family_id=family_id
+        )
+
+        # Datum parsen (bereits validiert durch Pydantic)
+        birth_date_obj = datetime.strptime(participant_data.birth_date, "%Y-%m-%d").date()
 
         # Automatische Preisberechnung
         calculated_price = _calculate_price_for_participant(
             db=db,
             event_id=event_id,
-            role_id=role_id,
+            role_id=participant_data.role_id,
             birth_date=birth_date_obj,
-            family_id=family_id
+            family_id=participant_data.family_id
         )
 
         # Neuen Teilnehmer erstellen
         participant = Participant(
-            first_name=first_name,
-            last_name=last_name,
+            first_name=participant_data.first_name,
+            last_name=participant_data.last_name,
             birth_date=birth_date_obj,
-            gender=gender,
-            email=email if email else None,
-            phone=phone if phone else None,
-            address=address if address else None,
-            bildung_teilhabe_id=bildung_teilhabe_id if bildung_teilhabe_id else None,
-            allergies=allergies if allergies else None,
-            medical_notes=medical_notes if medical_notes else None,
-            notes=notes if notes else None,
-            discount_percent=discount_percent,
-            discount_reason=discount_reason if discount_reason else None,
-            manual_price_override=manual_price_override,
+            gender=participant_data.gender,
+            email=participant_data.email,
+            phone=participant_data.phone,
+            address=participant_data.address,
+            bildung_teilhabe_id=participant_data.bildung_teilhabe_id,
+            allergies=participant_data.allergies,
+            medical_notes=participant_data.medical_notes,
+            notes=participant_data.notes,
+            discount_percent=participant_data.discount_percent,
+            discount_reason=participant_data.discount_reason,
+            manual_price_override=participant_data.manual_price_override,
             event_id=event_id,  # Aus Session, nicht aus Formular!
-            role_id=role_id,
-            family_id=family_id if family_id else None,
+            role_id=participant_data.role_id,
+            family_id=participant_data.family_id,
             calculated_price=calculated_price
         )
 
@@ -220,12 +248,33 @@ async def create_participant(
         db.commit()
         db.refresh(participant)
 
+        flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich erstellt", "success")
         return RedirectResponse(url=f"/participants/{participant.id}", status_code=303)
 
-    except Exception as e:
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error creating participant: {e}", exc_info=True)
+        # Ersten Fehler extrahieren für benutzerfreundliche Nachricht
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url="/participants/create?error=validation", status_code=303)
+
+    except IntegrityError as e:
         db.rollback()
-        # Fehler anzeigen (TODO: Besseres Error-Handling)
-        return RedirectResponse(url="/participants/create?error=1", status_code=303)
+        logger.error(f"Database integrity error creating participant: {e}", exc_info=True)
+        flash(request, "Teilnehmer konnte nicht erstellt werden (Datenbankfehler)", "error")
+        return RedirectResponse(url="/participants/create?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data creating participant: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url="/participants/create?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, "/participants/create", "Creating participant", db, request)
 
 
 @router.post("/calculate-price", response_class=HTMLResponse)
@@ -277,8 +326,12 @@ async def calculate_price_preview(
             }
         )
 
+    except ValueError as e:
+        logger.warning(f"Invalid date input for price calculation: {e}", exc_info=True)
+        return HTMLResponse(content=f'<div class="text-sm text-red-500">Ungültiges Datum</div>')
+
     except Exception as e:
-        # Bei Fehler leeres Fragment zurückgeben
+        logger.error(f"Error calculating price preview: {e}", exc_info=True)
         return HTMLResponse(content=f'<div class="text-sm text-gray-500">Preis wird berechnet...</div>')
 
 
@@ -379,45 +432,86 @@ async def update_participant(
         return RedirectResponse(url="/participants", status_code=303)
 
     try:
-        # Datum parsen
-        birth_date_obj = datetime.strptime(birth_date, "%Y-%m-%d").date()
+        # Pydantic-Validierung
+        participant_data = ParticipantUpdateSchema(
+            first_name=first_name,
+            last_name=last_name,
+            birth_date=birth_date,
+            gender=gender,
+            email=email,
+            phone=phone,
+            address=address,
+            bildung_teilhabe_id=bildung_teilhabe_id,
+            allergies=allergies,
+            medical_notes=medical_notes,
+            notes=notes,
+            discount_percent=discount_percent,
+            discount_reason=discount_reason,
+            manual_price_override=manual_price_override,
+            role_id=role_id,
+            family_id=family_id
+        )
+
+        # Datum parsen (bereits validiert durch Pydantic)
+        birth_date_obj = datetime.strptime(participant_data.birth_date, "%Y-%m-%d").date()
 
         # Preis neu berechnen (wenn sich relevante Daten geändert haben)
         calculated_price = _calculate_price_for_participant(
             db=db,
             event_id=event_id,
-            role_id=role_id,
+            role_id=participant_data.role_id,
             birth_date=birth_date_obj,
-            family_id=family_id
+            family_id=participant_data.family_id
         )
 
         # Teilnehmer aktualisieren
-        participant.first_name = first_name
-        participant.last_name = last_name
+        participant.first_name = participant_data.first_name
+        participant.last_name = participant_data.last_name
         participant.birth_date = birth_date_obj
-        participant.gender = gender
-        participant.email = email if email else None
-        participant.phone = phone if phone else None
-        participant.address = address if address else None
-        participant.bildung_teilhabe_id = bildung_teilhabe_id if bildung_teilhabe_id else None
-        participant.allergies = allergies if allergies else None
-        participant.medical_notes = medical_notes if medical_notes else None
-        participant.notes = notes if notes else None
-        participant.discount_percent = discount_percent
-        participant.discount_reason = discount_reason if discount_reason else None
-        participant.manual_price_override = manual_price_override
+        participant.gender = participant_data.gender
+        participant.email = participant_data.email
+        participant.phone = participant_data.phone
+        participant.address = participant_data.address
+        participant.bildung_teilhabe_id = participant_data.bildung_teilhabe_id
+        participant.allergies = participant_data.allergies
+        participant.medical_notes = participant_data.medical_notes
+        participant.notes = participant_data.notes
+        participant.discount_percent = participant_data.discount_percent
+        participant.discount_reason = participant_data.discount_reason
+        participant.manual_price_override = participant_data.manual_price_override
         # event_id bleibt unverändert (Sicherheit!)
-        participant.role_id = role_id
-        participant.family_id = family_id if family_id else None
+        participant.role_id = participant_data.role_id
+        participant.family_id = participant_data.family_id
         participant.calculated_price = calculated_price
 
         db.commit()
 
+        flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich aktualisiert", "success")
         return RedirectResponse(url=f"/participants/{participant_id}", status_code=303)
 
-    except Exception as e:
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error updating participant: {e}", exc_info=True)
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=validation", status_code=303)
+
+    except IntegrityError as e:
         db.rollback()
-        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=1", status_code=303)
+        logger.error(f"Database integrity error updating participant: {e}", exc_info=True)
+        flash(request, "Teilnehmer konnte nicht aktualisiert werden (Datenbankfehler)", "error")
+        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data updating participant: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, f"/participants/{participant_id}/edit", "Updating participant", db, request)
 
 
 @router.post("/{participant_id}/delete")
@@ -436,9 +530,19 @@ async def delete_participant(
         raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")
 
     try:
+        participant_name = participant.full_name
         db.delete(participant)
         db.commit()
+        logger.info(f"Participant deleted: {participant_name} (ID: {participant_id})")
+        # Note: Flash-Message kann hier nicht gesetzt werden, da Request fehlt
         return RedirectResponse(url="/participants", status_code=303)
+
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Cannot delete participant due to integrity constraint: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Teilnehmer kann nicht gelöscht werden, da noch Zahlungen oder andere Verknüpfungen existieren")
+
     except Exception as e:
         db.rollback()
+        logger.exception(f"Error deleting participant: {e}")
         raise HTTPException(status_code=500, detail="Fehler beim Löschen")

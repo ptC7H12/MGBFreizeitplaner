@@ -1,17 +1,25 @@
 """Payments (Zahlungen) Router"""
+import logging
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
 from typing import Optional
 from io import BytesIO
+from pydantic import ValidationError
 
 from app.config import settings
 from app.database import get_db
 from app.models import Payment, Participant, Family
 from app.dependencies import get_current_event_id
 from app.services.invoice_generator import InvoiceGenerator
+from app.utils.error_handler import handle_db_exception
+from app.utils.flash import flash
+from app.schemas import PaymentCreateSchema, PaymentUpdateSchema
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
@@ -85,40 +93,74 @@ async def create_payment(
 ):
     """Erstellt eine neue Zahlung"""
     try:
-        # Datum parsen
-        payment_date_obj = datetime.strptime(payment_date, "%Y-%m-%d").date()
+        # Pydantic-Validierung
+        payment_data = PaymentCreateSchema(
+            amount=amount,
+            payment_date=payment_date,
+            payment_method=payment_method,
+            reference=reference,
+            notes=notes,
+            participant_id=participant_id,
+            family_id=family_id
+        )
 
-        # Validierung: Entweder Teilnehmer oder Familie
-        if not participant_id and not family_id:
-            return RedirectResponse(url="/payments/create?error=no_target", status_code=303)
+        # Datum parsen (bereits validiert durch Pydantic)
+        payment_date_obj = datetime.strptime(payment_data.payment_date, "%Y-%m-%d").date()
 
         # Neue Zahlung erstellen
         payment = Payment(
             event_id=event_id,
-            amount=amount,
+            amount=payment_data.amount,
             payment_date=payment_date_obj,
-            payment_method=payment_method if payment_method else None,
-            reference=reference if reference else None,
-            notes=notes if notes else None,
-            participant_id=participant_id if participant_id else None,
-            family_id=family_id if family_id else None
+            payment_method=payment_data.payment_method,
+            reference=payment_data.reference,
+            notes=payment_data.notes,
+            participant_id=payment_data.participant_id,
+            family_id=payment_data.family_id
         )
 
         db.add(payment)
         db.commit()
         db.refresh(payment)
 
+        flash(request, f"Zahlung über {payment_data.amount}€ wurde erfolgreich erfasst", "success")
+
         # Redirect zurück zur Quelle (Teilnehmer oder Familie)
-        if participant_id:
-            return RedirectResponse(url=f"/participants/{participant_id}", status_code=303)
-        elif family_id:
-            return RedirectResponse(url=f"/families/{family_id}", status_code=303)
+        if payment_data.participant_id:
+            return RedirectResponse(url=f"/participants/{payment_data.participant_id}", status_code=303)
+        elif payment_data.family_id:
+            return RedirectResponse(url=f"/families/{payment_data.family_id}", status_code=303)
         else:
             return RedirectResponse(url="/payments", status_code=303)
 
-    except Exception as e:
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error creating payment: {e}", exc_info=True)
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url="/payments/create?error=validation", status_code=303)
+
+    except ValueError as e:
+        logger.warning(f"Invalid input for payment creation: {e}", exc_info=True)
+        flash(request, f"Ungültige Eingabe: {str(e)}", "error")
+        return RedirectResponse(url="/payments/create?error=invalid_input", status_code=303)
+
+    except IntegrityError as e:
         db.rollback()
-        return RedirectResponse(url="/payments/create?error=1", status_code=303)
+        logger.error(f"Database integrity error creating payment: {e}", exc_info=True)
+        flash(request, "Zahlung konnte nicht erstellt werden (Datenbankfehler)", "error")
+        return RedirectResponse(url="/payments/create?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data creating payment: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url="/payments/create?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, "/payments/create", "Creating payment", db, request)
 
 
 @router.post("/{payment_id}/delete")
@@ -132,9 +174,11 @@ async def delete_payment(payment_id: int, db: Session = Depends(get_db), event_i
     try:
         participant_id = payment.participant_id
         family_id = payment.family_id
+        payment_amount = payment.amount
 
         db.delete(payment)
         db.commit()
+        logger.info(f"Payment deleted: {payment_amount}€ (ID: {payment_id})")
 
         # Redirect zurück zur Quelle
         if participant_id:
@@ -144,8 +188,14 @@ async def delete_payment(payment_id: int, db: Session = Depends(get_db), event_i
         else:
             return RedirectResponse(url="/payments", status_code=303)
 
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Cannot delete payment due to integrity constraint: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Zahlung kann nicht gelöscht werden, da noch Verknüpfungen existieren")
+
     except Exception as e:
         db.rollback()
+        logger.exception(f"Error deleting payment: {e}")
         raise HTTPException(status_code=500, detail="Fehler beim Löschen")
 
 
@@ -158,7 +208,7 @@ async def generate_participant_invoice(participant_id: int, db: Session = Depend
         raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")
 
     # PDF generieren
-    generator = InvoiceGenerator()
+    generator = InvoiceGenerator(db)
     pdf_bytes = generator.generate_participant_invoice(participant)
 
     # PDF als Download zurückgeben
@@ -181,7 +231,7 @@ async def generate_family_invoice(family_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Familie nicht gefunden")
 
     # PDF generieren
-    generator = InvoiceGenerator()
+    generator = InvoiceGenerator(db)
     pdf_bytes = generator.generate_family_invoice(family)
 
     # PDF als Download zurückgeben

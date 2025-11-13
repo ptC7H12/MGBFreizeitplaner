@@ -8,14 +8,37 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.pdfgen import canvas
+from sqlalchemy.orm import Session
 
 
 class InvoiceGenerator:
     """Service für die Generierung von PDF-Rechnungen"""
 
-    def __init__(self):
+    def __init__(self, db: Session):
         self.pagesize = A4
         self.width, self.height = self.pagesize
+        self.db = db
+
+    def _get_settings(self, event_id: int):
+        """
+        Lädt die Einstellungen für ein Event oder erstellt Standard-Einstellungen
+
+        Args:
+            event_id: ID des Events
+
+        Returns:
+            Setting-Objekt
+        """
+        from app.models import Setting
+
+        setting = self.db.query(Setting).filter(Setting.event_id == event_id).first()
+
+        if not setting:
+            # Keine Einstellungen vorhanden -> Standard-Einstellungen verwenden
+            setting = Setting(event_id=event_id)
+            # Nicht in DB speichern, nur Standard-Werte verwenden
+
+        return setting
 
     def generate_participant_invoice(self, participant) -> bytes:
         """
@@ -43,9 +66,15 @@ class InvoiceGenerator:
         heading_style = styles['Heading2']
         normal_style = styles['Normal']
 
+        # Einstellungen laden
+        settings = self._get_settings(participant.event_id)
+
         # Absender/Organisation
-        story.append(Paragraph("Freizeit-Kassen-System", title_style))
-        story.append(Paragraph("Musterstraße 123 • 12345 Musterstadt", normal_style))
+        story.append(Paragraph(settings.organization_name, title_style))
+        if settings.organization_address:
+            # Adresse aufbereiten (Zeilenumbrüche durch • ersetzen für kompakte Anzeige)
+            address_compact = settings.organization_address.replace('\n', ' • ')
+            story.append(Paragraph(address_compact, normal_style))
         story.append(Spacer(1, 0.5*cm))
 
         # Rechnungsnummer und Datum
@@ -76,7 +105,8 @@ class InvoiceGenerator:
         story.append(Spacer(1, 1*cm))
 
         # Betreff
-        story.append(Paragraph(f"Teilnahme an: {participant.event.name}", heading_style))
+        subject_prefix = settings.invoice_subject_prefix or "Teilnahme an"
+        story.append(Paragraph(f"{subject_prefix}: {participant.event.name}", heading_style))
         story.append(Spacer(1, 0.5*cm))
 
         # Positions-Tabelle
@@ -137,22 +167,25 @@ class InvoiceGenerator:
         story.append(Spacer(1, 1.5*cm))
 
         # Zahlungsinformationen
+        footer_text = settings.invoice_footer_text or "Vielen Dank für Ihre Zahlung!"
         if outstanding > 0:
             story.append(Paragraph("Zahlungsinformationen:", heading_style))
-            payment_text = """
+            payment_text = f"""
             Bitte überweisen Sie den offenen Betrag unter Angabe der Rechnungsnummer auf folgendes Konto:<br/>
             <br/>
-            <b>Kontoinhaber:</b> Freizeit-Kassen-System<br/>
-            <b>IBAN:</b> DE89 3704 0044 0532 0130 00<br/>
-            <b>BIC:</b> COBADEFFXXX<br/>
-            <b>Verwendungszweck:</b> {}<br/>
+            <b>Kontoinhaber:</b> {settings.bank_account_holder}<br/>
+            <b>IBAN:</b> {settings.bank_iban}<br/>
+            """
+            if settings.bank_bic:
+                payment_text += f"<b>BIC:</b> {settings.bank_bic}<br/>"
+            payment_text += f"""<b>Verwendungszweck:</b> {invoice_number}<br/>
             <br/>
-            Vielen Dank für Ihre Zahlung!
-            """.format(invoice_number)
+            {footer_text}
+            """
             story.append(Paragraph(payment_text, normal_style))
         else:
             story.append(Paragraph("Status: Vollständig bezahlt", heading_style))
-            story.append(Paragraph("Vielen Dank für Ihre Zahlung!", normal_style))
+            story.append(Paragraph(footer_text, normal_style))
 
         # PDF generieren
         doc.build(story)
@@ -185,9 +218,15 @@ class InvoiceGenerator:
         heading_style = styles['Heading2']
         normal_style = styles['Normal']
 
+        # Einstellungen laden
+        settings = self._get_settings(family.event_id)
+
         # Absender/Organisation
-        story.append(Paragraph("Freizeit-Kassen-System", title_style))
-        story.append(Paragraph("Musterstraße 123 • 12345 Musterstadt", normal_style))
+        story.append(Paragraph(settings.organization_name, title_style))
+        if settings.organization_address:
+            # Adresse aufbereiten (Zeilenumbrüche durch • ersetzen für kompakte Anzeige)
+            address_compact = settings.organization_address.replace('\n', ' • ')
+            story.append(Paragraph(address_compact, normal_style))
         story.append(Spacer(1, 0.5*cm))
 
         # Rechnungsnummer und Datum
@@ -291,22 +330,25 @@ class InvoiceGenerator:
             story.append(Spacer(1, 0.5*cm))
 
         # Zahlungsinformationen
+        footer_text = settings.invoice_footer_text or "Vielen Dank für Ihre Zahlung!"
         if outstanding > 0:
             story.append(Paragraph("Zahlungsinformationen:", heading_style))
-            payment_text = """
+            payment_text = f"""
             Bitte überweisen Sie den offenen Betrag unter Angabe der Rechnungsnummer auf folgendes Konto:<br/>
             <br/>
-            <b>Kontoinhaber:</b> Freizeit-Kassen-System<br/>
-            <b>IBAN:</b> DE89 3704 0044 0532 0130 00<br/>
-            <b>BIC:</b> COBADEFFXXX<br/>
-            <b>Verwendungszweck:</b> {}<br/>
+            <b>Kontoinhaber:</b> {settings.bank_account_holder}<br/>
+            <b>IBAN:</b> {settings.bank_iban}<br/>
+            """
+            if settings.bank_bic:
+                payment_text += f"<b>BIC:</b> {settings.bank_bic}<br/>"
+            payment_text += f"""<b>Verwendungszweck:</b> {invoice_number}<br/>
             <br/>
-            Vielen Dank für Ihre Zahlung!
-            """.format(invoice_number)
+            {footer_text}
+            """
             story.append(Paragraph(payment_text, normal_style))
         else:
             story.append(Paragraph("Status: Vollständig bezahlt", heading_style))
-            story.append(Paragraph("Vielen Dank für Ihre Zahlung!", normal_style))
+            story.append(Paragraph(footer_text, normal_style))
 
         # PDF generieren
         doc.build(story)
