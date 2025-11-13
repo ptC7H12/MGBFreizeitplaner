@@ -124,17 +124,23 @@ def setup_embedded_python(platform_dir: Path) -> bool:
     if not download_file(PIP_URL, pip_installer, "pip installer"):
         return False
 
-    # Aktiviere site-packages
+    # Aktiviere site-packages und füge Parent-Directory hinzu
     pth_files = list(python_dir.glob("python*._pth"))
     if pth_files:
         pth_file = pth_files[0]
         content = pth_file.read_text()
         content = content.replace("#import site", "import site")
-        # Füge Lib/site-packages hinzu falls nicht vorhanden
+
+        # Füge notwendige Pfade hinzu
         if "Lib\\site-packages" not in content:
             content += "\nLib\\site-packages\n"
+
+        # Füge Parent-Directory hinzu (wo app/ liegt)
+        if ".." not in content:
+            content += "..\n"
+
         pth_file.write_text(content)
-        print(f"✅ Site-packages aktiviert in {pth_file.name}")
+        print(f"✅ Site-packages und app-Pfad aktiviert in {pth_file.name}")
 
     print("✅ Embedded Python eingerichtet")
     return True
