@@ -14,6 +14,7 @@ import shutil
 import zipfile
 import urllib.request
 import ssl
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -147,20 +148,64 @@ def install_dependencies(platform_dir: Path) -> bool:
     python_exe = python_dir / "python.exe"
     requirements = PROJECT_ROOT / "requirements.txt"
 
+    # Konvertiere zu absoluten Pfaden
+    python_exe = python_exe.absolute()
+    requirements = requirements.absolute()
+    get_pip = (python_dir / "get-pip.py").absolute()
+
+    # Prüfe ob Dateien existieren
+    if not python_exe.exists():
+        print(f"❌ Python nicht gefunden: {python_exe}")
+        return False
+
+    if not get_pip.exists():
+        print(f"❌ get-pip.py nicht gefunden: {get_pip}")
+        return False
+
+    if not requirements.exists():
+        print(f"❌ requirements.txt nicht gefunden: {requirements}")
+        return False
+
     # Installiere pip
-    get_pip = python_dir / "get-pip.py"
     print("  Installing pip...")
-    result = os.system(f'"{python_exe}" "{get_pip}" --no-warn-script-location')
-    if result != 0:
-        print("❌ Pip-Installation fehlgeschlagen")
+    try:
+        result = subprocess.run(
+            [str(python_exe), str(get_pip), "--no-warn-script-location"],
+            cwd=str(python_dir),
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            print(f"❌ Pip-Installation fehlgeschlagen")
+            print(f"STDOUT: {result.stdout}")
+            print(f"STDERR: {result.stderr}")
+            return False
+
+        print("  ✓ Pip installiert")
+    except Exception as e:
+        print(f"❌ Fehler bei pip-Installation: {e}")
         return False
 
     # Installiere Dependencies
     print(f"  Installing requirements...")
-    result = os.system(f'"{python_exe}" -m pip install -r "{requirements}" --no-warn-script-location')
+    try:
+        result = subprocess.run(
+            [str(python_exe), "-m", "pip", "install", "-r", str(requirements), "--no-warn-script-location"],
+            cwd=str(platform_dir),
+            capture_output=True,
+            text=True
+        )
 
-    if result != 0:
-        print("❌ Dependency-Installation fehlgeschlagen")
+        if result.returncode != 0:
+            print(f"❌ Dependency-Installation fehlgeschlagen")
+            print(f"STDOUT: {result.stdout}")
+            print(f"STDERR: {result.stderr}")
+            return False
+
+        print("  ✓ Dependencies installiert")
+    except Exception as e:
+        print(f"❌ Fehler bei Dependency-Installation: {e}")
         return False
 
     print("✅ Dependencies installiert")
