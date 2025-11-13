@@ -17,9 +17,41 @@ Ein Web-basiertes Kassensystem für Kinder-, Jugend- und Familienfreizeiten mit 
 - **Datenbank**: SQLite mit SQLAlchemy ORM
 - **Deployment**: Docker + Docker Compose
 
-## Schnellstart
+## Installation
 
-### Mit Docker (empfohlen)
+### 🎯 Option 1: Portable Version (Empfohlen für Endanwender)
+
+**Einfachste Installation - kein Git, kein Docker nötig!**
+
+#### Windows
+1. [Download Windows ZIP](../../releases) herunterladen
+2. ZIP entpacken
+3. **Doppelklick auf `start.bat`** (oder `start.ps1` für PowerShell)
+4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+
+**Voraussetzung:** Python 3.11+ von [python.org](https://www.python.org/downloads/) (bei Installation "Add Python to PATH" aktivieren!)
+
+#### macOS
+1. [Download macOS ZIP](../../releases) herunterladen
+2. ZIP entpacken
+3. **Doppelklick auf `start.sh`** (oder im Terminal: `./start.sh`)
+4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+
+**Voraussetzung:** Python 3.11+ installiert via `brew install python@3.11` oder von [python.org](https://www.python.org/downloads/)
+
+#### Linux
+1. [Download Linux ZIP](../../releases) herunterladen
+2. ZIP entpacken
+3. Im Terminal: `./start.sh`
+4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+
+**Voraussetzung:** Python 3.11+ installiert (z.B. `sudo apt install python3.11`)
+
+---
+
+### 🐳 Option 2: Mit Docker
+
+**Für Server-Deployment oder Entwickler mit Docker-Erfahrung**
 
 1. Repository klonen:
 ```bash
@@ -37,7 +69,11 @@ docker-compose up -d
 http://localhost:8000
 ```
 
-### Ohne Docker
+---
+
+### 💻 Option 3: Manuelle Installation (Entwickler)
+
+**Für Entwickler die am Code arbeiten möchten**
 
 1. Repository klonen und in Verzeichnis wechseln:
 ```bash
@@ -75,6 +111,18 @@ uvicorn app.main:app --reload
 ```
 http://localhost:8000
 ```
+
+---
+
+## 📦 Portable Releases erstellen
+
+Für Maintainer: Um neue Portable-Versionen zu erstellen:
+
+```bash
+python build_portable.py
+```
+
+Dies erstellt ZIP-Archive für Windows, macOS und Linux im `releases/` Ordner.
 
 ## Projektstruktur
 

@@ -20,6 +20,9 @@ wheels/
 .installed.cfg
 *.egg
 
+# Portable Releases
+releases/
+
 # Virtual Environment
 venv/
 ENV/
