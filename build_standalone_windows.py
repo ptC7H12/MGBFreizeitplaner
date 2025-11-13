@@ -1,0 +1,388 @@
+#!/usr/bin/env python3
+"""
+Build-Skript für Windows Standalone Version von MGBFreizeitplaner
+
+Erstellt vollständig eigenständige ZIP-Archive mit embedded Python für Windows.
+KEINE Python-Installation erforderlich!
+
+Für macOS/Linux: Verwende die Portable-Version (build_portable.py)
+"""
+
+import os
+import sys
+import shutil
+import zipfile
+import urllib.request
+import ssl
+from pathlib import Path
+from datetime import datetime
+
+# Projektverzeichnis
+PROJECT_ROOT = Path(__file__).parent
+BUILD_DIR = PROJECT_ROOT / "build"
+RELEASE_DIR = PROJECT_ROOT / "releases"
+DOWNLOAD_CACHE = PROJECT_ROOT / ".download_cache"
+
+# Version
+VERSION = "1.0.0"
+
+# Python Version für Windows
+PYTHON_VERSION = "3.11.9"
+PYTHON_URL = f"https://www.python.org/ftp/python/{PYTHON_VERSION}/python-{PYTHON_VERSION}-embed-amd64.zip"
+PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
+
+# Dateien die inkludiert werden sollen
+INCLUDE_ITEMS = [
+    "app/",
+    "rulesets/",
+    "requirements.txt",
+    ".env.example",
+    "README.md",
+    "PHASE7_README.md",
+    "PHASE7_STATUS.md",
+]
+
+
+def download_file(url: str, destination: Path, description: str = "Datei"):
+    """Lädt eine Datei mit Fortschrittsanzeige herunter"""
+    print(f"📥 Lade {description} herunter...")
+    print(f"   URL: {url}")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    ssl_context = ssl.create_default_context()
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    request = urllib.request.Request(url, headers=headers)
+
+    try:
+        with urllib.request.urlopen(request, context=ssl_context) as response:
+            total_size = int(response.headers.get('content-length', 0))
+            block_size = 8192
+            downloaded = 0
+
+            with open(destination, 'wb') as f:
+                while True:
+                    buffer = response.read(block_size)
+                    if not buffer:
+                        break
+
+                    downloaded += len(buffer)
+                    f.write(buffer)
+
+                    if total_size > 0:
+                        percent = (downloaded / total_size) * 100
+                        mb_downloaded = downloaded / (1024 * 1024)
+                        mb_total = total_size / (1024 * 1024)
+                        print(f"\r   Progress: {percent:.1f}% ({mb_downloaded:.1f}/{mb_total:.1f} MB)", end='')
+
+        print()
+        print(f"✅ Download abgeschlossen: {destination.name}")
+        return True
+
+    except Exception as e:
+        print(f"\n❌ Fehler beim Download: {e}")
+        return False
+
+
+def extract_zip(zip_path: Path, destination: Path):
+    """Entpackt ein ZIP-Archiv"""
+    print(f"📦 Entpacke {zip_path.name}...")
+    destination.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(destination)
+        print(f"✅ Entpackt nach: {destination}")
+        return True
+    except Exception as e:
+        print(f"❌ Fehler beim Entpacken: {e}")
+        return False
+
+
+def setup_embedded_python(platform_dir: Path) -> bool:
+    """Richtet embedded Python für Windows ein"""
+    print("\n🐍 Richte embedded Python für Windows ein...")
+
+    python_dir = platform_dir / "python"
+
+    # Download Python embeddable
+    cache_file = DOWNLOAD_CACHE / f"python-{PYTHON_VERSION}-embed-amd64.zip"
+
+    if not cache_file.exists():
+        if not download_file(PYTHON_URL, cache_file, f"Python {PYTHON_VERSION} Embeddable"):
+            return False
+    else:
+        print(f"✅ Verwende gecachte Datei: {cache_file.name}")
+
+    # Entpacke Python
+    if not extract_zip(cache_file, python_dir):
+        return False
+
+    # Download get-pip.py
+    pip_installer = python_dir / "get-pip.py"
+    if not download_file(PIP_URL, pip_installer, "pip installer"):
+        return False
+
+    # Aktiviere site-packages
+    pth_files = list(python_dir.glob("python*._pth"))
+    if pth_files:
+        pth_file = pth_files[0]
+        content = pth_file.read_text()
+        content = content.replace("#import site", "import site")
+        # Füge Lib/site-packages hinzu falls nicht vorhanden
+        if "Lib\\site-packages" not in content:
+            content += "\nLib\\site-packages\n"
+        pth_file.write_text(content)
+        print(f"✅ Site-packages aktiviert in {pth_file.name}")
+
+    print("✅ Embedded Python eingerichtet")
+    return True
+
+
+def install_dependencies(platform_dir: Path) -> bool:
+    """Installiert Python-Dependencies"""
+    print(f"\n📦 Installiere Dependencies...")
+
+    python_dir = platform_dir / "python"
+    python_exe = python_dir / "python.exe"
+    requirements = PROJECT_ROOT / "requirements.txt"
+
+    # Installiere pip
+    get_pip = python_dir / "get-pip.py"
+    print("  Installing pip...")
+    result = os.system(f'"{python_exe}" "{get_pip}" --no-warn-script-location')
+    if result != 0:
+        print("❌ Pip-Installation fehlgeschlagen")
+        return False
+
+    # Installiere Dependencies
+    print(f"  Installing requirements...")
+    result = os.system(f'"{python_exe}" -m pip install -r "{requirements}" --no-warn-script-location')
+
+    if result != 0:
+        print("❌ Dependency-Installation fehlgeschlagen")
+        return False
+
+    print("✅ Dependencies installiert")
+    return True
+
+
+def copy_project_files(target_dir: Path):
+    """Kopiert Projektdateien"""
+    print(f"📋 Kopiere Projektdateien...")
+
+    for item in INCLUDE_ITEMS:
+        source = PROJECT_ROOT / item
+        if not source.exists():
+            print(f"⚠️  Warnung: {item} nicht gefunden")
+            continue
+
+        dest = target_dir / item
+
+        if source.is_dir():
+            shutil.copytree(source, dest, dirs_exist_ok=True)
+        else:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, dest)
+        print(f"  ✓ {item}")
+
+
+def create_startup_script(platform_dir: Path):
+    """Erstellt Startup-Skript"""
+    script_content = '''@echo off
+REM ============================================
+REM  MGBFreizeitplaner - Standalone Version
+REM  KEINE Python-Installation erforderlich!
+REM ============================================
+
+echo.
+echo ========================================
+echo   MGBFreizeitplaner
+echo   Freizeit-Kassen-System
+echo ========================================
+echo.
+
+REM Verwende embedded Python
+set PYTHON_EXE=%~dp0python\\python.exe
+
+if not exist "%PYTHON_EXE%" (
+    echo [FEHLER] Embedded Python nicht gefunden!
+    echo Bitte stelle sicher, dass der Ordner vollstaendig entpackt wurde.
+    pause
+    exit /b 1
+)
+
+echo [INFO] Verwende embedded Python
+echo.
+
+REM Check if .env file exists
+if not exist ".env" (
+    if exist ".env.example" (
+        echo [INFO] Erstelle .env Datei...
+        copy .env.example .env >nul
+    )
+)
+
+REM Start the application
+echo ========================================
+echo   Starte Anwendung...
+echo ========================================
+echo.
+echo Die Anwendung ist verfuegbar unter:
+echo   http://localhost:8000
+echo.
+echo Oeffne deinen Browser und gehe zu dieser Adresse.
+echo.
+echo Druecke Ctrl+C um die Anwendung zu beenden
+echo.
+
+"%PYTHON_EXE%" -m app.main
+
+if errorlevel 1 (
+    echo.
+    echo [FEHLER] Anwendung wurde mit Fehler beendet!
+    pause
+)
+'''
+
+    script_path = platform_dir / "start.bat"
+    script_path.write_text(script_content, encoding='utf-8')
+    print(f"✅ Startup-Skript erstellt: start.bat")
+
+
+def create_readme(platform_dir: Path):
+    """Erstellt README"""
+    readme_content = f"""# MGBFreizeitplaner - Windows Standalone Version
+
+## ✨ Keine Installation erforderlich!
+
+Diese Version enthält alles, was Sie brauchen - einschließlich Python!
+
+## Schnellstart
+
+1. **Doppelklick auf `start.bat`**
+2. Fertig! Browser öffnet automatisch unter http://localhost:8000
+
+## Das wars!
+
+Keine Python-Installation, keine Konfiguration, keine Kommandozeile erforderlich.
+Einfach entpacken und starten!
+
+## Technische Details
+
+- Enthält: Python {PYTHON_VERSION} (embedded)
+- Größe: ~60 MB (komprimiert)
+- Portable: Kann auf USB-Stick verwendet werden
+- Datenbank: Wird lokal im Ordner gespeichert (freizeit_kassen.db)
+
+## Bei Problemen
+
+### Windows Defender Firewall Warnung
+- Klicken Sie auf "Zugriff zulassen" - dies ist normal für lokale Server
+
+### Port 8000 bereits belegt
+- Schließen Sie andere Programme die Port 8000 nutzen
+- Oder ändern Sie PORT in der .env Datei
+
+## Support
+
+Bei Fragen oder Problemen: https://github.com/[YOUR_REPO]/issues
+
+## Hinweis für macOS/Linux Benutzer
+
+Für macOS und Linux verwenden Sie bitte die **Portable Version**, da:
+- Diese Systeme oft Python bereits haben
+- Die Standalone-Builds sehr groß sind (~70 MB)
+- Die Portable-Version besser optimiert ist
+
+Download Portable-Version: [GitHub Releases](../../releases)
+"""
+
+    readme_path = platform_dir / "README.txt"
+    readme_path.write_text(readme_content, encoding='utf-8')
+    print(f"✅ README erstellt")
+
+
+def create_package():
+    """Erstellt Windows Standalone-Paket"""
+    print("\n" + "="*60)
+    print("🚀 MGBFreizeitplaner - Windows Standalone Build")
+    print(f"📌 Version: {VERSION}")
+    print("="*60 + "\n")
+
+    # Vorbereitung
+    print("🧹 Räume alte Builds auf...")
+    if BUILD_DIR.exists():
+        shutil.rmtree(BUILD_DIR)
+    BUILD_DIR.mkdir(parents=True)
+    RELEASE_DIR.mkdir(parents=True, exist_ok=True)
+    DOWNLOAD_CACHE.mkdir(parents=True, exist_ok=True)
+    print("✅ Aufgeräumt!\n")
+
+    # Erstelle Build-Verzeichnis
+    platform_dir = BUILD_DIR / "MGBFreizeitplaner-Windows-Standalone"
+    platform_dir.mkdir(parents=True, exist_ok=True)
+
+    # Build-Schritte
+    try:
+        copy_project_files(platform_dir)
+
+        if not setup_embedded_python(platform_dir):
+            raise Exception("Python Setup fehlgeschlagen")
+
+        if not install_dependencies(platform_dir):
+            raise Exception("Dependency Installation fehlgeschlagen")
+
+        create_startup_script(platform_dir)
+        create_readme(platform_dir)
+
+        # Erstelle ZIP
+        timestamp = datetime.now().strftime("%Y%m%d")
+        zip_name = f"MGBFreizeitplaner-{VERSION}-Windows-Standalone-{timestamp}.zip"
+        zip_path = RELEASE_DIR / zip_name
+
+        print(f"\n🗜️  Erstelle ZIP-Archiv: {zip_name}")
+        print("   Dies kann einige Minuten dauern...")
+
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(platform_dir):
+                dirs[:] = [d for d in dirs if d not in ['__pycache__', '.pytest_cache']]
+
+                for file in files:
+                    if file.endswith('.pyc'):
+                        continue
+
+                    file_path = Path(root) / file
+                    arcname = file_path.relative_to(BUILD_DIR)
+                    zipf.write(file_path, arcname)
+
+        size_mb = zip_path.stat().st_size / (1024 * 1024)
+
+        print(f"\n✅ {zip_name} erstellt ({size_mb:.1f} MB)")
+
+        print("\n" + "="*60)
+        print("✨ Build erfolgreich abgeschlossen!")
+        print("="*60)
+        print(f"\n📁 Release: {zip_path.absolute()}\n")
+        print("💡 Nächste Schritte:")
+        print("  1. Teste das ZIP-Archiv auf einem Windows-PC")
+        print("  2. Lade es auf GitHub Releases hoch")
+        print("  3. Teile den Download-Link mit Benutzern")
+        print()
+
+    except Exception as e:
+        print(f"\n❌ Build fehlgeschlagen: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    try:
+        create_package()
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Build abgebrochen")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n\n❌ Kritischer Fehler: {e}")
+        sys.exit(1)

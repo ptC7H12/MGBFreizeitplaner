@@ -19,55 +19,54 @@ Ein Web-basiertes Kassensystem für Kinder-, Jugend- und Familienfreizeiten mit 
 
 ## Installation
 
-### 🎯 Option 1: Standalone Version ⭐ **NEU** (Empfohlen für alle Benutzer)
+### 🎯 Option 1: Standalone Version für Windows ⭐ **NEU** (Empfohlen für Windows-Benutzer)
 
 **Komplett ohne Installation - Python ist bereits dabei!**
 
 #### Windows
 1. [Download Windows Standalone ZIP](../../releases) herunterladen (~60 MB)
 2. ZIP entpacken
-3. **Doppelklick auf `start_embedded.bat`**
+3. **Doppelklick auf `start.bat`**
 4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
 
-**Voraussetzungen:** KEINE! Alles ist enthalten.
+**Voraussetzungen:** KEINE! Python ist enthalten.
 
-#### macOS
-1. [Download macOS Standalone ZIP](../../releases) herunterladen (~70 MB)
-2. ZIP entpacken
-3. **Doppelklick auf `start_embedded.sh`** (oder im Terminal: `./start_embedded.sh`)
-4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
-
-**Voraussetzungen:** KEINE! Alles ist enthalten.
-
-#### Linux
-1. [Download Linux Standalone ZIP](../../releases) herunterladen (~70 MB)
-2. ZIP entpacken
-3. Im Terminal: `./start_embedded.sh`
-4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
-
-**Voraussetzungen:** KEINE! Alles ist enthalten.
+**Perfekt für:** Nicht-technische Benutzer, Jugendgruppen, schnelle Installation
 
 ---
 
-### 💾 Option 2: Portable Version (für Nutzer mit Python)
+**Hinweis für macOS/Linux:** Für diese Systeme empfehlen wir die Portable-Version (Option 2) - sie ist kleiner, schneller und diese Systeme haben oft Python bereits installiert.
 
-**Kleinere Download-Größe (~5 MB), aber Python muss vorinstalliert sein**
+---
 
-#### Windows
-1. [Download Windows Portable ZIP](../../releases) herunterladen
+### 💾 Option 2: Portable Version ⭐ (Empfohlen für macOS/Linux)
+
+**Kleinere Download-Größe (~5 MB), Python muss vorinstalliert sein**
+
+#### macOS
+1. [Download macOS Portable ZIP](../../releases) herunterladen (~5 MB)
 2. ZIP entpacken
-3. **Doppelklick auf `start.bat`** (oder `start.ps1` für PowerShell)
+3. **Doppelklick auf `start.sh`** (oder im Terminal: `./start.sh`)
 4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
 
-**Voraussetzung:** Python 3.11+ von [python.org](https://www.python.org/downloads/) (bei Installation "Add Python to PATH" aktivieren!)
+**Voraussetzung:** Python 3.11+ installieren via `brew install python@3.11`
 
-#### macOS / Linux
-1. [Download Portable ZIP](../../releases) herunterladen
+#### Linux
+1. [Download Linux Portable ZIP](../../releases) herunterladen (~5 MB)
 2. ZIP entpacken
-3. **Ausführen:** `./start.sh`
+3. Im Terminal: `./start.sh`
 4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
 
-**Voraussetzung:** Python 3.11+ (macOS: `brew install python@3.11`, Linux: `apt install python3.11`)
+**Voraussetzung:** Python 3.11+ (z.B. `sudo apt install python3.11`)
+
+#### Windows (Alternative zur Standalone-Version)
+1. [Download Windows Portable ZIP](../../releases) herunterladen (~5 MB)
+2. ZIP entpacken
+3. **Doppelklick auf `start.bat`**
+4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+
+**Voraussetzung:** Python 3.11+ von [python.org](https://www.python.org/downloads/)
+⚠️ Bei Installation "Add Python to PATH" aktivieren!
 
 ---
 
@@ -140,19 +139,23 @@ http://localhost:8000
 
 Für Maintainer:
 
-**Standalone-Version (mit embedded Python - empfohlen):**
+**Windows Standalone-Version (mit embedded Python):**
 ```bash
-python build_portable_embedded.py
+python build_standalone_windows.py
 ```
-Erstellt vollständige Standalone-Pakete (~60-70 MB) - keine Python-Installation erforderlich!
+Erstellt Windows-Standalone-Paket (~60 MB) - keine Python-Installation erforderlich!
 
-**Portable-Version (ohne Python - kleiner):**
+**Portable-Version (für alle Plattformen):**
 ```bash
 python build_portable.py
 ```
-Erstellt kleinere Pakete (~5 MB) - Python-Installation erforderlich.
+Erstellt Portable-Pakete (~5 MB) - Python-Installation erforderlich.
 
 Beide Skripte erstellen ZIP-Archive im `releases/` Ordner.
+
+**Empfehlung:**
+- Windows: Beide Versionen bereitstellen (Standalone für Endanwender, Portable für Tech-Savvy)
+- macOS/Linux: Nur Portable-Version (kleiner, Python meist vorhanden)
 
 ## Projektstruktur
 

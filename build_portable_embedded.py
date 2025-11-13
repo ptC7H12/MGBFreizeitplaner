@@ -76,8 +76,14 @@ def download_file(url: str, destination: Path, description: str = "Datei"):
     # SSL context für Downloads
     ssl_context = ssl.create_default_context()
 
+    # Request mit User-Agent Header (GitHub requires this)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    request = urllib.request.Request(url, headers=headers)
+
     try:
-        with urllib.request.urlopen(url, context=ssl_context) as response:
+        with urllib.request.urlopen(request, context=ssl_context) as response:
             total_size = int(response.headers.get('content-length', 0))
             block_size = 8192
             downloaded = 0
