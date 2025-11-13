@@ -187,8 +187,8 @@ role_discounts:
 
 **Berechnung**:
 1. Basispreis wird aus Altersgruppe ermittelt
-2. Rollenrabatt wird angewendet: `Preis = Basispreis × (1 - Rabatt/100)`
-3. Danach wird ggf. noch der Familienrabatt angewendet
+2. Alle Rabatte werden **vom Basispreis** berechnet (nicht gestapelt!)
+3. `Endpreis = Basispreis - (Basispreis × Rollenrabatt/100) - (Basispreis × Familienrabatt/100)`
 
 #### `family_discount` (Object, optional)
 **Beschreibung**: Konfiguration für Geschwisterrabatte
@@ -220,7 +220,7 @@ family_discount:
 **Hinweise**:
 - Die Reihenfolge wird nach Geburtsdatum bestimmt (ältestes = erstes Kind)
 - Das erste Kind erhält keinen Familienrabatt
-- Familienrabatt wird **nach** dem Rollenrabatt angewendet
+- Familienrabatt wird **vom Basispreis** berechnet (nicht vom bereits reduzierten Preis!)
 - Nur Teilnehmer derselben Familie profitieren
 
 **Beispiele**:
@@ -261,14 +261,21 @@ Gesamt: 405€ statt 450€ (Ersparnis: 45€)
 Die Preisberechnung erfolgt in folgender Reihenfolge:
 
 1. **Basispreis ermitteln** (aus Altersgruppe)
-2. **Rollenrabatt anwenden** (falls vorhanden)
-3. **Familienrabatt anwenden** (falls aktiviert und anwendbar)
-4. **Manuelle Rabatte/Überschreibungen** (in der UI)
+2. **Rollenrabatt vom Basispreis berechnen** (falls vorhanden)
+3. **Familienrabatt vom Basispreis berechnen** (falls aktiviert und anwendbar)
+4. **Alle Rabatte vom Basispreis abziehen**
+5. **Manuelle Rabatte/Überschreibungen** (in der UI)
 
 ### Formel
 
+**WICHTIG**: Alle Rabatte werden vom Basispreis berechnet, nicht gestapelt!
+
 ```
-Endpreis = ((Basispreis × (1 - Rollenrabatt/100)) × (1 - Familienrabatt/100)) × (1 - Manueller_Rabatt/100)
+Rollenrabatt_Betrag = Basispreis × (Rollenrabatt/100)
+Familienrabatt_Betrag = Basispreis × (Familienrabatt/100)
+Manueller_Rabatt_Betrag = Basispreis × (Manueller_Rabatt/100)
+
+Endpreis = Basispreis - Rollenrabatt_Betrag - Familienrabatt_Betrag - Manueller_Rabatt_Betrag
 ```
 
 Oder bei manueller Preisüberschreibung:
@@ -351,9 +358,9 @@ family_discount:
 **Szenario**: Jugendlicher Betreuer (14 Jahre), zweites Kind in der Familie
 **Berechnung**:
 1. Basispreis: 150€
-2. Rollenrabatt (50%): 150€ × (1 - 0.5) = 75€
-3. Familienrabatt (10%): 75€ × (1 - 0.1) = 67.50€
-4. **Endpreis: 67.50€**
+2. Rollenrabatt-Betrag: 150€ × 50% = 75€
+3. Familienrabatt-Betrag: 150€ × 10% = 15€
+4. **Endpreis: 150€ - 75€ - 15€ = 60€**
 
 #### Beispiel 5: Komplexe Familie
 ```yaml
@@ -377,11 +384,14 @@ family_discount:
 
 **Familie**:
 - Kind 1: 14 Jahre, Betreuer
-  - Basis: 150€, Rolle: -50% = 75€, Familie: 0% → **75€**
+  - Basis: 150€, Rollenrabatt: 150€ × 50% = 75€, Familienrabatt: 0€
+  - **Endpreis: 150€ - 75€ = 75€**
 - Kind 2: 12 Jahre, Teilnehmer
-  - Basis: 150€, Rolle: 0% = 150€, Familie: -10% → **135€**
+  - Basis: 150€, Rollenrabatt: 0€, Familienrabatt: 150€ × 10% = 15€
+  - **Endpreis: 150€ - 15€ = 135€**
 - Kind 3: 8 Jahre, Teilnehmer
-  - Basis: 140€, Rolle: 0% = 140€, Familie: -20% → **112€**
+  - Basis: 140€, Rollenrabatt: 0€, Familienrabatt: 140€ × 20% = 28€
+  - **Endpreis: 140€ - 28€ = 112€**
 
 **Familiengesamtpreis: 322€** (statt 440€ ohne Rabatte)
 
