@@ -247,6 +247,9 @@ echo   Freizeit-Kassen-System
 echo ========================================
 echo.
 
+REM Wechsle ins Skript-Verzeichnis
+cd /d "%~dp0"
+
 REM Verwende embedded Python
 set PYTHON_EXE=%~dp0python\\python.exe
 
@@ -270,7 +273,7 @@ if not exist ".env" (
 
 REM Start the application
 echo ========================================
-echo   Starte Anwendung...
+echo   Starte Anwendung
 echo ========================================
 echo.
 echo Die Anwendung ist verfuegbar unter:
