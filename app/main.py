@@ -9,7 +9,7 @@ import secrets
 
 from app.config import settings
 from app.database import init_db
-from app.routers import dashboard, participants, families, rulesets, payments, expenses, auth
+from app.routers import dashboard, participants, families, rulesets, payments, expenses, auth, settings as settings_router
 
 # Logging konfigurieren
 logging.basicConfig(
@@ -50,6 +50,7 @@ app.include_router(families.router)
 app.include_router(rulesets.router)
 app.include_router(payments.router)
 app.include_router(expenses.router)
+app.include_router(settings_router.router)
 
 
 @app.on_event("startup")

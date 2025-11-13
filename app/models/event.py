@@ -36,6 +36,7 @@ class Event(Base):
     rulesets = relationship("Ruleset", back_populates="event", cascade="all, delete-orphan")
     families = relationship("Family", back_populates="event", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="event", cascade="all, delete-orphan")
+    settings = relationship("Setting", back_populates="event", cascade="all, delete-orphan", uselist=False)
 
     @staticmethod
     def generate_code(length=8):

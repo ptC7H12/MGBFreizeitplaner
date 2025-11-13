@@ -199,7 +199,7 @@ async def generate_participant_invoice(participant_id: int, db: Session = Depend
         raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")
 
     # PDF generieren
-    generator = InvoiceGenerator()
+    generator = InvoiceGenerator(db)
     pdf_bytes = generator.generate_participant_invoice(participant)
 
     # PDF als Download zurückgeben
@@ -222,7 +222,7 @@ async def generate_family_invoice(family_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Familie nicht gefunden")
 
     # PDF generieren
-    generator = InvoiceGenerator()
+    generator = InvoiceGenerator(db)
     pdf_bytes = generator.generate_family_invoice(family)
 
     # PDF als Download zurückgeben
