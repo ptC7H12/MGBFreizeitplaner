@@ -178,12 +178,38 @@ async def create_participant(
     discount_reason: Optional[str] = Form(None),
     manual_price_override: Optional[float] = Form(None),
     role_id: int = Form(...),
-    family_id: Optional[int] = Form(None)
+    family_id: Optional[int] = Form(None),
+    create_as_family: Optional[str] = Form(None)
 ):
     """Erstellt einen neuen Teilnehmer"""
     try:
         # Datum parsen
         birth_date_obj = datetime.strptime(birth_date, "%Y-%m-%d").date()
+
+        # Wenn "Als Familie erstellen" aktiviert ist, neue Familie erstellen
+        if create_as_family == "true":
+            # Prüfen ob Familie mit diesem Namen schon existiert
+            existing_family = db.query(Family).filter(
+                Family.event_id == event_id,
+                Family.name == last_name
+            ).first()
+
+            if existing_family:
+                # Familie existiert bereits, diese verwenden
+                family_id = existing_family.id
+            else:
+                # Neue Familie erstellen
+                new_family = Family(
+                    name=last_name,
+                    event_id=event_id,
+                    contact_person=f"{first_name} {last_name}",
+                    email=email if email else None,
+                    phone=phone if phone else None,
+                    address=address if address else None
+                )
+                db.add(new_family)
+                db.flush()  # Familie speichern, um ID zu erhalten
+                family_id = new_family.id
 
         # Automatische Preisberechnung
         calculated_price = _calculate_price_for_participant(

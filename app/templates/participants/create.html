@@ -137,7 +137,22 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div>
+                <div class="md:col-span-2">
+                    <div class="mb-3">
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="create_as_family"
+                                name="create_as_family"
+                                value="true"
+                                class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                onchange="toggleFamilySelect(this.checked)"
+                            >
+                            <span class="ml-2 text-sm font-medium text-gray-700">Als neue Familie erstellen (Familienname = Nachname)</span>
+                        </label>
+                        <p class="mt-1 ml-6 text-xs text-gray-500">Aktivieren Sie diese Option, um automatisch eine Familie mit dem Nachnamen zu erstellen</p>
+                    </div>
+
                     <label for="family_id" class="block text-sm font-medium text-gray-700 mb-2">Familie</label>
                     <select
                         id="family_id"
@@ -156,6 +171,20 @@
                 </div>
             </div>
         </div>
+
+        <script>
+        function toggleFamilySelect(createAsFamily) {
+            const familySelect = document.getElementById('family_id');
+            if (createAsFamily) {
+                familySelect.value = '';
+                familySelect.disabled = true;
+                familySelect.classList.add('bg-gray-100', 'cursor-not-allowed');
+            } else {
+                familySelect.disabled = false;
+                familySelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            }
+        }
+        </script>
 
         <!-- Preis-Vorschau -->
         <div class="border-b border-gray-200 pb-6">
