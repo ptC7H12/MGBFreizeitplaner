@@ -4,9 +4,116 @@ Detaillierte Anleitung für die Installation auf Windows, macOS und Linux.
 
 ---
 
-## 📥 Portable Version (Empfohlen)
+## 🌟 Standalone Version (NEU - Absolut empfohlen!)
 
-Die einfachste Methode für Endanwender ohne technische Vorkenntnisse.
+**Die absolut einfachste Methode - KEINE Vorkenntnisse oder Installationen erforderlich!**
+
+### ✨ Vorteile:
+- ✅ Python ist bereits dabei - nichts zu installieren!
+- ✅ Funktioniert sofort nach dem Entpacken
+- ✅ Kein "Add Python to PATH" Problem
+- ✅ Perfekt für nicht-technische Benutzer
+- ✅ Portable - funktioniert auch vom USB-Stick
+
+### Windows (Standalone)
+
+#### Installation in 3 einfachen Schritten:
+
+1. **Download:**
+   - Lade `MGBFreizeitplaner-XXX-windows-standalone-YYYYMMDD.zip` herunter
+   - Von: [GitHub Releases](../../releases)
+   - Größe: ~60 MB
+
+2. **Entpacken:**
+   - Rechtsklick auf ZIP-Datei → "Alle extrahieren..."
+   - Wähle einen Zielordner (z.B. `C:\Programme\MGBFreizeitplaner`)
+   - Klicke "Extrahieren"
+
+3. **Starten:**
+   - Öffne den entpackten Ordner
+   - **Doppelklick auf `start_embedded.bat`**
+   - Fertig! Browser öffnet automatisch: http://localhost:8000
+
+#### Das wars! 🎉
+
+Keine Python-Installation, keine Konfiguration, keine Kommandozeile.
+
+#### Bei Windows Defender Firewall Warnung:
+- Klicke "Zugriff zulassen" - ist normal für lokale Server
+
+---
+
+### macOS (Standalone)
+
+#### Installation in 3 einfachen Schritten:
+
+1. **Download:**
+   - Lade `MGBFreizeitplaner-XXX-macos-standalone-YYYYMMDD.zip` herunter
+   - Von: [GitHub Releases](../../releases)
+   - Größe: ~70 MB
+
+2. **Entpacken:**
+   - Doppelklick auf ZIP-Datei (entpackt automatisch)
+   - Oder im Terminal:
+     ```bash
+     unzip MGBFreizeitplaner-*-macos-standalone-*.zip
+     ```
+
+3. **Starten:**
+   - **Variante A (Doppelklick):**
+     - Rechtsklick auf `start_embedded.sh` → "Öffnen"
+     - Bei Gatekeeper-Warnung: Klicke "Öffnen"
+
+   - **Variante B (Terminal):**
+     ```bash
+     cd MGBFreizeitplaner-macos-standalone
+     ./start_embedded.sh
+     ```
+
+   - Fertig! Browser öffnet automatisch: http://localhost:8000
+
+#### Das wars! 🎉
+
+Keine Python-Installation, keine Homebrew, keine Konfiguration.
+
+---
+
+### Linux (Standalone)
+
+#### Installation in 3 einfachen Schritten:
+
+1. **Download:**
+   ```bash
+   wget https://github.com/[YOUR_REPO]/releases/download/vX.X.X/MGBFreizeitplaner-XXX-linux-standalone-YYYYMMDD.zip
+   ```
+   Oder: Download manuell von [GitHub Releases](../../releases)
+   Größe: ~70 MB
+
+2. **Entpacken:**
+   ```bash
+   unzip MGBFreizeitplaner-*-linux-standalone-*.zip
+   cd MGBFreizeitplaner-linux-standalone
+   ```
+
+3. **Starten:**
+   ```bash
+   ./start_embedded.sh
+   ```
+
+   Fertig! Browser öffnet automatisch: http://localhost:8000
+
+#### Das wars! 🎉
+
+Keine Python-Installation, keine apt/dnf install, keine Konfiguration.
+
+---
+
+## 📥 Portable Version (Für Nutzer mit Python)
+
+**Alternative für Nutzer die bereits Python installiert haben.**
+Kleinerer Download (~5 MB statt ~60-70 MB).
+
+Die einfachste Methode für Endanwender mit existierender Python-Installation.
 
 ### Windows
 

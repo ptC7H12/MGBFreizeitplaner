@@ -19,37 +19,59 @@ Ein Web-basiertes Kassensystem für Kinder-, Jugend- und Familienfreizeiten mit 
 
 ## Installation
 
-### 🎯 Option 1: Portable Version (Empfohlen für Endanwender)
+### 🎯 Option 1: Standalone Version ⭐ **NEU** (Empfohlen für alle Benutzer)
 
-**Einfachste Installation - kein Git, kein Docker nötig!**
+**Komplett ohne Installation - Python ist bereits dabei!**
 
 #### Windows
-1. [Download Windows ZIP](../../releases) herunterladen
+1. [Download Windows Standalone ZIP](../../releases) herunterladen (~60 MB)
+2. ZIP entpacken
+3. **Doppelklick auf `start_embedded.bat`**
+4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+
+**Voraussetzungen:** KEINE! Alles ist enthalten.
+
+#### macOS
+1. [Download macOS Standalone ZIP](../../releases) herunterladen (~70 MB)
+2. ZIP entpacken
+3. **Doppelklick auf `start_embedded.sh`** (oder im Terminal: `./start_embedded.sh`)
+4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+
+**Voraussetzungen:** KEINE! Alles ist enthalten.
+
+#### Linux
+1. [Download Linux Standalone ZIP](../../releases) herunterladen (~70 MB)
+2. ZIP entpacken
+3. Im Terminal: `./start_embedded.sh`
+4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+
+**Voraussetzungen:** KEINE! Alles ist enthalten.
+
+---
+
+### 💾 Option 2: Portable Version (für Nutzer mit Python)
+
+**Kleinere Download-Größe (~5 MB), aber Python muss vorinstalliert sein**
+
+#### Windows
+1. [Download Windows Portable ZIP](../../releases) herunterladen
 2. ZIP entpacken
 3. **Doppelklick auf `start.bat`** (oder `start.ps1` für PowerShell)
 4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
 
 **Voraussetzung:** Python 3.11+ von [python.org](https://www.python.org/downloads/) (bei Installation "Add Python to PATH" aktivieren!)
 
-#### macOS
-1. [Download macOS ZIP](../../releases) herunterladen
+#### macOS / Linux
+1. [Download Portable ZIP](../../releases) herunterladen
 2. ZIP entpacken
-3. **Doppelklick auf `start.sh`** (oder im Terminal: `./start.sh`)
+3. **Ausführen:** `./start.sh`
 4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
 
-**Voraussetzung:** Python 3.11+ installiert via `brew install python@3.11` oder von [python.org](https://www.python.org/downloads/)
-
-#### Linux
-1. [Download Linux ZIP](../../releases) herunterladen
-2. ZIP entpacken
-3. Im Terminal: `./start.sh`
-4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
-
-**Voraussetzung:** Python 3.11+ installiert (z.B. `sudo apt install python3.11`)
+**Voraussetzung:** Python 3.11+ (macOS: `brew install python@3.11`, Linux: `apt install python3.11`)
 
 ---
 
-### 🐳 Option 2: Mit Docker
+### 🐳 Option 3: Mit Docker
 
 **Für Server-Deployment oder Entwickler mit Docker-Erfahrung**
 
@@ -71,7 +93,7 @@ http://localhost:8000
 
 ---
 
-### 💻 Option 3: Manuelle Installation (Entwickler)
+### 💻 Option 4: Manuelle Installation (Entwickler)
 
 **Für Entwickler die am Code arbeiten möchten**
 
@@ -114,15 +136,23 @@ http://localhost:8000
 
 ---
 
-## 📦 Portable Releases erstellen
+## 📦 Releases erstellen
 
-Für Maintainer: Um neue Portable-Versionen zu erstellen:
+Für Maintainer:
 
+**Standalone-Version (mit embedded Python - empfohlen):**
+```bash
+python build_portable_embedded.py
+```
+Erstellt vollständige Standalone-Pakete (~60-70 MB) - keine Python-Installation erforderlich!
+
+**Portable-Version (ohne Python - kleiner):**
 ```bash
 python build_portable.py
 ```
+Erstellt kleinere Pakete (~5 MB) - Python-Installation erforderlich.
 
-Dies erstellt ZIP-Archive für Windows, macOS und Linux im `releases/` Ordner.
+Beide Skripte erstellen ZIP-Archive im `releases/` Ordner.
 
 ## Projektstruktur
 

@@ -22,6 +22,7 @@ wheels/
 
 # Portable Releases
 releases/
+.download_cache/
 
 # Virtual Environment
 venv/
