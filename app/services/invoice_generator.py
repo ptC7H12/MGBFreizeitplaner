@@ -1,7 +1,7 @@
 """Invoice (Rechnung) Generator Service"""
 from io import BytesIO
 from datetime import datetime, date
-from typing import List
+from typing import List, Dict, Any
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -39,6 +39,121 @@ class InvoiceGenerator:
             # Nicht in DB speichern, nur Standard-Werte verwenden
 
         return setting
+
+    def _calculate_price_breakdown(self, participant) -> Dict[str, Any]:
+        """
+        Berechnet die detaillierte Preis-Aufschlüsselung für einen Teilnehmer
+
+        Args:
+            participant: Participant-Objekt
+
+        Returns:
+            Dictionary mit Preis-Details
+        """
+        from app.models import Ruleset
+        from app.services.price_calculator import PriceCalculator
+
+        breakdown = {
+            'base_price': 0.0,
+            'role_discount_percent': 0.0,
+            'role_discount_amount': 0.0,
+            'price_after_role_discount': 0.0,
+            'family_discount_percent': 0.0,
+            'family_discount_amount': 0.0,
+            'price_after_family_discount': 0.0,
+            'manual_discount_percent': participant.discount_percent,
+            'manual_discount_amount': 0.0,
+            'manual_price_override': participant.manual_price_override,
+            'final_price': participant.final_price,
+            'has_discounts': False,
+            'discount_reasons': []
+        }
+
+        # Wenn manueller Preis gesetzt ist, überschreibt dieser alles
+        if participant.manual_price_override is not None:
+            breakdown['has_discounts'] = True
+            breakdown['discount_reasons'].append(f"Manueller Preis: {participant.manual_price_override:.2f} €")
+            if participant.discount_reason:
+                breakdown['discount_reasons'].append(f"Grund: {participant.discount_reason}")
+            return breakdown
+
+        # Aktives Regelwerk finden
+        ruleset = self.db.query(Ruleset).filter(
+            Ruleset.is_active == True,
+            Ruleset.valid_from <= participant.event.start_date,
+            Ruleset.valid_until >= participant.event.start_date
+        ).first()
+
+        if not ruleset:
+            return breakdown
+
+        # Basispreis aus Altersgruppen
+        age = participant.age_at_event
+        for group in ruleset.age_groups:
+            min_age = group.get('min_age', 0)
+            max_age = group.get('max_age', 999)
+            if min_age <= age <= max_age:
+                breakdown['base_price'] = float(group.get('price', 0))
+                break
+
+        # Rollenrabatt
+        role_name_lower = participant.role.name.lower()
+        role_discounts = ruleset.role_discounts or {}
+        if role_name_lower in role_discounts:
+            breakdown['role_discount_percent'] = float(role_discounts[role_name_lower].get('discount_percent', 0))
+            breakdown['role_discount_amount'] = breakdown['base_price'] * (breakdown['role_discount_percent'] / 100)
+            breakdown['price_after_role_discount'] = breakdown['base_price'] - breakdown['role_discount_amount']
+            breakdown['has_discounts'] = True
+            breakdown['discount_reasons'].append(
+                f"Rollenrabatt ({participant.role.display_name}): {breakdown['role_discount_percent']:.0f}%"
+            )
+        else:
+            breakdown['price_after_role_discount'] = breakdown['base_price']
+
+        # Familienrabatt
+        if participant.family_id:
+            # Position in Familie ermitteln
+            siblings = self.db.query(type(participant)).filter(
+                type(participant).family_id == participant.family_id,
+                type(participant).is_active == True
+            ).order_by(type(participant).birth_date).all()
+
+            family_position = next((i + 1 for i, p in enumerate(siblings) if p.id == participant.id), 1)
+
+            family_discount_config = ruleset.family_discount or {}
+            if family_discount_config.get('enabled', False):
+                if family_position == 2:
+                    breakdown['family_discount_percent'] = float(family_discount_config.get('second_child_percent', 0))
+                elif family_position >= 3:
+                    breakdown['family_discount_percent'] = float(family_discount_config.get('third_plus_child_percent', 0))
+
+                if breakdown['family_discount_percent'] > 0:
+                    breakdown['family_discount_amount'] = breakdown['price_after_role_discount'] * (
+                                breakdown['family_discount_percent'] / 100)
+                    breakdown['price_after_family_discount'] = breakdown['price_after_role_discount'] - breakdown[
+                        'family_discount_amount']
+                    breakdown['has_discounts'] = True
+                    breakdown['discount_reasons'].append(
+                        f"Familienrabatt ({family_position}. Kind): {breakdown['family_discount_percent']:.0f}%"
+                    )
+                else:
+                    breakdown['price_after_family_discount'] = breakdown['price_after_role_discount']
+            else:
+                breakdown['price_after_family_discount'] = breakdown['price_after_role_discount']
+        else:
+            breakdown['price_after_family_discount'] = breakdown['price_after_role_discount']
+
+        # Manueller Rabatt (zusätzlich)
+        if participant.discount_percent > 0:
+            breakdown['manual_discount_amount'] = breakdown['price_after_family_discount'] * (
+                        participant.discount_percent / 100)
+            breakdown['has_discounts'] = True
+            reason = f"Zusätzlicher Rabatt: {participant.discount_percent:.0f}%"
+            if participant.discount_reason:
+                reason += f" ({participant.discount_reason})"
+            breakdown['discount_reasons'].append(reason)
+
+        return breakdown
 
     def generate_participant_invoice(self, participant) -> bytes:
         """
@@ -109,16 +224,41 @@ class InvoiceGenerator:
         story.append(Paragraph(f"{subject_prefix}: {participant.event.name}", heading_style))
         story.append(Spacer(1, 0.5*cm))
 
+        # Preis-Aufschlüsselung berechnen
+        breakdown = self._calculate_price_breakdown(participant)
+
         # Positions-Tabelle
         positions_data = [
             ["Pos.", "Beschreibung", "Menge", "Einzelpreis", "Gesamtpreis"]
         ]
 
         # Position: Teilnahmegebühr
-        description = f"Teilnahmegebühr {participant.event.name}\n"
+        description = f"<b>Teilnahmegebühr {participant.event.name}</b>\n"
         description += f"Zeitraum: {participant.event.start_date.strftime('%d.%m.%Y')} - {participant.event.end_date.strftime('%d.%m.%Y')}\n"
         description += f"Teilnehmer: {participant.full_name} ({participant.age_at_event} Jahre)\n"
-        description += f"Rolle: {participant.role.display_name}"
+        description += f"Rolle: {participant.role.display_name}\n"
+
+        # Rabatt-Details hinzufügen
+        if breakdown['has_discounts']:
+            description += "\n<b>Preisberechnung:</b>\n"
+            if breakdown['manual_price_override'] is None:
+                # Normale Berechnung
+                description += f"• Basispreis (Altersgruppe): {breakdown['base_price']:.2f} €\n"
+                if breakdown['role_discount_percent'] > 0:
+                    description += f"• Rollenrabatt ({participant.role.display_name}): -{breakdown['role_discount_percent']:.0f}% (-{breakdown['role_discount_amount']:.2f} €)\n"
+                    description += f"  → Nach Rollenrabatt: {breakdown['price_after_role_discount']:.2f} €\n"
+                if breakdown['family_discount_percent'] > 0:
+                    description += f"• Familienrabatt: -{breakdown['family_discount_percent']:.0f}% (-{breakdown['family_discount_amount']:.2f} €)\n"
+                    description += f"  → Nach Familienrabatt: {breakdown['price_after_family_discount']:.2f} €\n"
+                if breakdown['manual_discount_percent'] > 0:
+                    description += f"• Zusätzlicher Rabatt: -{breakdown['manual_discount_percent']:.0f}% (-{breakdown['manual_discount_amount']:.2f} €)\n"
+                    if participant.discount_reason:
+                        description += f"  Grund: {participant.discount_reason}\n"
+            else:
+                # Manuelle Preisüberschreibung
+                description += f"• Manuell gesetzter Preis: {breakdown['manual_price_override']:.2f} €\n"
+                if participant.discount_reason:
+                    description += f"  Grund: {participant.discount_reason}\n"
 
         final_price = participant.final_price
         positions_data.append([
@@ -269,10 +409,34 @@ class InvoiceGenerator:
             if not participant.is_active:
                 continue
 
+            # Preis-Aufschlüsselung berechnen
+            breakdown = self._calculate_price_breakdown(participant)
+
             description = f"<b>{participant.full_name}</b>\n"
             description += f"{participant.event.name}\n"
             description += f"Zeitraum: {participant.event.start_date.strftime('%d.%m.%Y')} - {participant.event.end_date.strftime('%d.%m.%Y')}\n"
-            description += f"Alter: {participant.age_at_event} Jahre, Rolle: {participant.role.display_name}"
+            description += f"Alter: {participant.age_at_event} Jahre, Rolle: {participant.role.display_name}\n"
+
+            # Rabatt-Details hinzufügen
+            if breakdown['has_discounts']:
+                description += "\n<b>Preisberechnung:</b>\n"
+                if breakdown['manual_price_override'] is None:
+                    # Normale Berechnung
+                    description += f"• Basispreis: {breakdown['base_price']:.2f} €\n"
+                    if breakdown['role_discount_percent'] > 0:
+                        description += f"• Rollenrabatt: -{breakdown['role_discount_percent']:.0f}% (-{breakdown['role_discount_amount']:.2f} €) → {breakdown['price_after_role_discount']:.2f} €\n"
+                    if breakdown['family_discount_percent'] > 0:
+                        description += f"• Familienrabatt: -{breakdown['family_discount_percent']:.0f}% (-{breakdown['family_discount_amount']:.2f} €) → {breakdown['price_after_family_discount']:.2f} €\n"
+                    if breakdown['manual_discount_percent'] > 0:
+                        description += f"• Zusätzl. Rabatt: -{breakdown['manual_discount_percent']:.0f}%"
+                        if participant.discount_reason:
+                            description += f" ({participant.discount_reason})"
+                        description += "\n"
+                else:
+                    # Manuelle Preisüberschreibung
+                    description += f"• Manueller Preis: {breakdown['manual_price_override']:.2f} €\n"
+                    if participant.discount_reason:
+                        description += f"  Grund: {participant.discount_reason}\n"
 
             price = participant.final_price
             total_amount += price
