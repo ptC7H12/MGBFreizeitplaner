@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="bg-white shadow rounded-lg">
+    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <h2 class="text-xl font-semibold text-gray-900">Alle Teilnehmer</h2>
+        <a href="/participants/create" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition">
+            <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+            </svg>
+            Neuer Teilnehmer
+        </a>
+    </div>
+
+    <!-- Such- und Filterbereich -->
+    <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+        <form method="get" action="/participants" class="flex flex-wrap gap-4">
+            <div class="flex-1 min-w-[200px]">
+                <input
+                    type="text"
+                    name="search"
+                    placeholder="Name oder E-Mail suchen..."
+                    value="{{ search if search else '' }}"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                >
+            </div>
+            <div class="min-w-[150px]">
+                <select name="role_id" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Alle Rollen</option>
+                    {% for role in roles %}
+                    <option value="{{ role.id }}" {% if selected_role_id == role.id %}selected{% endif %}>
+                        {{ role.display_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="min-w-[150px]">
+                <select name="family_id" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Alle Familien</option>
+                    {% for family in families %}
+                    <option value="{{ family.id }}" {% if selected_family_id == family.id %}selected{% endif %}>
+                        {{ family.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                Filtern
+            </button>
+            <a href="/participants" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">
+                Zurücksetzen
+            </a>
+        </form>
+    </div>
+
+    {% if participants %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Geburtsdatum</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rolle</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Familie</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preis</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktionen</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for participant in participants %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">{{ participant.full_name }}</div>
+                        {% if participant.email %}
+                        <div class="text-sm text-gray-500">{{ participant.email }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ participant.birth_date.strftime('%d.%m.%Y') }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if participant.role %}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                            {{ participant.role.display_name }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {% if participant.family %}
+                        <a href="/families/{{ participant.family.id }}" class="text-blue-600 hover:text-blue-800">
+                            {{ participant.family.name }}
+                        </a>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {{ "%.2f"|format(participant.final_price) }} €
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <a href="/participants/{{ participant.id }}" class="text-blue-600 hover:text-blue-800 mr-3">Anzeigen</a>
+                        <a href="/participants/{{ participant.id }}/edit" class="text-green-600 hover:text-green-800">Bearbeiten</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="px-6 py-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">Keine Teilnehmer</h3>
+        <p class="mt-1 text-sm text-gray-500">Beginnen Sie, indem Sie einen neuen Teilnehmer hinzufügen.</p>
+        <div class="mt-6">
+            <a href="/participants/create" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                Neuer Teilnehmer
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
