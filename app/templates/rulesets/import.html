@@ -26,8 +26,15 @@
     <div class="border-b border-gray-200 mb-6">
         <nav class="-mb-px flex space-x-8">
             <button
-                id="tab-upload"
+                id="tab-directory"
                 class="tab-button border-b-2 border-purple-600 text-purple-600 py-4 px-1 text-sm font-medium"
+                onclick="switchTab('directory')"
+            >
+                🗂️ Aus Verzeichnis
+            </button>
+            <button
+                id="tab-upload"
+                class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium"
                 onclick="switchTab('upload')"
             >
                 YAML-Datei hochladen
@@ -49,8 +56,33 @@
         </nav>
     </div>
 
+    <!-- Directory Scan -->
+    <div id="content-directory" class="tab-content">
+        <div class="text-center py-8">
+            <svg class="mx-auto h-16 w-16 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+            </svg>
+            <h3 class="mt-4 text-lg font-medium text-gray-900">Regelwerke aus Projektverzeichnis laden</h3>
+            <p class="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+                Durchsuchen Sie die lokalen Verzeichnisse nach verfügbaren Regelwerk-YAML-Dateien und wählen Sie eines zum Importieren aus.
+            </p>
+            <div class="mt-6">
+                <a href="/rulesets/import/scan" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700">
+                    <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a3 3 0 00-3-3H8z"/>
+                        <path d="M6 2a2 2 0 00-2 2v4a2 2 0 002 2V4h10V2a2 2 0 00-2-2H6z"/>
+                    </svg>
+                    Verzeichnisse durchsuchen
+                </a>
+            </div>
+            <div class="mt-4 text-xs text-gray-500">
+                Durchsucht: <code class="bg-gray-100 px-2 py-1 rounded">rulesets/</code>
+            </div>
+        </div>
+    </div>
+
     <!-- Upload-Form -->
-    <div id="content-upload" class="tab-content">
+    <div id="content-upload" class="tab-content hidden">
         <form method="post" action="/rulesets/import/upload" enctype="multipart/form-data" class="space-y-6">
             <div>
                 <label for="file" class="block text-sm font-medium text-gray-700 mb-2">

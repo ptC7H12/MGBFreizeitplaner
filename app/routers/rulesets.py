@@ -16,6 +16,7 @@ from app.database import get_db
 from app.models import Ruleset, Event
 from app.services.ruleset_parser import RulesetParser
 from app.services.role_manager import RoleManager
+from app.services.ruleset_scanner import RulesetScanner
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
@@ -58,6 +59,97 @@ async def import_ruleset_form(
             "success": success
         }
     )
+
+
+@router.get("/import/scan", response_class=HTMLResponse)
+async def scan_rulesets_directory(
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Scannt Verzeichnisse nach Regelwerk-Dateien und zeigt eine Auswahlliste"""
+    event = db.query(Event).filter(Event.id == event_id).first()
+
+    # Scanne alle konfigurierten Verzeichnisse
+    all_rulesets = RulesetScanner.scan_all_default_directories()
+
+    # Zähle gefundene Rulesets
+    total_rulesets = sum(len(rulesets) for rulesets in all_rulesets.values())
+    valid_rulesets_count = sum(
+        len(RulesetScanner.filter_valid_rulesets(rulesets))
+        for rulesets in all_rulesets.values()
+    )
+
+    return templates.TemplateResponse(
+        "rulesets/scan.html",
+        {
+            "request": request,
+            "title": "Regelwerke aus Verzeichnis auswählen",
+            "event": event,
+            "all_rulesets": all_rulesets,
+            "total_rulesets": total_rulesets,
+            "valid_rulesets_count": valid_rulesets_count
+        }
+    )
+
+
+@router.post("/import/from-file", response_class=HTMLResponse)
+async def import_ruleset_from_file(
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
+    file_path: str = Form(...)
+):
+    """Importiert ein Regelwerk aus einer gescannten Datei"""
+    try:
+        # Datei einlesen
+        yaml_file = Path(file_path)
+        if not yaml_file.exists():
+            flash(request, f"Datei nicht gefunden: {file_path}", "error")
+            return RedirectResponse(url="/rulesets/import/scan", status_code=303)
+
+        # YAML parsen
+        parser = RulesetParser()
+        data = parser.parse_yaml_file(yaml_file)
+
+        # Validieren
+        is_valid, error_msg = parser.validate_ruleset(data)
+        if not is_valid:
+            flash(request, f"Ungültiges Regelwerk: {error_msg}", "error")
+            return RedirectResponse(url="/rulesets/import/scan", status_code=303)
+
+        # Regelwerk in Datenbank speichern
+        ruleset = Ruleset(
+            name=data["name"],
+            ruleset_type=data["type"],
+            description=data.get("description"),
+            valid_from=datetime.strptime(data["valid_from"], "%Y-%m-%d").date(),
+            valid_until=datetime.strptime(data["valid_until"], "%Y-%m-%d").date(),
+            age_groups=data["age_groups"],
+            role_discounts=data.get("role_discounts"),
+            family_discount=data.get("family_discount"),
+            source_file=str(yaml_file),
+            event_id=event_id
+        )
+
+        db.add(ruleset)
+        db.commit()
+        db.refresh(ruleset)
+
+        # Rollen automatisch aus role_discounts erstellen
+        if data.get("role_discounts"):
+            RoleManager.create_roles_from_ruleset(db, event_id, data.get("role_discounts"))
+            flash(request, f"Regelwerk '{data['name']}' importiert und {len(data.get('role_discounts'))} Rollen erstellt", "success")
+        else:
+            flash(request, f"Regelwerk '{data['name']}' erfolgreich importiert", "success")
+
+        return RedirectResponse(url=f"/rulesets/{ruleset.id}", status_code=303)
+
+    except Exception as e:
+        logger.error(f"Error importing ruleset from file: {e}")
+        db.rollback()
+        flash(request, f"Fehler beim Import: {str(e)}", "error")
+        return RedirectResponse(url="/rulesets/import/scan", status_code=303)
 
 
 @router.post("/import/upload", response_class=HTMLResponse)
