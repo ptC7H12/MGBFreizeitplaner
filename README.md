@@ -17,9 +17,62 @@ Ein Web-basiertes Kassensystem für Kinder-, Jugend- und Familienfreizeiten mit 
 - **Datenbank**: SQLite mit SQLAlchemy ORM
 - **Deployment**: Docker + Docker Compose
 
-## Schnellstart
+## Installation
 
-### Mit Docker (empfohlen)
+### 🎯 Option 1: Standalone Version für Windows ⭐ **NEU** (Empfohlen für Windows-Benutzer)
+
+**Komplett ohne Installation - Python ist bereits dabei!**
+
+#### Windows
+1. [Download Windows Standalone ZIP](../../releases) herunterladen (~60 MB)
+2. ZIP entpacken
+3. **Doppelklick auf `start.bat`**
+4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+
+**Voraussetzungen:** KEINE! Python ist enthalten.
+
+**Perfekt für:** Nicht-technische Benutzer, Jugendgruppen, schnelle Installation
+
+---
+
+**Hinweis für macOS/Linux:** Für diese Systeme empfehlen wir die Portable-Version (Option 2) - sie ist kleiner, schneller und diese Systeme haben oft Python bereits installiert.
+
+---
+
+### 💾 Option 2: Portable Version ⭐ (Empfohlen für macOS/Linux)
+
+**Kleinere Download-Größe (~5 MB), Python muss vorinstalliert sein**
+
+#### macOS
+1. [Download macOS Portable ZIP](../../releases) herunterladen (~5 MB)
+2. ZIP entpacken
+3. **Doppelklick auf `start.sh`** (oder im Terminal: `./start.sh`)
+4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+
+**Voraussetzung:** Python 3.11+ installieren via `brew install python@3.11`
+
+#### Linux
+1. [Download Linux Portable ZIP](../../releases) herunterladen (~5 MB)
+2. ZIP entpacken
+3. Im Terminal: `./start.sh`
+4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+
+**Voraussetzung:** Python 3.11+ (z.B. `sudo apt install python3.11`)
+
+#### Windows (Alternative zur Standalone-Version)
+1. [Download Windows Portable ZIP](../../releases) herunterladen (~5 MB)
+2. ZIP entpacken
+3. **Doppelklick auf `start.bat`**
+4. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+
+**Voraussetzung:** Python 3.11+ von [python.org](https://www.python.org/downloads/)
+⚠️ Bei Installation "Add Python to PATH" aktivieren!
+
+---
+
+### 🐳 Option 3: Mit Docker
+
+**Für Server-Deployment oder Entwickler mit Docker-Erfahrung**
 
 1. Repository klonen:
 ```bash
@@ -37,7 +90,11 @@ docker-compose up -d
 http://localhost:8000
 ```
 
-### Ohne Docker
+---
+
+### 💻 Option 4: Manuelle Installation (Entwickler)
+
+**Für Entwickler die am Code arbeiten möchten**
 
 1. Repository klonen und in Verzeichnis wechseln:
 ```bash
@@ -75,6 +132,30 @@ uvicorn app.main:app --reload
 ```
 http://localhost:8000
 ```
+
+---
+
+## 📦 Releases erstellen
+
+Für Maintainer:
+
+**Windows Standalone-Version (mit embedded Python):**
+```bash
+python build_standalone_windows.py
+```
+Erstellt Windows-Standalone-Paket (~60 MB) - keine Python-Installation erforderlich!
+
+**Portable-Version (für alle Plattformen):**
+```bash
+python build_portable.py
+```
+Erstellt Portable-Pakete (~5 MB) - Python-Installation erforderlich.
+
+Beide Skripte erstellen ZIP-Archive im `releases/` Ordner.
+
+**Empfehlung:**
+- Windows: Beide Versionen bereitstellen (Standalone für Endanwender, Portable für Tech-Savvy)
+- macOS/Linux: Nur Portable-Version (kleiner, Python meist vorhanden)
 
 ## Projektstruktur
 
