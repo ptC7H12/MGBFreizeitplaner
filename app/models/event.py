@@ -33,6 +33,7 @@ class Event(Base):
     # Beziehungen
     participants = relationship("Participant", back_populates="event", cascade="all, delete-orphan")
     expenses = relationship("Expense", back_populates="event", cascade="all, delete-orphan")
+    incomes = relationship("Income", back_populates="event", cascade="all, delete-orphan")
     rulesets = relationship("Ruleset", back_populates="event", cascade="all, delete-orphan")
     families = relationship("Family", back_populates="event", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="event", cascade="all, delete-orphan")

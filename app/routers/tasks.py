@@ -8,7 +8,7 @@ from datetime import datetime, date, timedelta
 
 from app.config import settings
 from app.database import get_db
-from app.models import Participant, Payment, Expense, Event, Task
+from app.models import Participant, Payment, Expense, Event, Task, Income, Role
 from app.dependencies import get_current_event_id
 from app.utils.flash import flash
 
@@ -48,7 +48,8 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
         "expense_reimbursement": [],
         "outstanding_payments": [],
         "manual_price_override": [],
-        "overdue_payments": []
+        "overdue_payments": [],
+        "income_subsidy_mismatch": []
     }
 
     # 1. Bildung & Teilhabe IDs vorhanden (müssen beantragt werden)
@@ -149,6 +150,72 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
                         "task_type": "overdue_payment",
                         "description": f"{task['description']} - ÜBERFÄLLIG!"
                     })
+
+    # 10. Zuschuss-Validierung (prüfe ob Einnahmen mit Rabatten übereinstimmen)
+    # Hole alle Einnahmen mit Rollenverknüpfung
+    role_incomes = db.query(
+        Role.id,
+        Role.display_name,
+        func.sum(Income.amount).label("total_income")
+    ).join(
+        Income, Income.role_id == Role.id
+    ).filter(
+        Role.event_id == event_id,
+        Income.event_id == event_id
+    ).group_by(Role.id).all()
+
+    for role_income in role_incomes:
+        role_id = role_income.id
+        role_name = role_income.display_name
+        total_subsidy = role_income.total_income
+
+        # Berechne erwartete Rabatte für alle Teilnehmer mit dieser Rolle
+        participants_with_role = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.role_id == role_id,
+            Participant.is_active == True
+        ).all()
+
+        expected_discounts = 0.0
+        for participant in participants_with_role:
+            if participant.calculated_price and participant.base_price:
+                # Rabatt = Basispreis - berechneter Preis (enthält alle Rabatte)
+                # Wir müssen den Rollenrabatt isolieren
+                # Da alle Rabatte vom Basispreis berechnet werden, müssen wir anders vorgehen
+
+                # Hole das Regelwerk für diesen Event
+                from app.models import Ruleset
+                ruleset = db.query(Ruleset).filter(
+                    Ruleset.event_id == event_id,
+                    Ruleset.is_active == True
+                ).first()
+
+                if ruleset and ruleset.data:
+                    role_discounts = ruleset.data.get("role_discounts", {})
+                    role_name_lower = participant.role.name.lower() if participant.role else ""
+
+                    if role_name_lower in role_discounts:
+                        discount_percent = role_discounts[role_name_lower].get("discount_percent", 0)
+                        role_discount_amount = participant.base_price * (discount_percent / 100)
+                        expected_discounts += role_discount_amount
+
+        # Berechne Differenz
+        difference = total_subsidy - expected_discounts
+
+        # Wenn Differenz signifikant (mehr als 1€), erstelle Task
+        if abs(difference) > 1.0:
+            if not is_task_completed(completed_tasks, "income_subsidy_mismatch", role_id):
+                status = "zu viel" if difference > 0 else "zu wenig"
+                tasks["income_subsidy_mismatch"].append({
+                    "id": role_id,
+                    "title": f"Zuschuss-Differenz: {role_name}",
+                    "description": f"Zuschuss: {total_subsidy:.2f}€ | Rabatte: {expected_discounts:.2f}€ | Differenz: {abs(difference):.2f}€ ({status})",
+                    "link": f"/incomes",
+                    "task_type": "income_subsidy_mismatch",
+                    "difference": difference,
+                    "total_subsidy": total_subsidy,
+                    "expected_discounts": expected_discounts
+                })
 
     # Zähle Gesamtaufgaben
     total_tasks = sum(len(task_list) for task_list in tasks.values())

@@ -30,6 +30,7 @@ class Role(Base):
     # Beziehungen
     event = relationship("Event", back_populates="roles")
     participants = relationship("Participant", back_populates="role")
+    incomes = relationship("Income", back_populates="role")
 
     def __repr__(self):
         return f"<Role {self.display_name}>"
