@@ -1,8 +1,10 @@
 """Participants (Teilnehmer) Router"""
+import logging
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
 from typing import Optional
 
@@ -11,6 +13,10 @@ from app.database import get_db
 from app.models import Participant, Role, Event, Family, Ruleset
 from app.services.price_calculator import PriceCalculator
 from app.dependencies import get_current_event_id
+from app.utils.error_handler import handle_db_exception
+from app.utils.flash import flash
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/participants", tags=["participants"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
@@ -185,6 +191,12 @@ async def create_participant(
         # Datum parsen
         birth_date_obj = datetime.strptime(birth_date, "%Y-%m-%d").date()
 
+        # Datums-Validierung
+        if birth_date_obj > date.today():
+            raise ValueError("Geburtsdatum darf nicht in der Zukunft liegen")
+        if birth_date_obj.year < 1900:
+            raise ValueError("Geburtsdatum muss nach 1900 liegen")
+
         # Automatische Preisberechnung
         calculated_price = _calculate_price_for_participant(
             db=db,
@@ -220,12 +232,28 @@ async def create_participant(
         db.commit()
         db.refresh(participant)
 
+        flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich erstellt", "success")
         return RedirectResponse(url=f"/participants/{participant.id}", status_code=303)
 
-    except Exception as e:
+    except ValueError as e:
+        logger.warning(f"Invalid date input for participant creation: {e}", exc_info=True)
+        flash(request, f"Ungültiges Datum: {str(e)}", "error")
+        return RedirectResponse(url="/participants/create?error=invalid_date", status_code=303)
+
+    except IntegrityError as e:
         db.rollback()
-        # Fehler anzeigen (TODO: Besseres Error-Handling)
-        return RedirectResponse(url="/participants/create?error=1", status_code=303)
+        logger.error(f"Database integrity error creating participant: {e}", exc_info=True)
+        flash(request, "Teilnehmer konnte nicht erstellt werden (Datenbankfehler)", "error")
+        return RedirectResponse(url="/participants/create?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data creating participant: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url="/participants/create?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, "/participants/create", "Creating participant", db, request)
 
 
 @router.post("/calculate-price", response_class=HTMLResponse)
@@ -277,8 +305,12 @@ async def calculate_price_preview(
             }
         )
 
+    except ValueError as e:
+        logger.warning(f"Invalid date input for price calculation: {e}", exc_info=True)
+        return HTMLResponse(content=f'<div class="text-sm text-red-500">Ungültiges Datum</div>')
+
     except Exception as e:
-        # Bei Fehler leeres Fragment zurückgeben
+        logger.error(f"Error calculating price preview: {e}", exc_info=True)
         return HTMLResponse(content=f'<div class="text-sm text-gray-500">Preis wird berechnet...</div>')
 
 
@@ -382,6 +414,12 @@ async def update_participant(
         # Datum parsen
         birth_date_obj = datetime.strptime(birth_date, "%Y-%m-%d").date()
 
+        # Datums-Validierung
+        if birth_date_obj > date.today():
+            raise ValueError("Geburtsdatum darf nicht in der Zukunft liegen")
+        if birth_date_obj.year < 1900:
+            raise ValueError("Geburtsdatum muss nach 1900 liegen")
+
         # Preis neu berechnen (wenn sich relevante Daten geändert haben)
         calculated_price = _calculate_price_for_participant(
             db=db,
@@ -413,11 +451,28 @@ async def update_participant(
 
         db.commit()
 
+        flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich aktualisiert", "success")
         return RedirectResponse(url=f"/participants/{participant_id}", status_code=303)
 
-    except Exception as e:
+    except ValueError as e:
+        logger.warning(f"Invalid date input for participant update: {e}", exc_info=True)
+        flash(request, f"Ungültiges Datum: {str(e)}", "error")
+        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=invalid_date", status_code=303)
+
+    except IntegrityError as e:
         db.rollback()
-        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=1", status_code=303)
+        logger.error(f"Database integrity error updating participant: {e}", exc_info=True)
+        flash(request, "Teilnehmer konnte nicht aktualisiert werden (Datenbankfehler)", "error")
+        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data updating participant: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, f"/participants/{participant_id}/edit", "Updating participant", db, request)
 
 
 @router.post("/{participant_id}/delete")
@@ -436,9 +491,19 @@ async def delete_participant(
         raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")
 
     try:
+        participant_name = participant.full_name
         db.delete(participant)
         db.commit()
+        logger.info(f"Participant deleted: {participant_name} (ID: {participant_id})")
+        # Note: Flash-Message kann hier nicht gesetzt werden, da Request fehlt
         return RedirectResponse(url="/participants", status_code=303)
+
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Cannot delete participant due to integrity constraint: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Teilnehmer kann nicht gelöscht werden, da noch Zahlungen oder andere Verknüpfungen existieren")
+
     except Exception as e:
         db.rollback()
+        logger.exception(f"Error deleting participant: {e}")
         raise HTTPException(status_code=500, detail="Fehler beim Löschen")

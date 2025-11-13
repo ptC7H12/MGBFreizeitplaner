@@ -1,8 +1,10 @@
 """Payments (Zahlungen) Router"""
+import logging
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
 from typing import Optional
 from io import BytesIO
@@ -12,6 +14,10 @@ from app.database import get_db
 from app.models import Payment, Participant, Family
 from app.dependencies import get_current_event_id
 from app.services.invoice_generator import InvoiceGenerator
+from app.utils.error_handler import handle_db_exception
+from app.utils.flash import flash
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
@@ -88,8 +94,17 @@ async def create_payment(
         # Datum parsen
         payment_date_obj = datetime.strptime(payment_date, "%Y-%m-%d").date()
 
+        # Datums-Validierung
+        if payment_date_obj > date.today():
+            raise ValueError("Zahlungsdatum darf nicht in der Zukunft liegen")
+
+        # Betrag-Validierung
+        if amount <= 0:
+            raise ValueError("Zahlungsbetrag muss größer als 0 sein")
+
         # Validierung: Entweder Teilnehmer oder Familie
         if not participant_id and not family_id:
+            flash(request, "Bitte wählen Sie einen Teilnehmer oder eine Familie aus", "error")
             return RedirectResponse(url="/payments/create?error=no_target", status_code=303)
 
         # Neue Zahlung erstellen
@@ -108,6 +123,8 @@ async def create_payment(
         db.commit()
         db.refresh(payment)
 
+        flash(request, f"Zahlung über {amount}€ wurde erfolgreich erfasst", "success")
+
         # Redirect zurück zur Quelle (Teilnehmer oder Familie)
         if participant_id:
             return RedirectResponse(url=f"/participants/{participant_id}", status_code=303)
@@ -116,9 +133,25 @@ async def create_payment(
         else:
             return RedirectResponse(url="/payments", status_code=303)
 
-    except Exception as e:
+    except ValueError as e:
+        logger.warning(f"Invalid input for payment creation: {e}", exc_info=True)
+        flash(request, f"Ungültige Eingabe: {str(e)}", "error")
+        return RedirectResponse(url="/payments/create?error=invalid_input", status_code=303)
+
+    except IntegrityError as e:
         db.rollback()
-        return RedirectResponse(url="/payments/create?error=1", status_code=303)
+        logger.error(f"Database integrity error creating payment: {e}", exc_info=True)
+        flash(request, "Zahlung konnte nicht erstellt werden (Datenbankfehler)", "error")
+        return RedirectResponse(url="/payments/create?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data creating payment: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url="/payments/create?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, "/payments/create", "Creating payment", db, request)
 
 
 @router.post("/{payment_id}/delete")
@@ -132,9 +165,11 @@ async def delete_payment(payment_id: int, db: Session = Depends(get_db), event_i
     try:
         participant_id = payment.participant_id
         family_id = payment.family_id
+        payment_amount = payment.amount
 
         db.delete(payment)
         db.commit()
+        logger.info(f"Payment deleted: {payment_amount}€ (ID: {payment_id})")
 
         # Redirect zurück zur Quelle
         if participant_id:
@@ -144,8 +179,14 @@ async def delete_payment(payment_id: int, db: Session = Depends(get_db), event_i
         else:
             return RedirectResponse(url="/payments", status_code=303)
 
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Cannot delete payment due to integrity constraint: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Zahlung kann nicht gelöscht werden, da noch Verknüpfungen existieren")
+
     except Exception as e:
         db.rollback()
+        logger.exception(f"Error deleting payment: {e}")
         raise HTTPException(status_code=500, detail="Fehler beim Löschen")
 
 

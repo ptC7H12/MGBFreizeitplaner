@@ -1,8 +1,10 @@
 """Expenses (Ausgaben) Router"""
+import logging
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
 from typing import Optional
 
@@ -10,6 +12,10 @@ from app.config import settings
 from app.database import get_db
 from app.models import Expense, Event
 from app.dependencies import get_current_event_id
+from app.utils.error_handler import handle_db_exception
+from app.utils.flash import flash
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
@@ -87,6 +93,18 @@ async def create_expense(
         # Datum parsen
         expense_date_obj = datetime.strptime(expense_date, "%Y-%m-%d").date()
 
+        # Datums-Validierung
+        if expense_date_obj > date.today():
+            raise ValueError("Ausgabendatum darf nicht in der Zukunft liegen")
+
+        # Betrag-Validierung
+        if amount <= 0:
+            raise ValueError("Ausgabenbetrag muss größer als 0 sein")
+
+        # Titel-Validierung
+        if not title or len(title.strip()) == 0:
+            raise ValueError("Titel darf nicht leer sein")
+
         # Neue Ausgabe erstellen
         expense = Expense(
             title=title,
@@ -104,11 +122,28 @@ async def create_expense(
         db.commit()
         db.refresh(expense)
 
+        flash(request, f"Ausgabe '{expense.title}' über {amount}€ wurde erfolgreich erfasst", "success")
         return RedirectResponse(url="/expenses", status_code=303)
 
-    except Exception as e:
+    except ValueError as e:
+        logger.warning(f"Invalid input for expense creation: {e}", exc_info=True)
+        flash(request, f"Ungültige Eingabe: {str(e)}", "error")
+        return RedirectResponse(url="/expenses/create?error=invalid_input", status_code=303)
+
+    except IntegrityError as e:
         db.rollback()
-        return RedirectResponse(url="/expenses/create?error=1", status_code=303)
+        logger.error(f"Database integrity error creating expense: {e}", exc_info=True)
+        flash(request, "Ausgabe konnte nicht erstellt werden (Datenbankfehler)", "error")
+        return RedirectResponse(url="/expenses/create?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data creating expense: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url="/expenses/create?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, "/expenses/create", "Creating expense", db, request)
 
 
 @router.get("/{expense_id}/edit", response_class=HTMLResponse)
@@ -119,7 +154,7 @@ async def edit_expense_form(request: Request, expense_id: int, db: Session = Dep
     if not expense:
         return RedirectResponse(url="/expenses", status_code=303)
 
-    event = db.query(Event).filter(Event.id == event_id).first()
+    event = db.query(Event).filter(Event.id == expense.event_id).first()
 
     return templates.TemplateResponse(
         "expenses/edit.html",
@@ -127,7 +162,7 @@ async def edit_expense_form(request: Request, expense_id: int, db: Session = Dep
             "request": request,
             "title": f"Ausgabe bearbeiten: {expense.title}",
             "expense": expense,
-            "events": events
+            "event": event
         }
     )
 
@@ -156,6 +191,18 @@ async def update_expense(
         # Datum parsen
         expense_date_obj = datetime.strptime(expense_date, "%Y-%m-%d").date()
 
+        # Datums-Validierung
+        if expense_date_obj > date.today():
+            raise ValueError("Ausgabendatum darf nicht in der Zukunft liegen")
+
+        # Betrag-Validierung
+        if amount <= 0:
+            raise ValueError("Ausgabenbetrag muss größer als 0 sein")
+
+        # Titel-Validierung
+        if not title or len(title.strip()) == 0:
+            raise ValueError("Titel darf nicht leer sein")
+
         # Ausgabe aktualisieren
         expense.title = title
         expense.description = description if description else None
@@ -165,15 +212,31 @@ async def update_expense(
         expense.receipt_number = receipt_number if receipt_number else None
         expense.paid_by = paid_by if paid_by else None
         expense.notes = notes if notes else None
-        expense.event_id = event_id
 
         db.commit()
 
+        flash(request, f"Ausgabe '{expense.title}' wurde erfolgreich aktualisiert", "success")
         return RedirectResponse(url="/expenses", status_code=303)
 
-    except Exception as e:
+    except ValueError as e:
+        logger.warning(f"Invalid input for expense update: {e}", exc_info=True)
+        flash(request, f"Ungültige Eingabe: {str(e)}", "error")
+        return RedirectResponse(url=f"/expenses/{expense_id}/edit?error=invalid_input", status_code=303)
+
+    except IntegrityError as e:
         db.rollback()
-        return RedirectResponse(url=f"/expenses/{expense_id}/edit?error=1", status_code=303)
+        logger.error(f"Database integrity error updating expense: {e}", exc_info=True)
+        flash(request, "Ausgabe konnte nicht aktualisiert werden (Datenbankfehler)", "error")
+        return RedirectResponse(url=f"/expenses/{expense_id}/edit?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data updating expense: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url=f"/expenses/{expense_id}/edit?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, f"/expenses/{expense_id}/edit", "Updating expense", db, request)
 
 
 @router.post("/{expense_id}/delete")
@@ -185,9 +248,18 @@ async def delete_expense(expense_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Ausgabe nicht gefunden")
 
     try:
+        expense_title = expense.title
         db.delete(expense)
         db.commit()
+        logger.info(f"Expense deleted: {expense_title} (ID: {expense_id})")
         return RedirectResponse(url="/expenses", status_code=303)
+
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Cannot delete expense due to integrity constraint: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Ausgabe kann nicht gelöscht werden, da noch Verknüpfungen existieren")
+
     except Exception as e:
         db.rollback()
+        logger.exception(f"Error deleting expense: {e}")
         raise HTTPException(status_code=500, detail="Fehler beim Löschen")

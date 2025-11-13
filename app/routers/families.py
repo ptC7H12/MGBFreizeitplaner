@@ -1,14 +1,20 @@
 """Families (Familien) Router"""
+import logging
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, DataError
 from typing import Optional
 
 from app.config import settings
 from app.database import get_db
 from app.models import Family, Participant
 from app.dependencies import get_current_event_id
+from app.utils.error_handler import handle_db_exception
+from app.utils.flash import flash
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/families", tags=["families"])
 templates = Jinja2Templates(directory=str(settings.templates_dir))
@@ -69,6 +75,10 @@ async def create_family(
 ):
     """Erstellt eine neue Familie"""
     try:
+        # Validierung
+        if not name or len(name.strip()) == 0:
+            raise ValueError("Familienname darf nicht leer sein")
+
         family = Family(
             name=name,
             contact_person=contact_person if contact_person else None,
@@ -83,11 +93,28 @@ async def create_family(
         db.commit()
         db.refresh(family)
 
+        flash(request, f"Familie {family.name} wurde erfolgreich erstellt", "success")
         return RedirectResponse(url=f"/families/{family.id}", status_code=303)
 
-    except Exception as e:
+    except ValueError as e:
+        logger.warning(f"Invalid input for family creation: {e}", exc_info=True)
+        flash(request, f"Ungültige Eingabe: {str(e)}", "error")
+        return RedirectResponse(url="/families/create?error=invalid_input", status_code=303)
+
+    except IntegrityError as e:
         db.rollback()
-        return RedirectResponse(url="/families/create?error=1", status_code=303)
+        logger.error(f"Database integrity error creating family: {e}", exc_info=True)
+        flash(request, "Familie konnte nicht erstellt werden (Datenbankfehler)", "error")
+        return RedirectResponse(url="/families/create?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data creating family: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url="/families/create?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, "/families/create", "Creating family", db, request)
 
 
 @router.get("/{family_id}", response_class=HTMLResponse)
@@ -172,6 +199,10 @@ async def update_family(
         return RedirectResponse(url="/families", status_code=303)
 
     try:
+        # Validierung
+        if not name or len(name.strip()) == 0:
+            raise ValueError("Familienname darf nicht leer sein")
+
         family.name = name
         family.contact_person = contact_person if contact_person else None
         family.email = email if email else None
@@ -181,11 +212,28 @@ async def update_family(
 
         db.commit()
 
+        flash(request, f"Familie {family.name} wurde erfolgreich aktualisiert", "success")
         return RedirectResponse(url=f"/families/{family_id}", status_code=303)
 
-    except Exception as e:
+    except ValueError as e:
+        logger.warning(f"Invalid input for family update: {e}", exc_info=True)
+        flash(request, f"Ungültige Eingabe: {str(e)}", "error")
+        return RedirectResponse(url=f"/families/{family_id}/edit?error=invalid_input", status_code=303)
+
+    except IntegrityError as e:
         db.rollback()
-        return RedirectResponse(url=f"/families/{family_id}/edit?error=1", status_code=303)
+        logger.error(f"Database integrity error updating family: {e}", exc_info=True)
+        flash(request, "Familie konnte nicht aktualisiert werden (Datenbankfehler)", "error")
+        return RedirectResponse(url=f"/families/{family_id}/edit?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data updating family: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url=f"/families/{family_id}/edit?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, f"/families/{family_id}/edit", "Updating family", db, request)
 
 
 @router.post("/{family_id}/delete")
@@ -211,9 +259,18 @@ async def delete_family(
         )
 
     try:
+        family_name = family.name
         db.delete(family)
         db.commit()
+        logger.info(f"Family deleted: {family_name} (ID: {family_id})")
         return RedirectResponse(url="/families", status_code=303)
+
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Cannot delete family due to integrity constraint: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Familie kann nicht gelöscht werden, da noch Zahlungen oder andere Verknüpfungen existieren")
+
     except Exception as e:
         db.rollback()
+        logger.exception(f"Error deleting family: {e}")
         raise HTTPException(status_code=500, detail="Fehler beim Löschen")

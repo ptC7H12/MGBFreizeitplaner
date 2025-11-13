@@ -30,17 +30,9 @@
         </div>
         {% endblock %}
 
-        <!-- Messages/Alerts -->
+        <!-- Flash Messages -->
         {% block messages %}
-        {% if messages %}
-        <div class="mb-6">
-            {% for message in messages %}
-            <div class="bg-{{ message.type }}-100 border border-{{ message.type }}-400 text-{{ message.type }}-700 px-4 py-3 rounded mb-2" role="alert">
-                {{ message.text }}
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
+        {% include "components/flash_messages.html" %}
         {% endblock %}
 
         <!-- Page Content -->

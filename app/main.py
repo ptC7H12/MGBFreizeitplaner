@@ -38,6 +38,10 @@ app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="stat
 # Templates konfigurieren
 templates = Jinja2Templates(directory=str(settings.templates_dir))
 
+# Flash-Messages als Template-Global registrieren
+from app.utils.flash import get_flashed_messages
+templates.env.globals['get_flashed_messages'] = get_flashed_messages
+
 # Router registrieren
 app.include_router(auth.router)
 app.include_router(dashboard.router)
