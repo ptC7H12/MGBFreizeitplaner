@@ -21,6 +21,7 @@ class Expense(Base):
     receipt_number = Column(String(100), nullable=True)
     paid_by = Column(String(200), nullable=True)  # Wer hat die Ausgabe getätigt
     is_reimbursed = Column(Boolean, default=False, nullable=False)  # Wurde die Ausgabe erstattet?
+    is_settled = Column(Boolean, default=False, nullable=False)  # Wurde die Ausgabe aus der Freizeitkasse beglichen?
     notes = Column(Text, nullable=True)
 
     # Foreign Key

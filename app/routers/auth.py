@@ -14,14 +14,18 @@ templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse)
-async def landing_page(request: Request, error: str = None):
+async def landing_page(request: Request, db: Session = Depends(get_db), error: str = None):
     """Landing Page für Freizeit-Auswahl oder -Erstellung"""
+    # Alle aktiven Freizeiten laden
+    events = db.query(Event).filter(Event.is_active == True).order_by(Event.start_date.desc()).all()
+
     return templates.TemplateResponse(
         "auth/landing.html",
         {
             "request": request,
             "title": "Willkommen",
-            "error": error
+            "error": error,
+            "events": events
         }
     )
 
@@ -30,28 +34,24 @@ async def landing_page(request: Request, error: str = None):
 async def select_event(
     request: Request,
     db: Session = Depends(get_db),
-    code: str = Form(...)
+    event_id: int = Form(...)
 ):
-    """Wählt eine Freizeit anhand des Codes aus"""
-    # Code normalisieren (Uppercase, Leerzeichen entfernen)
-    code = code.strip().upper()
-
+    """Wählt eine Freizeit aus"""
     # Event suchen
     event = db.query(Event).filter(
-        Event.code == code,
+        Event.id == event_id,
         Event.is_active == True
     ).first()
 
     if not event:
         return RedirectResponse(
-            url="/auth/?error=invalid_code",
+            url="/auth/?error=invalid_event",
             status_code=303
         )
 
     # Event-ID in Session speichern
     request.session["event_id"] = event.id
     request.session["event_name"] = event.name
-    request.session["event_code"] = event.code
 
     return RedirectResponse(url="/dashboard", status_code=303)
 
@@ -65,8 +65,7 @@ async def create_event(
     start_date: str = Form(...),
     end_date: str = Form(...),
     location: str = Form(None),
-    description: str = Form(None),
-    custom_code: str = Form(None)
+    description: str = Form(None)
 ):
     """Erstellt eine neue Freizeit"""
     try:
@@ -74,25 +73,7 @@ async def create_event(
         start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
 
-        # Code generieren oder verwenden
-        if custom_code:
-            code = custom_code.strip().upper()
-            # Prüfen ob Code bereits existiert
-            existing = db.query(Event).filter(Event.code == code).first()
-            if existing:
-                return RedirectResponse(
-                    url="/auth/?error=code_exists",
-                    status_code=303
-                )
-        else:
-            # Eindeutigen Code generieren
-            while True:
-                code = Event.generate_code()
-                existing = db.query(Event).filter(Event.code == code).first()
-                if not existing:
-                    break
-
-        # Neue Freizeit erstellen
+        # Neue Freizeit erstellen (ohne Code für lokalen Betrieb)
         event = Event(
             name=name,
             event_type=event_type,
@@ -100,7 +81,7 @@ async def create_event(
             end_date=end_date_obj,
             location=location if location else None,
             description=description if description else None,
-            code=code,
+            code=None,  # Kein Code für lokalen Betrieb
             is_active=True
         )
 
@@ -111,7 +92,6 @@ async def create_event(
         # Event-ID in Session speichern
         request.session["event_id"] = event.id
         request.session["event_name"] = event.name
-        request.session["event_code"] = event.code
 
         return RedirectResponse(url="/dashboard", status_code=303)
 

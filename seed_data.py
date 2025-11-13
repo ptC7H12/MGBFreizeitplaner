@@ -42,7 +42,8 @@ def seed_event(db):
             start_date=date(2024, 7, 15),
             end_date=date(2024, 7, 28),
             location="Freizeitheim Waldblick",
-            code=Event.generate_code()
+            code=Event.generate_code(),
+            is_active=True
         )
         db.add(event)
         db.commit()
@@ -86,10 +87,10 @@ def seed_families_and_participants(db, event, ruleset):
     role_kueche = db.query(Role).filter(Role.name == "kueche", Role.event_id == event.id).first()
 
     # Familie 1: Familie Müller
-    family1 = db.query(Family).filter(Family.name == "Familie Müller", Family.event_id == event.id).first()
+    family1 = db.query(Family).filter(Family.name == "Müller", Family.event_id == event.id).first()
     if not family1:
         family1 = Family(
-            name="Familie Müller",
+            name="Müller",
             contact_person="Anna Müller",
             email="anna.mueller@example.com",
             phone="0123-456789",
@@ -97,7 +98,7 @@ def seed_families_and_participants(db, event, ruleset):
         )
         db.add(family1)
         db.commit()
-        print(f"✓ Familie erstellt: {family1.name}")
+        print(f"✓ Familie erstellt: Familie {family1.name}")
 
         # Kinder der Familie Müller
         participants = [
@@ -135,10 +136,10 @@ def seed_families_and_participants(db, event, ruleset):
         db.commit()
 
     # Familie 2: Familie Schmidt
-    family2 = db.query(Family).filter(Family.name == "Familie Schmidt", Family.event_id == event.id).first()
+    family2 = db.query(Family).filter(Family.name == "Schmidt", Family.event_id == event.id).first()
     if not family2:
         family2 = Family(
-            name="Familie Schmidt",
+            name="Schmidt",
             contact_person="Peter Schmidt",
             email="peter.schmidt@example.com",
             phone="0987-654321",
@@ -146,7 +147,7 @@ def seed_families_and_participants(db, event, ruleset):
         )
         db.add(family2)
         db.commit()
-        print(f"✓ Familie erstellt: {family2.name}")
+        print(f"✓ Familie erstellt: Familie {family2.name}")
 
         # Kinder der Familie Schmidt
         p = Participant(
@@ -186,50 +187,112 @@ def seed_families_and_participants(db, event, ruleset):
 def seed_payments(db, event):
     """Erstellt Beispiel-Zahlungen"""
     # Zahlung für Familie Müller
-    family1 = db.query(Family).filter(Family.name == "Familie Müller", Family.event_id == event.id).first()
+    family1 = db.query(Family).filter(Family.name == "Müller", Family.event_id == event.id).first()
     if family1:
         payment_exists = db.query(Payment).filter(Payment.family_id == family1.id).first()
         if not payment_exists:
+            payments = [
+                Payment(
+                    amount=200.00,
+                    payment_date=date(2024, 6, 1),
+                    payment_method="Überweisung",
+                    reference="Anzahlung Sommerfreizeit",
+                    family_id=family1.id,
+                    event_id=event.id
+                ),
+                Payment(
+                    amount=90.00,
+                    payment_date=date(2024, 7, 1),
+                    payment_method="Bar",
+                    reference="Restzahlung",
+                    family_id=family1.id,
+                    event_id=event.id
+                )
+            ]
+            for payment in payments:
+                db.add(payment)
+                print(f"✓ Zahlung erstellt: {payment.amount}€ für Familie {family1.name}")
+            db.commit()
+
+    # Zahlung für Familie Schmidt
+    family2 = db.query(Family).filter(Family.name == "Schmidt", Family.event_id == event.id).first()
+    if family2:
+        payment_exists = db.query(Payment).filter(Payment.family_id == family2.id).first()
+        if not payment_exists:
             payment = Payment(
-                amount=200.00,
-                payment_date=date(2024, 6, 1),
+                amount=150.00,
+                payment_date=date(2024, 6, 15),
                 payment_method="Überweisung",
-                reference="Familie Müller - Anzahlung",
-                family=family1,
+                reference="Freizeit Tom Schmidt",
+                family_id=family2.id,
                 event_id=event.id
             )
             db.add(payment)
             db.commit()
-            print(f"✓ Zahlung erstellt: {payment.amount}€ für {family1.name}")
+            print(f"✓ Zahlung erstellt: {payment.amount}€ für Familie {family2.name}")
 
 
 def seed_expenses(db, event):
     """Erstellt Beispiel-Ausgaben"""
-    expense_exists = db.query(Expense).filter(Expense.title == "Verpflegung").first()
+    expense_exists = db.query(Expense).filter(Expense.title == "Verpflegung", Expense.event_id == event.id).first()
     if not expense_exists:
         expenses = [
-            {
-                "title": "Verpflegung",
-                "description": "Lebensmittel für die Freizeit",
-                "amount": 450.00,
-                "expense_date": date(2024, 7, 10),
-                "category": "Verpflegung",
-                "event": event
-            },
-            {
-                "title": "Material",
-                "description": "Bastelmaterial und Spiele",
-                "amount": 120.00,
-                "expense_date": date(2024, 7, 5),
-                "category": "Material",
-                "event": event
-            }
+            Expense(
+                title="Verpflegung Supermarkt",
+                description="Lebensmitteleinkauf für die erste Woche",
+                amount=450.00,
+                expense_date=date(2024, 7, 10),
+                category="Verpflegung",
+                paid_by="Anna Müller",
+                is_settled=True,
+                event_id=event.id
+            ),
+            Expense(
+                title="Bastelmaterial",
+                description="Bastelutensilien und Kreativmaterial",
+                amount=85.50,
+                expense_date=date(2024, 7, 5),
+                category="Material",
+                paid_by="Peter Schmidt",
+                is_settled=False,
+                event_id=event.id
+            ),
+            Expense(
+                title="Spielgeräte",
+                description="Bälle, Frisbees und Outdoorspielzeug",
+                amount=120.00,
+                expense_date=date(2024, 7, 8),
+                category="Material",
+                paid_by="Sarah Meyer",
+                is_settled=True,
+                event_id=event.id
+            ),
+            Expense(
+                title="Getränke",
+                description="Wasser und Saftschorlen",
+                amount=95.00,
+                expense_date=date(2024, 7, 12),
+                category="Verpflegung",
+                paid_by="Anna Müller",
+                is_settled=False,
+                event_id=event.id
+            ),
+            Expense(
+                title="Erste-Hilfe Material",
+                description="Pflaster, Verbandsmaterial",
+                amount=42.30,
+                expense_date=date(2024, 7, 3),
+                category="Sonstiges",
+                paid_by="Sarah Meyer",
+                is_settled=True,
+                event_id=event.id
+            )
         ]
 
-        for exp_data in expenses:
-            exp = Expense(**exp_data)
+        for exp in expenses:
             db.add(exp)
-            print(f"✓ Ausgabe erstellt: {exp.title} ({exp.amount}€)")
+            status = "✓ beglichen" if exp.is_settled else "⏳ offen"
+            print(f"✓ Ausgabe erstellt: {exp.title} ({exp.amount}€) - von {exp.paid_by} {status}")
 
         db.commit()
 
