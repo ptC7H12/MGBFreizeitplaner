@@ -52,8 +52,7 @@ async def list_expenses(
 async def create_expense_form(
     request: Request,
     db: Session = Depends(get_db),
-    event_id: int = Depends(get_current_event_id),
-    event_id: Optional[int] = None
+    event_id: int = Depends(get_current_event_id)
 ):
     """Formular zum Erstellen einer neuen Ausgabe"""
     event = db.query(Event).filter(Event.id == event_id).first()
