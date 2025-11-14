@@ -26,5 +26,8 @@ httpx==0.26.0
 # PDF Generation
 reportlab==4.0.7
 
+# QR Code Generation
+qrcode[pil]==7.4.2
+
 # Development
 python-dotenv==1.0.0

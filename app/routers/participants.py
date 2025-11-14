@@ -1,7 +1,7 @@
 """Participants (Teilnehmer) Router"""
 import logging
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, DataError
@@ -11,8 +11,9 @@ from pydantic import ValidationError
 
 from app.config import settings
 from app.database import get_db
-from app.models import Participant, Role, Event, Family, Ruleset
+from app.models import Participant, Role, Event, Family, Ruleset, Setting
 from app.services.price_calculator import PriceCalculator
+from app.services.qrcode_service import QRCodeService
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
@@ -572,3 +573,53 @@ async def delete_participant(
         db.rollback()
         logger.exception(f"Error deleting participant: {e}")
         raise HTTPException(status_code=500, detail="Fehler beim Löschen")
+
+@router.get("/{participant_id}/payment-qr", response_class=Response)
+async def generate_payment_qr_code(
+    participant_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Generiert einen QR-Code für die Zahlung (SEPA EPC QR-Code)"""
+    # Teilnehmer laden
+    participant = db.query(Participant).filter(
+        Participant.id == participant_id,
+        Participant.event_id == event_id
+    ).first()
+
+    if not participant:
+        raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")
+
+    # Einstellungen laden
+    setting = db.query(Setting).filter(Setting.event_id == event_id).first()
+
+    if not setting or not setting.bank_iban:
+        raise HTTPException(status_code=400, detail="Bank-Daten nicht konfiguriert")
+
+    # Berechne offenen Betrag
+    total_paid = sum(payment.amount for payment in participant.payments)
+    outstanding = participant.final_price - total_paid
+
+    if outstanding <= 0:
+        outstanding = participant.final_price  # Zeige Gesamtpreis wenn bereits bezahlt
+
+    # Verwendungszweck erstellen
+    invoice_number = f"TN-{participant.id:06d}"
+    purpose = f"{participant.event.name} - {participant.full_name} - Rechnungsnr: {invoice_number}"
+
+    # QR-Code generieren
+    qr_code_data = QRCodeService.generate_sepa_qr_code(
+        recipient_name=setting.organization_name or "Freizeit-Organisation",
+        iban=setting.bank_iban,
+        amount=outstanding,
+        purpose=purpose,
+        bic=setting.bank_bic
+    )
+
+    return Response(
+        content=qr_code_data,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": f"inline; filename=payment_qr_{participant_id}.png"
+        }
+    )

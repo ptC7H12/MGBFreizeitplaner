@@ -1,5 +1,7 @@
 """Konfiguration für das Freizeit-Kassen-System"""
+import secrets
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 from pathlib import Path
 
 
@@ -25,7 +27,12 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # Security
-    secret_key: str = "change-this-to-a-random-secret-key-in-production"
+    # Wird automatisch generiert, falls nicht in .env gesetzt
+    # WICHTIG: In Production MUSS SECRET_KEY in .env gesetzt werden!
+    secret_key: str = Field(
+        default_factory=lambda: secrets.token_urlsafe(32),
+        description="Secret key for session encryption. Set via SECRET_KEY environment variable in production."
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

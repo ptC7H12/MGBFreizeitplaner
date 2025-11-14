@@ -1,15 +1,19 @@
 """Router für Einnahmen (Zuschüsse, Spenden, etc.)"""
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy.orm import Session
+from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session, joinedload
 from datetime import date as date_type
 
 from app.database import get_db
 from app.models.income import Income
 from app.models.role import Role
-from app.dependencies import get_current_event_id, flash
+from app.dependencies import get_current_event_id
+from app.utils.flash import flash
+from app.config import settings
 
 router = APIRouter(prefix="/incomes", tags=["incomes"])
+templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -19,7 +23,12 @@ async def list_incomes(
     event_id: int = Depends(get_current_event_id)
 ):
     """Liste aller Einnahmen für das aktuelle Event"""
-    incomes = db.query(Income).filter(Income.event_id == event_id).order_by(Income.date.desc()).all()
+    # Eager Loading um N+1 Query Problem zu vermeiden
+    incomes = db.query(Income)\
+        .filter(Income.event_id == event_id)\
+        .options(joinedload(Income.role))\
+        .order_by(Income.date.desc())\
+        .all()
 
     # Gruppiere nach Rolle falls vorhanden
     incomes_by_role = {}
@@ -37,7 +46,7 @@ async def list_incomes(
 
     total_income = sum(i.amount for i in incomes)
 
-    return request.state.templates.TemplateResponse(
+    return templates.TemplateResponse(
         "incomes/list.html",
         {
             "request": request,
@@ -57,7 +66,7 @@ async def new_income_form(
     """Formular für neue Einnahme"""
     roles = db.query(Role).filter(Role.event_id == event_id, Role.is_active == True).all()
 
-    return request.state.templates.TemplateResponse(
+    return templates.TemplateResponse(
         "incomes/form.html",
         {
             "request": request,
@@ -116,7 +125,7 @@ async def edit_income_form(
 
     roles = db.query(Role).filter(Role.event_id == event_id, Role.is_active == True).all()
 
-    return request.state.templates.TemplateResponse(
+    return templates.TemplateResponse(
         "incomes/form.html",
         {
             "request": request,

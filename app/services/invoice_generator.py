@@ -6,9 +6,10 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.pdfgen import canvas
 from sqlalchemy.orm import Session
+from app.services.qrcode_service import QRCodeService
 
 
 class InvoiceGenerator:
@@ -43,6 +44,7 @@ class InvoiceGenerator:
     def _calculate_price_breakdown(self, participant) -> Dict[str, Any]:
         """
         Berechnet die detaillierte Preis-Aufschlüsselung für einen Teilnehmer
+        Verwendet PriceCalculator um Code-Duplikation zu vermeiden
 
         Args:
             participant: Participant-Objekt
@@ -50,32 +52,8 @@ class InvoiceGenerator:
         Returns:
             Dictionary mit Preis-Details
         """
-        from app.models import Ruleset
+        from app.models import Ruleset, Participant
         from app.services.price_calculator import PriceCalculator
-
-        breakdown = {
-            'base_price': 0.0,
-            'role_discount_percent': 0.0,
-            'role_discount_amount': 0.0,
-            'price_after_role_discount': 0.0,
-            'family_discount_percent': 0.0,
-            'family_discount_amount': 0.0,
-            'price_after_family_discount': 0.0,
-            'manual_discount_percent': participant.discount_percent,
-            'manual_discount_amount': 0.0,
-            'manual_price_override': participant.manual_price_override,
-            'final_price': participant.final_price,
-            'has_discounts': False,
-            'discount_reasons': []
-        }
-
-        # Wenn manueller Preis gesetzt ist, überschreibt dieser alles
-        if participant.manual_price_override is not None:
-            breakdown['has_discounts'] = True
-            breakdown['discount_reasons'].append(f"Manueller Preis: {participant.manual_price_override:.2f} €")
-            if participant.discount_reason:
-                breakdown['discount_reasons'].append(f"Grund: {participant.discount_reason}")
-            return breakdown
 
         # Aktives Regelwerk finden
         ruleset = self.db.query(Ruleset).filter(
@@ -85,73 +63,50 @@ class InvoiceGenerator:
         ).first()
 
         if not ruleset:
-            return breakdown
+            # Kein Regelwerk vorhanden - Minimales Breakdown zurückgeben
+            return {
+                'base_price': 0.0,
+                'role_discount_percent': 0.0,
+                'role_discount_amount': 0.0,
+                'price_after_role_discount': 0.0,
+                'family_discount_percent': 0.0,
+                'family_discount_amount': 0.0,
+                'price_after_family_discount': 0.0,
+                'manual_discount_percent': participant.discount_percent,
+                'manual_discount_amount': 0.0,
+                'manual_price_override': participant.manual_price_override,
+                'final_price': participant.final_price,
+                'has_discounts': False,
+                'discount_reasons': []
+            }
 
-        # Basispreis aus Altersgruppen
-        age = participant.age_at_event
-        for group in ruleset.age_groups:
-            min_age = group.get('min_age', 0)
-            max_age = group.get('max_age', 999)
-            if min_age <= age <= max_age:
-                breakdown['base_price'] = float(group.get('price', 0))
-                break
+        # Ruleset-Daten vorbereiten
+        ruleset_data = {
+            'age_groups': ruleset.age_groups or [],
+            'role_discounts': ruleset.role_discounts or {},
+            'family_discount': ruleset.family_discount or {}
+        }
 
-        # Rollenrabatt
-        role_name_lower = participant.role.name.lower()
-        role_discounts = ruleset.role_discounts or {}
-        if role_name_lower in role_discounts:
-            breakdown['role_discount_percent'] = float(role_discounts[role_name_lower].get('discount_percent', 0))
-            breakdown['role_discount_amount'] = breakdown['base_price'] * (breakdown['role_discount_percent'] / 100)
-            breakdown['price_after_role_discount'] = breakdown['base_price'] - breakdown['role_discount_amount']
-            breakdown['has_discounts'] = True
-            breakdown['discount_reasons'].append(
-                f"Rollenrabatt ({participant.role.display_name}): {breakdown['role_discount_percent']:.0f}%"
-            )
-        else:
-            breakdown['price_after_role_discount'] = breakdown['base_price']
-
-        # Familienrabatt
+        # Position in Familie ermitteln
+        family_position = 1
         if participant.family_id:
-            # Position in Familie ermitteln
-            siblings = self.db.query(type(participant)).filter(
-                type(participant).family_id == participant.family_id,
-                type(participant).is_active == True
-            ).order_by(type(participant).birth_date).all()
-
+            siblings = self.db.query(Participant).filter(
+                Participant.family_id == participant.family_id,
+                Participant.is_active == True
+            ).order_by(Participant.birth_date).all()
             family_position = next((i + 1 for i, p in enumerate(siblings) if p.id == participant.id), 1)
 
-            family_discount_config = ruleset.family_discount or {}
-            if family_discount_config.get('enabled', False):
-                if family_position == 2:
-                    breakdown['family_discount_percent'] = float(family_discount_config.get('second_child_percent', 0))
-                elif family_position >= 3:
-                    breakdown['family_discount_percent'] = float(family_discount_config.get('third_plus_child_percent', 0))
-
-                if breakdown['family_discount_percent'] > 0:
-                    breakdown['family_discount_amount'] = breakdown['price_after_role_discount'] * (
-                                breakdown['family_discount_percent'] / 100)
-                    breakdown['price_after_family_discount'] = breakdown['price_after_role_discount'] - breakdown[
-                        'family_discount_amount']
-                    breakdown['has_discounts'] = True
-                    breakdown['discount_reasons'].append(
-                        f"Familienrabatt ({family_position}. Kind): {breakdown['family_discount_percent']:.0f}%"
-                    )
-                else:
-                    breakdown['price_after_family_discount'] = breakdown['price_after_role_discount']
-            else:
-                breakdown['price_after_family_discount'] = breakdown['price_after_role_discount']
-        else:
-            breakdown['price_after_family_discount'] = breakdown['price_after_role_discount']
-
-        # Manueller Rabatt (zusätzlich)
-        if participant.discount_percent > 0:
-            breakdown['manual_discount_amount'] = breakdown['price_after_family_discount'] * (
-                        participant.discount_percent / 100)
-            breakdown['has_discounts'] = True
-            reason = f"Zusätzlicher Rabatt: {participant.discount_percent:.0f}%"
-            if participant.discount_reason:
-                reason += f" ({participant.discount_reason})"
-            breakdown['discount_reasons'].append(reason)
+        # PriceCalculator verwenden für konsistente Berechnung
+        breakdown = PriceCalculator.calculate_participant_price_with_breakdown(
+            age=participant.age_at_event,
+            role_name=participant.role.name,
+            role_display_name=participant.role.display_name,
+            ruleset_data=ruleset_data,
+            family_children_count=family_position,
+            discount_percent=participant.discount_percent,
+            discount_reason=participant.discount_reason,
+            manual_price_override=participant.manual_price_override
+        )
 
         return breakdown
 
@@ -323,6 +278,30 @@ class InvoiceGenerator:
             {footer_text}
             """
             story.append(Paragraph(payment_text, normal_style))
+            story.append(Spacer(1, 0.5*cm))
+
+            # QR-Code für SEPA-Zahlung generieren
+            try:
+                qr_code_bytes = QRCodeService.generate_sepa_qr_code(
+                    recipient_name=settings.bank_account_holder,
+                    iban=settings.bank_iban,
+                    amount=outstanding,
+                    purpose=invoice_number,
+                    bic=settings.bank_bic
+                )
+
+                # QR-Code als Bild einfügen
+                qr_image = Image(BytesIO(qr_code_bytes), width=4*cm, height=4*cm)
+                story.append(Paragraph("<b>QR-Code für Banking-App:</b>", normal_style))
+                story.append(Spacer(1, 0.2*cm))
+                story.append(qr_image)
+                story.append(Paragraph(
+                    f"Scannen Sie diesen QR-Code mit Ihrer Banking-App um die Überweisung von {outstanding:.2f} € direkt auszuführen.",
+                    normal_style
+                ))
+            except Exception as e:
+                # Falls QR-Code-Generierung fehlschlägt, einfach überspringen
+                print(f"Warnung: QR-Code konnte nicht generiert werden: {e}")
         else:
             story.append(Paragraph("Status: Vollständig bezahlt", heading_style))
             story.append(Paragraph(footer_text, normal_style))
@@ -510,6 +489,30 @@ class InvoiceGenerator:
             {footer_text}
             """
             story.append(Paragraph(payment_text, normal_style))
+            story.append(Spacer(1, 0.5*cm))
+
+            # QR-Code für SEPA-Zahlung generieren
+            try:
+                qr_code_bytes = QRCodeService.generate_sepa_qr_code(
+                    recipient_name=settings.bank_account_holder,
+                    iban=settings.bank_iban,
+                    amount=outstanding,
+                    purpose=invoice_number,
+                    bic=settings.bank_bic
+                )
+
+                # QR-Code als Bild einfügen
+                qr_image = Image(BytesIO(qr_code_bytes), width=4*cm, height=4*cm)
+                story.append(Paragraph("<b>QR-Code für Banking-App:</b>", normal_style))
+                story.append(Spacer(1, 0.2*cm))
+                story.append(qr_image)
+                story.append(Paragraph(
+                    f"Scannen Sie diesen QR-Code mit Ihrer Banking-App um die Überweisung von {outstanding:.2f} € direkt auszuführen.",
+                    normal_style
+                ))
+            except Exception as e:
+                # Falls QR-Code-Generierung fehlschlägt, einfach überspringen
+                print(f"Warnung: QR-Code konnte nicht generiert werden: {e}")
         else:
             story.append(Paragraph("Status: Vollständig bezahlt", heading_style))
             story.append(Paragraph(footer_text, normal_style))

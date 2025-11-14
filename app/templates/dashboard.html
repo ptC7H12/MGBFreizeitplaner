@@ -164,6 +164,33 @@
     </div>
 </div>
 
+<!-- Statistik-Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <!-- Altersverteilung -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Altersverteilung</h3>
+        <canvas id="ageChart" height="200"></canvas>
+    </div>
+
+    <!-- Rollen-Verteilung -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Verteilung nach Rollen</h3>
+        <canvas id="roleChart" height="200"></canvas>
+    </div>
+
+    <!-- Zahlungsverlauf -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Zahlungsverlauf (kumulativ)</h3>
+        <canvas id="paymentTimelineChart" height="200"></canvas>
+    </div>
+
+    <!-- Ausgaben nach Kategorien -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Ausgaben nach Kategorien</h3>
+        <canvas id="expenseChart" height="200"></canvas>
+    </div>
+</div>
+
 <!-- Quick Actions -->
 <div class="bg-white shadow rounded-lg p-6">
     <h2 class="text-xl font-semibold text-gray-900 mb-4">Schnellzugriff</h2>
@@ -200,4 +227,124 @@
         </a>
     </div>
 </div>
+
+<!-- Chart.js Script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chartDefaults = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    };
+
+    // Altersverteilung Chart
+    fetch('/dashboard/api/age-distribution')
+        .then(res => res.json())
+        .then(data => {
+            new Chart(document.getElementById('ageChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Anzahl Teilnehmer',
+                        data: data.data,
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    ...chartDefaults,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+    // Rollen-Verteilung Chart
+    fetch('/dashboard/api/role-distribution')
+        .then(res => res.json())
+        .then(data => {
+            new Chart(document.getElementById('roleChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.data,
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.7)',
+                            'rgba(16, 185, 129, 0.7)',
+                            'rgba(245, 158, 11, 0.7)',
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(139, 92, 246, 0.7)'
+                        ]
+                    }]
+                },
+                options: chartDefaults
+            });
+        });
+
+    // Zahlungsverlauf Chart
+    fetch('/dashboard/api/payment-timeline')
+        .then(res => res.json())
+        .then(data => {
+            new Chart(document.getElementById('paymentTimelineChart'), {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Kumulierte Zahlungen (€)',
+                        data: data.data,
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    ...chartDefaults,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        });
+
+    // Ausgaben Chart
+    fetch('/dashboard/api/expense-categories')
+        .then(res => res.json())
+        .then(data => {
+            new Chart(document.getElementById('expenseChart'), {
+                type: 'pie',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.data,
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(245, 158, 11, 0.7)',
+                            'rgba(16, 185, 129, 0.7)',
+                            'rgba(59, 130, 246, 0.7)',
+                            'rgba(139, 92, 246, 0.7)'
+                        ]
+                    }]
+                },
+                options: chartDefaults
+            });
+        });
+});
+</script>
 {% endblock %}
