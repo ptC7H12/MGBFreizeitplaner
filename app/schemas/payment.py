@@ -20,6 +20,17 @@ class PaymentCreate(PaymentBase):
     pass
 
 
+class PaymentUpdate(BaseModel):
+    """Schema für das Aktualisieren einer Zahlung"""
+    amount: Optional[float] = Field(None, gt=0)
+    payment_date: Optional[date] = None
+    payment_method: Optional[str] = Field(None, max_length=50)
+    reference: Optional[str] = Field(None, max_length=200)
+    notes: Optional[str] = None
+    participant_id: Optional[int] = None
+    family_id: Optional[int] = None
+
+
 class PaymentResponse(PaymentBase):
     """Schema für die Antwort"""
     id: int

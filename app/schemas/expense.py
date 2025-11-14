@@ -22,6 +22,18 @@ class ExpenseCreate(ExpenseBase):
     pass
 
 
+class ExpenseUpdate(BaseModel):
+    """Schema für das Aktualisieren einer Ausgabe"""
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    amount: Optional[float] = Field(None, gt=0)
+    expense_date: Optional[date] = None
+    category: Optional[str] = Field(None, max_length=100)
+    receipt_number: Optional[str] = Field(None, max_length=100)
+    paid_by: Optional[str] = Field(None, max_length=200)
+    notes: Optional[str] = None
+
+
 class ExpenseResponse(ExpenseBase):
     """Schema für die Antwort"""
     id: int
