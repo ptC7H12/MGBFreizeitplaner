@@ -211,9 +211,6 @@ async def create_participant(
             family_id=family_id
         )
 
-        # Datum parsen (bereits validiert durch Pydantic)
-        birth_date_obj = datetime.strptime(participant_data.birth_date, "%Y-%m-%d").date()
-
         # Wenn "Als Familie erstellen" aktiviert ist, neue Familie erstellen
         if create_as_family == "true":
             # Prüfen ob Familie mit diesem Namen schon existiert
@@ -239,20 +236,20 @@ async def create_participant(
                 db.flush()  # Familie speichern, um ID zu erhalten
                 family_id = new_family.id
 
-        # Automatische Preisberechnung
+        # Automatische Preisberechnung (birth_date ist bereits ein date-Objekt)
         calculated_price = _calculate_price_for_participant(
             db=db,
             event_id=event_id,
             role_id=participant_data.role_id,
-            birth_date=birth_date_obj,
+            birth_date=participant_data.birth_date,
             family_id=participant_data.family_id
         )
 
-        # Neuen Teilnehmer erstellen
+        # Neuen Teilnehmer erstellen (birth_date ist bereits ein date-Objekt)
         participant = Participant(
             first_name=participant_data.first_name,
             last_name=participant_data.last_name,
-            birth_date=birth_date_obj,
+            birth_date=participant_data.birth_date,
             gender=participant_data.gender,
             email=participant_data.email,
             phone=participant_data.phone,
@@ -478,22 +475,20 @@ async def update_participant(
             family_id=family_id
         )
 
-        # Datum parsen (bereits validiert durch Pydantic)
-        birth_date_obj = datetime.strptime(participant_data.birth_date, "%Y-%m-%d").date()
-
         # Preis neu berechnen (wenn sich relevante Daten geändert haben)
+        # birth_date ist bereits ein date-Objekt nach Pydantic-Validierung
         calculated_price = _calculate_price_for_participant(
             db=db,
             event_id=event_id,
             role_id=participant_data.role_id,
-            birth_date=birth_date_obj,
+            birth_date=participant_data.birth_date,
             family_id=participant_data.family_id
         )
 
-        # Teilnehmer aktualisieren
+        # Teilnehmer aktualisieren (birth_date ist bereits ein date-Objekt)
         participant.first_name = participant_data.first_name
         participant.last_name = participant_data.last_name
-        participant.birth_date = birth_date_obj
+        participant.birth_date = participant_data.birth_date
         participant.gender = participant_data.gender
         participant.email = participant_data.email
         participant.phone = participant_data.phone

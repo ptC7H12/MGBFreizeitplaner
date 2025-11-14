@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hauptkennzahlen Grid -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+    <!-- Netto-Kassenstand mit Status-Badge -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Netto-Kassenstand</dt>
+            <dd class="mt-1 text-3xl font-semibold {% if status.color == 'green' %}text-green-600{% elif status.color == 'yellow' %}text-yellow-600{% else %}text-red-600{% endif %}">
+                {{ "%.2f"|format(net_balance) }} €
+            </dd>
+            <p class="mt-2 flex items-center text-sm">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if status.color == 'green' %}bg-green-100 text-green-800{% elif status.color == 'yellow' %}bg-yellow-100 text-yellow-800{% else %}bg-red-100 text-red-800{% endif %}">
+                    {{ status.text }}
+                </span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Einnahmen durch Zahlungen -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Einnahmen (Zahlungen)</dt>
+            <dd class="mt-1 text-3xl font-semibold text-green-600">
+                {{ "%.2f"|format(total_payments) }} €
+            </dd>
+        </div>
+    </div>
+
+    <!-- Zuschüsse/Einnahmen -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Zuschüsse/Förderungen</dt>
+            <dd class="mt-1 text-3xl font-semibold text-blue-600">
+                {{ "%.2f"|format(total_incomes) }} €
+            </dd>
+        </div>
+    </div>
+
+    <!-- Beglichene Ausgaben -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Beglichene Ausgaben</dt>
+            <dd class="mt-1 text-3xl font-semibold text-red-600">
+                {{ "%.2f"|format(settled_expenses) }} €
+            </dd>
+        </div>
+    </div>
+</div>
+
+<!-- Zweite Zeile -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+    <!-- Offene Ausgaben -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Offene Ausgaben</dt>
+            <dd class="mt-1 text-3xl font-semibold text-yellow-600">
+                {{ "%.2f"|format(open_expenses) }} €
+            </dd>
+        </div>
+    </div>
+
+    <!-- Noch zu erwartende Zahlungen -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Noch zu erwarten</dt>
+            <dd class="mt-1 text-3xl font-semibold {% if outstanding_payments > 0 %}text-orange-600{% else %}text-gray-900{% endif %}">
+                {{ "%.2f"|format(outstanding_payments) }} €
+            </dd>
+            <p class="mt-1 text-xs text-gray-500">von {{ "%.2f"|format(expected_income) }} € erwartet</p>
+        </div>
+    </div>
+
+    <!-- Vorgestreckte Beträge -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Vorgestreckt</dt>
+            <dd class="mt-1 text-3xl font-semibold text-purple-600">
+                {{ "%.2f"|format(unreimbursed_expenses) }} €
+            </dd>
+            <p class="mt-1 text-xs text-gray-500">noch zu erstatten</p>
+        </div>
+    </div>
+
+    <!-- Brutto-Kassenstand -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Endstand (theoretisch)</dt>
+            <dd class="mt-1 text-3xl font-semibold {% if gross_balance >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                {{ "%.2f"|format(gross_balance) }} €
+            </dd>
+            <p class="mt-1 text-xs text-gray-500">wenn alles bezahlt</p>
+        </div>
+    </div>
+</div>
+
+<!-- Ausgaben nach Kategorie -->
+<div class="bg-white shadow rounded-lg overflow-hidden mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Ausgaben nach Kategorie</h2>
+    </div>
+    {% if categories %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategorie</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anzahl</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Betrag</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for category in categories %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {{ category.name }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ category.count }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 text-right">
+                        {{ "%.2f"|format(category.total) }} €
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="px-6 py-12 text-center">
+        <p class="text-sm text-gray-500">Keine Ausgaben vorhanden</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Erklärung -->
+<div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+    <h3 class="text-sm font-semibold text-blue-900 mb-2">💡 Erklärung der Kennzahlen</h3>
+    <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-xs text-blue-800">
+        <div>
+            <dt class="font-semibold">Netto-Kassenstand:</dt>
+            <dd>Aktuell verfügbar = Zahlungen + Zuschüsse - Beglichene Ausgaben</dd>
+        </div>
+        <div>
+            <dt class="font-semibold">Endstand (theoretisch):</dt>
+            <dd>Erwarteter Endstand = Erwartete Einnahmen + Zuschüsse - Alle Ausgaben</dd>
+        </div>
+        <div>
+            <dt class="font-semibold">Noch zu erwarten:</dt>
+            <dd>Ausstehende Teilnehmerzahlungen</dd>
+        </div>
+        <div>
+            <dt class="font-semibold">Vorgestreckt:</dt>
+            <dd>Ausgaben, die von Personen vorgestreckt wurden und noch erstattet werden müssen</dd>
+        </div>
+    </dl>
+</div>
+{% endblock %}

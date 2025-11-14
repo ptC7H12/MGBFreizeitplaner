@@ -68,8 +68,7 @@ async def create_expense_form(
         {
             "request": request,
             "title": "Neue Ausgabe",
-            "event": event,
-            "preselected_event_id": event_id
+            "event": event
         }
     )
 
@@ -102,15 +101,12 @@ async def create_expense(
             notes=notes
         )
 
-        # Datum parsen (bereits validiert durch Pydantic)
-        expense_date_obj = datetime.strptime(expense_data.expense_date, "%Y-%m-%d").date()
-
-        # Neue Ausgabe erstellen
+        # Neue Ausgabe erstellen (expense_date ist bereits ein date-Objekt)
         expense = Expense(
             title=expense_data.title,
             description=expense_data.description,
             amount=expense_data.amount,
-            expense_date=expense_date_obj,
+            expense_date=expense_data.expense_date,
             category=expense_data.category,
             receipt_number=expense_data.receipt_number,
             paid_by=expense_data.paid_by,
@@ -209,14 +205,11 @@ async def update_expense(
             notes=notes
         )
 
-        # Datum parsen (bereits validiert durch Pydantic)
-        expense_date_obj = datetime.strptime(expense_data.expense_date, "%Y-%m-%d").date()
-
-        # Ausgabe aktualisieren
+        # Ausgabe aktualisieren (expense_date ist bereits ein date-Objekt)
         expense.title = expense_data.title
         expense.description = expense_data.description
         expense.amount = expense_data.amount
-        expense.expense_date = expense_date_obj
+        expense.expense_date = expense_data.expense_date
         expense.category = expense_data.category
         expense.receipt_number = expense_data.receipt_number
         expense.paid_by = expense_data.paid_by
@@ -258,8 +251,10 @@ async def update_expense(
 
 
 @router.post("/{expense_id}/toggle-settled")
-async def toggle_settled(expense_id: int, db: Session = Depends(get_db)):
+async def toggle_settled(expense_id: int, db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
     """Toggelt den Beglichen-Status einer Ausgabe"""
+    from app.models import Task
+
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
 
     if not expense:
@@ -272,6 +267,52 @@ async def toggle_settled(expense_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Fehler beim Aktualisieren")
+
+
+@router.post("/{expense_id}/toggle-reimbursed")
+async def toggle_reimbursed(expense_id: int, db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
+    """Toggelt den Erstattet-Status einer Ausgabe und synchronisiert mit Tasks"""
+    from app.models import Task
+    from datetime import datetime
+
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+
+    if not expense:
+        raise HTTPException(status_code=404, detail="Ausgabe nicht gefunden")
+
+    try:
+        expense.is_reimbursed = not expense.is_reimbursed
+
+        # Synchronisiere mit Tasks
+        task = db.query(Task).filter(
+            Task.event_id == event_id,
+            Task.task_type == "expense_reimbursement",
+            Task.reference_id == expense_id
+        ).first()
+
+        if expense.is_reimbursed:
+            # Ausgabe wurde erstattet → Task als erledigt markieren/erstellen
+            if task:
+                task.is_completed = True
+                task.completed_at = datetime.utcnow()
+            else:
+                new_task = Task(
+                    task_type="expense_reimbursement",
+                    reference_id=expense_id,
+                    is_completed=True,
+                    event_id=event_id
+                )
+                db.add(new_task)
+        else:
+            # Ausgabe wurde als nicht erstattet markiert → Task löschen falls vorhanden
+            if task:
+                db.delete(task)
+
+        db.commit()
+        return RedirectResponse(url="/expenses", status_code=303)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Fehler beim Aktualisieren: {str(e)}")
 
 
 @router.post("/{expense_id}/delete")

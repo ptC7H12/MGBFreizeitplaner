@@ -1,11 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="mb-6 flex justify-between items-center">
-    <div>
-        <h1 class="text-3xl font-bold text-gray-900">Zahlungen</h1>
-        <p class="mt-2 text-sm text-gray-600">Übersicht aller erfassten Zahlungen</p>
-    </div>
+<div class="mb-6 flex justify-end items-center">
     <a href="/payments/create" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition">
         <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/>
@@ -32,14 +28,21 @@
     </div>
     <div class="bg-white overflow-hidden shadow rounded-lg">
         <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Durchschnitt</dt>
+            <dt class="text-sm font-medium text-gray-500 truncate">Erwartete Einnahme</dt>
             <dd class="mt-1 text-3xl font-semibold text-blue-600">
-                {% if payments|length > 0 %}
-                    {{ "%.2f"|format(payments|sum(attribute='amount') / payments|length) }} €
-                {% else %}
-                    0.00 €
-                {% endif %}
+                {{ "%.2f"|format(expected_income) }} €
             </dd>
+            {% set total_received = payments|sum(attribute='amount') %}
+            {% set difference = expected_income - total_received %}
+            <p class="mt-2 text-sm {% if difference > 0 %}text-red-600{% elif difference < 0 %}text-green-600{% else %}text-gray-500{% endif %}">
+                {% if difference > 0 %}
+                    Noch ausstehend: {{ "%.2f"|format(difference) }} €
+                {% elif difference < 0 %}
+                    Überzahlung: {{ "%.2f"|format(-difference) }} €
+                {% else %}
+                    Vollständig bezahlt
+                {% endif %}
+            </p>
         </div>
     </div>
 </div>
