@@ -156,13 +156,17 @@ class InvoiceGenerator:
         outstanding = participant.final_price - total_paid
         qr_image = None
 
+        # Verwendungszweck: Präfix + Teilnehmername
+        subject_prefix = settings.invoice_subject_prefix or "Teilnahmegebühr"
+        payment_reference = f"{subject_prefix} {participant.full_name}"
+
         if outstanding > 0:
             try:
                 qr_code_bytes = QRCodeService.generate_sepa_qr_code(
                     recipient_name=settings.bank_account_holder,
                     iban=settings.bank_iban,
                     amount=outstanding,
-                    purpose=invoice_number,
+                    purpose=payment_reference,
                     bic=settings.bank_bic
                 )
                 qr_image = Image(BytesIO(qr_code_bytes), width=3.5*cm, height=3.5*cm)
@@ -212,9 +216,9 @@ class InvoiceGenerator:
         story.append(Paragraph(recipient_text, normal_style))
         story.append(Spacer(1, 1*cm))
 
-        # Betreff
-        subject_prefix = settings.invoice_subject_prefix or "Teilnahme an"
-        story.append(Paragraph(f"{subject_prefix}: {participant.event.name}", heading_style))
+        # Betreff (für Rechnung - nicht für Überweisung)
+        subject_prefix_display = settings.invoice_subject_prefix or "Teilnahme an"
+        story.append(Paragraph(f"{subject_prefix_display}: {participant.event.name}", heading_style))
         story.append(Spacer(1, 0.5*cm))
 
         # Preis-Aufschlüsselung berechnen
@@ -306,7 +310,7 @@ class InvoiceGenerator:
             """
             if settings.bank_bic:
                 payment_text += f"<b>BIC:</b> {settings.bank_bic}<br/>"
-            payment_text += f"""<b>Verwendungszweck:</b> {invoice_number}<br/>
+            payment_text += f"""<b>Verwendungszweck:</b> {payment_reference}<br/>
             <br/>
             {footer_text}
             """
@@ -379,13 +383,17 @@ class InvoiceGenerator:
         outstanding_early = total_amount - total_paid_early
         qr_image = None
 
+        # Verwendungszweck: Präfix + Familienname
+        subject_prefix = settings.invoice_subject_prefix or "Teilnahmegebühr"
+        payment_reference = f"{subject_prefix} Familie {family.name}"
+
         if outstanding_early > 0:
             try:
                 qr_code_bytes = QRCodeService.generate_sepa_qr_code(
                     recipient_name=settings.bank_account_holder,
                     iban=settings.bank_iban,
                     amount=outstanding_early,
-                    purpose=invoice_number,
+                    purpose=payment_reference,
                     bic=settings.bank_bic
                 )
                 qr_image = Image(BytesIO(qr_code_bytes), width=3.5*cm, height=3.5*cm)
@@ -548,7 +556,7 @@ class InvoiceGenerator:
             """
             if settings.bank_bic:
                 payment_text += f"<b>BIC:</b> {settings.bank_bic}<br/>"
-            payment_text += f"""<b>Verwendungszweck:</b> {invoice_number}<br/>
+            payment_text += f"""<b>Verwendungszweck:</b> {payment_reference}<br/>
             <br/>
             {footer_text}
             """
