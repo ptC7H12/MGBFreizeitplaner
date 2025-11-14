@@ -64,6 +64,22 @@ async def startup_event():
     init_db()
     logger.info("Datenbank erfolgreich initialisiert!")
 
+    # Prüfen ob Demo-Daten erstellt werden sollen (nur beim ersten Start)
+    from app.database import SessionLocal
+    from app.models.event import Event
+    db = SessionLocal()
+    try:
+        event_count = db.query(Event).count()
+        if event_count == 0:
+            logger.info("Keine Events gefunden - erstelle Demo-Daten...")
+            from app.utils.seed_helper import create_demo_data
+            create_demo_data(db)
+            logger.info("Demo-Daten erfolgreich erstellt!")
+    except Exception as e:
+        logger.error(f"Fehler beim Erstellen der Demo-Daten: {e}")
+    finally:
+        db.close()
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
