@@ -1,0 +1,46 @@
+name: "Familienfreizeit 2024 - mit Rabatt ab 1. Kind"
+type: "familie"
+valid_from: "2024-01-01"
+valid_until: "2024-12-31"
+
+age_groups:
+  - min_age: 0
+    max_age: 5
+    price: 100.00
+  - min_age: 6
+    max_age: 11
+    price: 140.00
+  - min_age: 12
+    max_age: 17
+    price: 150.00
+  - min_age: 18
+    max_age: 25
+    price: 120.00
+  - min_age: 26
+    max_age: 999
+    price: 80.00
+
+role_discounts:
+  betreuer:
+    discount_percent: 50
+    max_count: 15
+  kueche:
+    discount_percent: 100
+    max_count: 3
+  leitung:
+    discount_percent: 75
+    max_count: 5
+
+# Beispiel: Rabatt ab dem ersten Kind
+# Nützlich wenn Familien grundsätzlich einen Vorteil erhalten sollen
+family_discount:
+  enabled: true
+  first_child_percent: 5       # 5% Rabatt bereits beim ersten Kind
+  second_child_percent: 15     # 15% Rabatt beim zweiten Kind
+  third_plus_child_percent: 25 # 25% Rabatt ab dem dritten Kind
+
+# Beispiel-Berechnung für eine Familie mit 3 Kindern (alle 6-11 Jahre):
+# - 1. Kind: 140€ - 5% = 133€
+# - 2. Kind: 140€ - 15% = 119€
+# - 3. Kind: 140€ - 25% = 105€
+# Gesamt: 357€ (statt 420€ ohne Rabatt)
