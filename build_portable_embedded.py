@@ -294,6 +294,11 @@ echo   http://localhost:8000
 echo.
 echo Druecke Ctrl+C um die Anwendung zu beenden
 echo.
+echo [INFO] Browser wird automatisch geoeffnet...
+echo.
+
+REM Start browser in background after 3 seconds using PowerShell
+start /b powershell -WindowStyle Hidden -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:8000'"
 
 "%PYTHON_EXE%" -m app.main
 
