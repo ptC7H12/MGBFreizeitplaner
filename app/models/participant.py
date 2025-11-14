@@ -18,7 +18,7 @@ class Participant(Base):
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100), nullable=False, index=True)
     birth_date = Column(Date, nullable=False)
-    gender = Column(String(20), nullable=True)  # "männlich", "weiblich", "divers"
+    gender = Column(String(20), nullable=True)  # "männlich", "weiblich"
 
     # Kontaktdaten
     email = Column(String(200), nullable=True)
