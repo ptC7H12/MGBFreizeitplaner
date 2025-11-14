@@ -15,7 +15,9 @@
                         <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
                     </svg>
                     <span class="font-medium">{{ request.session.get('event_name') }}</span>
+                    {% if request.session.get('event_code') %}
                     <span class="ml-2 text-blue-200 text-xs">({{ request.session.get('event_code') }})</span>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>
@@ -83,7 +85,7 @@
         <div class="px-2 pt-2 pb-3 space-y-1">
             {% if request.session.get('event_name') %}
             <div class="px-3 py-2 text-sm text-blue-200 border-b border-blue-500 mb-2">
-                {{ request.session.get('event_name') }} ({{ request.session.get('event_code') }})
+                {{ request.session.get('event_name') }}{% if request.session.get('event_code') %} ({{ request.session.get('event_code') }}){% endif %}
             </div>
             {% endif %}
             <a href="/dashboard" class="hover:bg-blue-700 block px-3 py-2 rounded-md text-base font-medium">Dashboard</a>
