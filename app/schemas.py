@@ -1,6 +1,6 @@
 """Pydantic Schemas für Input-Validierung"""
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import Optional
+from typing import Optional, Union
 from datetime import date, datetime
 import re
 
@@ -154,7 +154,7 @@ class ExpenseCreateSchema(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
     amount: float = Field(..., gt=0.0)
-    expense_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    expense_date: Union[str, date] = Field(...)
     category: Optional[str] = Field(None, max_length=100)
     receipt_number: Optional[str] = Field(None, max_length=100)
     paid_by: Optional[str] = Field(None, max_length=200)
@@ -170,20 +170,23 @@ class ExpenseCreateSchema(BaseModel):
 
     @field_validator('expense_date')
     @classmethod
-    def validate_expense_date(cls, v: str) -> str:
+    def validate_expense_date(cls, v: Union[str, date]) -> date:
         """Validiert das Ausgabendatum"""
-        try:
-            expense_date_obj = datetime.strptime(v, "%Y-%m-%d").date()
-
-            # Datum darf nicht in der Zukunft liegen
-            if expense_date_obj > date.today():
-                raise ValueError("Ausgabendatum darf nicht in der Zukunft liegen")
-
-            return v
-        except ValueError as e:
-            if "does not match format" in str(e):
+        # Wenn bereits ein date-Objekt, validiere direkt
+        if isinstance(v, date):
+            expense_date_obj = v
+        else:
+            # String zu date konvertieren
+            try:
+                expense_date_obj = datetime.strptime(v, "%Y-%m-%d").date()
+            except ValueError:
                 raise ValueError("Ausgabendatum muss im Format YYYY-MM-DD vorliegen")
-            raise
+
+        # Datum darf nicht in der Zukunft liegen
+        if expense_date_obj > date.today():
+            raise ValueError("Ausgabendatum darf nicht in der Zukunft liegen")
+
+        return expense_date_obj
 
 
 class ExpenseUpdateSchema(ExpenseCreateSchema):

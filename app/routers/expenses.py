@@ -102,15 +102,12 @@ async def create_expense(
             notes=notes
         )
 
-        # Datum parsen (bereits validiert durch Pydantic)
-        expense_date_obj = datetime.strptime(expense_data.expense_date, "%Y-%m-%d").date()
-
-        # Neue Ausgabe erstellen
+        # Neue Ausgabe erstellen (expense_date ist bereits ein date-Objekt)
         expense = Expense(
             title=expense_data.title,
             description=expense_data.description,
             amount=expense_data.amount,
-            expense_date=expense_date_obj,
+            expense_date=expense_data.expense_date,
             category=expense_data.category,
             receipt_number=expense_data.receipt_number,
             paid_by=expense_data.paid_by,
@@ -209,14 +206,11 @@ async def update_expense(
             notes=notes
         )
 
-        # Datum parsen (bereits validiert durch Pydantic)
-        expense_date_obj = datetime.strptime(expense_data.expense_date, "%Y-%m-%d").date()
-
-        # Ausgabe aktualisieren
+        # Ausgabe aktualisieren (expense_date ist bereits ein date-Objekt)
         expense.title = expense_data.title
         expense.description = expense_data.description
         expense.amount = expense_data.amount
-        expense.expense_date = expense_date_obj
+        expense.expense_date = expense_data.expense_date
         expense.category = expense_data.category
         expense.receipt_number = expense_data.receipt_number
         expense.paid_by = expense_data.paid_by
