@@ -41,7 +41,15 @@ async def list_families(
     family_data = []
     for family in families:
         total_price = sum(p.final_price for p in family.participants)
-        total_paid = sum(payment.amount for payment in family.payments)
+
+        # Zahlungen: Sowohl direkte Familienzahlungen als auch Zahlungen an einzelne Mitglieder
+        family_payments = sum(payment.amount for payment in family.payments)
+        member_payments = sum(
+            payment.amount
+            for participant in family.participants
+            for payment in participant.payments
+        )
+        total_paid = family_payments + member_payments
 
         family_data.append({
             "family": family,
@@ -158,7 +166,15 @@ async def view_family(
 
     # Finanzielle Übersicht
     total_price = sum(p.final_price for p in family.participants)
-    total_paid = sum(payment.amount for payment in family.payments)
+
+    # Zahlungen: Sowohl direkte Familienzahlungen als auch Zahlungen an einzelne Mitglieder
+    family_payments = sum(payment.amount for payment in family.payments)
+    member_payments = sum(
+        payment.amount
+        for participant in family.participants
+        for payment in participant.payments
+    )
+    total_paid = family_payments + member_payments
 
     return templates.TemplateResponse(
         "families/detail.html",
