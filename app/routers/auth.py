@@ -14,8 +14,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request, db: Session = Depends(get_db), error: str = None):
     """Landing Page für Freizeit-Auswahl oder -Erstellung"""
-    # Alle aktiven Freizeiten laden
-    events = db.query(Event).filter(Event.is_active == True).order_by(Event.start_date.desc()).all()
+    # Alle aktiven Freizeiten laden (neueste zuerst)
+    events = db.query(Event).filter(Event.is_active == True).order_by(Event.created_at.desc()).all()
 
     return templates.TemplateResponse(
         "auth/landing.html",
@@ -112,3 +112,32 @@ async def logout(request: Request):
 async def switch_event_page(request: Request):
     """Seite zum Wechseln der Freizeit"""
     return RedirectResponse(url="/auth/logout", status_code=303)
+
+
+@router.post("/delete", response_class=HTMLResponse)
+async def delete_event(
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Form(...)
+):
+    """Löscht eine Freizeit"""
+    # Event suchen
+    event = db.query(Event).filter(Event.id == event_id).first()
+
+    if not event:
+        return RedirectResponse(
+            url="/auth/?error=invalid_event",
+            status_code=303
+        )
+
+    # Prüfen ob das Event aktuell in der Session ist
+    current_event_id = request.session.get("event_id")
+    if current_event_id == event_id:
+        # Session löschen wenn das aktuelle Event gelöscht wird
+        request.session.clear()
+
+    # Event löschen (Cascade löscht alle zugehörigen Daten)
+    db.delete(event)
+    db.commit()
+
+    return RedirectResponse(url="/auth/", status_code=303)
