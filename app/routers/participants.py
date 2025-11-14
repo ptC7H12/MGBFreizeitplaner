@@ -1,12 +1,16 @@
 """Participants (Teilnehmer) Router"""
 import logging
-from fastapi import APIRouter, Request, Depends, Form, HTTPException
+import json
+from io import BytesIO
+from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
 from typing import Optional
 from pydantic import ValidationError
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment
 
 from app.database import get_db
 from app.models import Participant, Role, Event, Family, Ruleset, Setting
@@ -705,3 +709,406 @@ async def generate_payment_qr_code(
             "Content-Disposition": f"inline; filename=payment_qr_{participant_id}.png"
         }
     )
+
+
+@router.get("/import", response_class=HTMLResponse)
+async def import_participants_form(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Zeigt das Excel-Import Formular"""
+    return templates.TemplateResponse(
+        "participants/import.html",
+        {
+            "request": request,
+            "title": "Excel Import"
+        }
+    )
+
+
+@router.get("/import/template")
+async def download_import_template(
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Generiert eine Excel-Vorlage zum Herunterladen"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Teilnehmer"
+
+    # Header-Zeile mit Formatierung
+    headers = [
+        "Vorname*", "Nachname*", "Geburtsdatum* (TT.MM.JJJJ)",
+        "Geschlecht", "E-Mail", "Telefon", "Adresse", "Familien-Nr"
+    ]
+
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Spaltenbreiten anpassen
+    column_widths = [15, 15, 25, 12, 25, 15, 30, 12]
+    for col_num, width in enumerate(column_widths, 1):
+        ws.column_dimensions[ws.cell(row=1, column=col_num).column_letter].width = width
+
+    # Beispieldaten hinzufügen
+    example_data = [
+        ["Max", "Mustermann", "15.03.2010", "männlich", "max@example.com", "0123456789", "Musterstraße 1, 12345 Stadt", "1"],
+        ["Maria", "Mustermann", "20.07.2012", "weiblich", "maria@example.com", "", "Musterstraße 1, 12345 Stadt", "1"],
+        ["Anna", "Schmidt", "05.09.2011", "weiblich", "anna@example.com", "0987654321", "", ""]
+    ]
+
+    for row_num, row_data in enumerate(example_data, 2):
+        for col_num, value in enumerate(row_data, 1):
+            ws.cell(row=row_num, column=col_num, value=value)
+
+    # Hinweise in separatem Sheet
+    ws_info = wb.create_sheet("Hinweise")
+    ws_info.column_dimensions['A'].width = 80
+
+    info_text = [
+        "Hinweise zum Excel-Import:",
+        "",
+        "PFLICHTFELDER (mit * markiert):",
+        "- Vorname: Vorname des Teilnehmers",
+        "- Nachname: Nachname des Teilnehmers",
+        "- Geburtsdatum: Format TT.MM.JJJJ (z.B. 15.03.2010)",
+        "",
+        "OPTIONALE FELDER:",
+        "- Geschlecht: männlich/weiblich/divers oder leer lassen",
+        "- E-Mail: E-Mail-Adresse des Teilnehmers oder Erziehungsberechtigten",
+        "- Telefon: Telefonnummer",
+        "- Adresse: Vollständige Adresse",
+        "- Familien-Nr: Gleiche Nummer für Familienmitglieder (z.B. 1, 2, 3...)",
+        "",
+        "FAMILIEN-GRUPPIERUNG:",
+        "Wenn mehrere Teilnehmer zur gleichen Familie gehören, geben Sie",
+        "die gleiche Familien-Nummer ein (z.B. alle '1', dann nächste Familie '2', etc.)",
+        "Der Familienname wird automatisch aus 'Nachname Vorname' des ersten",
+        "Mitglieds erstellt.",
+        "",
+        "BEISPIEL:",
+        "Max Mustermann (Familie 1)",
+        "Maria Mustermann (Familie 1)  <- Gleiche Familie",
+        "Anna Schmidt (Familie 2 oder leer)  <- Andere/Keine Familie"
+    ]
+
+    for row_num, text in enumerate(info_text, 1):
+        cell = ws_info.cell(row=row_num, column=1, value=text)
+        if "PFLICHTFELDER" in text or "OPTIONALE" in text or "FAMILIEN" in text:
+            cell.font = Font(bold=True, size=12)
+
+    # Excel in BytesIO speichern
+    excel_buffer = BytesIO()
+    wb.save(excel_buffer)
+    excel_buffer.seek(0)
+
+    return Response(
+        content=excel_buffer.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": "attachment; filename=Teilnehmer_Import_Vorlage.xlsx"
+        }
+    )
+
+
+@router.post("/import", response_class=HTMLResponse)
+async def upload_import_file(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Verarbeitet die hochgeladene Excel-Datei und zeigt eine Vorschau"""
+    try:
+        # Datei validieren
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            flash(request, "Bitte laden Sie eine Excel-Datei (.xlsx oder .xls) hoch", "error")
+            return RedirectResponse(url="/participants/import", status_code=303)
+
+        # Excel-Datei lesen
+        contents = await file.read()
+        wb = load_workbook(BytesIO(contents), data_only=True)
+        ws = wb.active
+
+        # Daten parsen
+        participants_data = []
+        errors = []
+        families_dict = {}  # family_number -> [participants]
+
+        # Header prüfen (erste Zeile)
+        header_row = [cell.value for cell in ws[1]]
+
+        # Ab Zeile 2 lesen (Zeile 1 ist Header)
+        for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            # Leere Zeilen überspringen
+            if not any(row):
+                continue
+
+            first_name = str(row[0]).strip() if row[0] else ""
+            last_name = str(row[1]).strip() if row[1] else ""
+            birth_date_str = str(row[2]).strip() if row[2] else ""
+            gender = str(row[3]).strip() if row[3] and len(row) > 3 else ""
+            email = str(row[4]).strip() if row[4] and len(row) > 4 else ""
+            phone = str(row[5]).strip() if row[5] and len(row) > 5 else ""
+            address = str(row[6]).strip() if row[6] and len(row) > 6 else ""
+            family_number = str(row[7]).strip() if row[7] and len(row) > 7 else ""
+
+            # Validierung
+            row_errors = []
+            has_error = False
+
+            if not first_name:
+                row_errors.append("Vorname fehlt")
+                has_error = True
+
+            if not last_name:
+                row_errors.append("Nachname fehlt")
+                has_error = True
+
+            # Geburtsdatum parsen
+            birth_date = None
+            if birth_date_str:
+                try:
+                    # Versuche verschiedene Formate
+                    for fmt in ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"]:
+                        try:
+                            birth_date = datetime.strptime(birth_date_str, fmt).date()
+                            break
+                        except ValueError:
+                            continue
+
+                    if not birth_date:
+                        row_errors.append(f"Ungültiges Datumsformat: {birth_date_str}")
+                        has_error = True
+                except Exception as e:
+                    row_errors.append(f"Fehler beim Datum: {str(e)}")
+                    has_error = True
+            else:
+                row_errors.append("Geburtsdatum fehlt")
+                has_error = True
+
+            if row_errors:
+                errors.append({
+                    "row": row_num,
+                    "message": ", ".join(row_errors)
+                })
+
+            # Teilnehmer zur Liste hinzufügen
+            participant_data = {
+                "first_name": first_name,
+                "last_name": last_name,
+                "birth_date": birth_date.strftime("%d.%m.%Y") if birth_date else birth_date_str,
+                "birth_date_obj": birth_date,
+                "gender": gender if gender else None,
+                "email": email if email else None,
+                "phone": phone if phone else None,
+                "address": address if address else None,
+                "family_number": family_number if family_number else None,
+                "has_error": has_error,
+                "row": row_num
+            }
+
+            participants_data.append(participant_data)
+
+            # Familien gruppieren
+            if family_number and not has_error:
+                if family_number not in families_dict:
+                    families_dict[family_number] = []
+                families_dict[family_number].append(participant_data)
+
+        if not participants_data:
+            flash(request, "Keine Teilnehmer in der Datei gefunden", "error")
+            return RedirectResponse(url="/participants/import", status_code=303)
+
+        # Import-Daten für Vorschau
+        import_data = {
+            "participants": participants_data,
+            "families": families_dict,
+            "errors": errors
+        }
+
+        # Als JSON für das Formular
+        import_data_json = json.dumps(import_data, default=str)
+
+        return templates.TemplateResponse(
+            "participants/import_preview.html",
+            {
+                "request": request,
+                "title": "Import-Vorschau",
+                "import_data": import_data,
+                "import_data_json": import_data_json
+            }
+        )
+
+    except Exception as e:
+        logger.exception(f"Error processing Excel file: {e}")
+        flash(request, f"Fehler beim Verarbeiten der Datei: {str(e)}", "error")
+        return RedirectResponse(url="/participants/import", status_code=303)
+
+
+@router.post("/import/confirm", response_class=HTMLResponse)
+async def confirm_import(
+    request: Request,
+    import_data: str = Form(...),
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Führt den eigentlichen Import durch"""
+    try:
+        # Import-Daten deserialisieren
+        data = json.loads(import_data)
+
+        imported_count = 0
+        skipped_count = 0
+        family_map = {}  # family_number -> family_id
+
+        # Event laden
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            flash(request, "Event nicht gefunden", "error")
+            return RedirectResponse(url="/participants/import", status_code=303)
+
+        # Aktives Ruleset laden für Preisberechnung
+        ruleset = db.query(Ruleset).filter(
+            Ruleset.is_active == True,
+            Ruleset.valid_from <= event.start_date,
+            Ruleset.valid_until >= event.start_date
+        ).first()
+
+        # Zuerst: Familien erstellen
+        for family_number, members in data.get("families", {}).items():
+            if not members:
+                continue
+
+            # Ersten Teilnehmer der Familie nehmen für Familiennamen
+            first_member = members[0]
+            family_name = f"{first_member['last_name']} {first_member['first_name']}"
+
+            # Familie erstellen
+            new_family = Family(
+                name=family_name,
+                event_id=event_id,
+                contact_person=f"{first_member['first_name']} {first_member['last_name']}",
+                email=first_member.get('email'),
+                phone=first_member.get('phone'),
+                address=first_member.get('address')
+            )
+
+            db.add(new_family)
+            db.flush()  # Familie speichern um ID zu bekommen
+
+            family_map[family_number] = new_family.id
+
+        # Dann: Teilnehmer importieren
+        for participant_data in data.get("participants", []):
+            # Fehlerhafte überspringen
+            if participant_data.get("has_error"):
+                skipped_count += 1
+                continue
+
+            try:
+                # Geburtsdatum parsen
+                birth_date_str = participant_data["birth_date"]
+                birth_date = None
+                for fmt in ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"]:
+                    try:
+                        birth_date = datetime.strptime(birth_date_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+
+                if not birth_date:
+                    skipped_count += 1
+                    continue
+
+                # Rolle basierend auf Alter ermitteln
+                age = event.start_date.year - birth_date.year
+                if (event.start_date.month, event.start_date.day) < (birth_date.month, birth_date.day):
+                    age -= 1
+
+                role_id = None
+                if ruleset and ruleset.age_groups:
+                    for age_group in ruleset.age_groups:
+                        min_age = age_group.get("min_age", 0)
+                        max_age = age_group.get("max_age", 999)
+                        if min_age <= age <= max_age:
+                            role_name = age_group.get("role", "").lower()
+                            role = db.query(Role).filter(Role.name == role_name).first()
+                            if role:
+                                role_id = role.id
+                                break
+
+                # Fallback: Erste Rolle verwenden
+                if not role_id:
+                    first_role = db.query(Role).first()
+                    if first_role:
+                        role_id = first_role.id
+
+                # Familie zuordnen
+                family_id = None
+                family_number = participant_data.get("family_number")
+                if family_number and family_number in family_map:
+                    family_id = family_map[family_number]
+
+                # Preis berechnen
+                final_price = 0.0
+                if role_id:
+                    final_price = _calculate_price_for_participant(
+                        db=db,
+                        event_id=event_id,
+                        role_id=role_id,
+                        birth_date=birth_date,
+                        family_id=family_id
+                    )
+
+                # Teilnehmer erstellen
+                new_participant = Participant(
+                    event_id=event_id,
+                    first_name=participant_data["first_name"],
+                    last_name=participant_data["last_name"],
+                    birth_date=birth_date,
+                    gender=participant_data.get("gender"),
+                    email=participant_data.get("email"),
+                    phone=participant_data.get("phone"),
+                    address=participant_data.get("address"),
+                    role_id=role_id,
+                    family_id=family_id,
+                    final_price=final_price,
+                    is_active=True
+                )
+
+                db.add(new_participant)
+                imported_count += 1
+
+            except Exception as e:
+                logger.error(f"Error importing participant {participant_data.get('first_name')} {participant_data.get('last_name')}: {e}")
+                skipped_count += 1
+                continue
+
+        # Commit aller Änderungen
+        db.commit()
+
+        # Erfolgs-Nachricht
+        message = f"{imported_count} Teilnehmer erfolgreich importiert"
+        if skipped_count > 0:
+            message += f" ({skipped_count} übersprungen)"
+
+        flash(request, message, "success")
+        return RedirectResponse(url="/participants", status_code=303)
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in import data: {e}")
+        flash(request, "Ungültige Import-Daten", "error")
+        return RedirectResponse(url="/participants/import", status_code=303)
+
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Error during import: {e}")
+        flash(request, f"Fehler beim Import: {str(e)}", "error")
+        return RedirectResponse(url="/participants/import", status_code=303)
