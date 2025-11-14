@@ -170,31 +170,38 @@ class InvoiceGenerator:
                 print(f"Warnung: QR-Code konnte nicht generiert werden: {e}")
 
         # Info-Tabelle links, QR-Code rechts
-        info_data = [
-            ["Rechnungsnummer:", invoice_number],
-            ["Rechnungsdatum:", invoice_date],
-            ["Teilnehmer-ID:", str(participant.id)]
-        ]
-        info_table = Table(info_data, colWidths=[5*cm, 6*cm])
-        info_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
-
         if qr_image:
-            # Info und QR-Code nebeneinander
-            combined_data = [[info_table, qr_image]]
-            combined_table = Table(combined_data, colWidths=[11*cm, 4*cm])
-            combined_table.setStyle(TableStyle([
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            # Info und QR-Code in einer Tabelle nebeneinander
+            info_data = [
+                ["Rechnungsnummer:", invoice_number, qr_image],
+                ["Rechnungsdatum:", invoice_date, ""],
+                ["Teilnehmer-ID:", str(participant.id), ""]
+            ]
+            info_table = Table(info_data, colWidths=[5*cm, 6*cm, 4*cm])
+            info_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (1, -1), 'LEFT'),
+                ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+                ('VALIGN', (2, 0), (2, 0), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (1, -1), 5),
+                ('SPAN', (2, 0), (2, 2)),  # QR-Code über alle 3 Zeilen spannen
             ]))
-            story.append(combined_table)
         else:
-            story.append(info_table)
+            info_data = [
+                ["Rechnungsnummer:", invoice_number],
+                ["Rechnungsdatum:", invoice_date],
+                ["Teilnehmer-ID:", str(participant.id)]
+            ]
+            info_table = Table(info_data, colWidths=[5*cm, 6*cm])
+            info_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ]))
 
+        story.append(info_table)
         story.append(Spacer(1, 1*cm))
 
         # Empfänger
@@ -386,32 +393,40 @@ class InvoiceGenerator:
                 print(f"Warnung: QR-Code konnte nicht generiert werden: {e}")
 
         # Info-Tabelle links, QR-Code rechts
-        info_data = [
-            ["Rechnungsnummer:", invoice_number],
-            ["Rechnungsdatum:", invoice_date],
-            ["Familien-ID:", str(family.id)],
-            ["Art:", "Sammelrechnung"]
-        ]
-        info_table = Table(info_data, colWidths=[5*cm, 6*cm])
-        info_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
-
         if qr_image:
-            # Info und QR-Code nebeneinander
-            combined_data = [[info_table, qr_image]]
-            combined_table = Table(combined_data, colWidths=[11*cm, 4*cm])
-            combined_table.setStyle(TableStyle([
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            # Info und QR-Code in einer Tabelle nebeneinander
+            info_data = [
+                ["Rechnungsnummer:", invoice_number, qr_image],
+                ["Rechnungsdatum:", invoice_date, ""],
+                ["Familien-ID:", str(family.id), ""],
+                ["Art:", "Sammelrechnung", ""]
+            ]
+            info_table = Table(info_data, colWidths=[5*cm, 6*cm, 4*cm])
+            info_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (1, -1), 'LEFT'),
+                ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+                ('VALIGN', (2, 0), (2, 0), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (1, -1), 5),
+                ('SPAN', (2, 0), (2, 3)),  # QR-Code über alle 4 Zeilen spannen
             ]))
-            story.append(combined_table)
         else:
-            story.append(info_table)
+            info_data = [
+                ["Rechnungsnummer:", invoice_number],
+                ["Rechnungsdatum:", invoice_date],
+                ["Familien-ID:", str(family.id)],
+                ["Art:", "Sammelrechnung"]
+            ]
+            info_table = Table(info_data, colWidths=[5*cm, 6*cm])
+            info_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ]))
 
+        story.append(info_table)
         story.append(Spacer(1, 1*cm))
 
         # Empfänger
