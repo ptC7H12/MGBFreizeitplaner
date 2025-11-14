@@ -68,8 +68,7 @@ async def create_expense_form(
         {
             "request": request,
             "title": "Neue Ausgabe",
-            "event": event,
-            "preselected_event_id": event_id
+            "event": event
         }
     )
 
