@@ -2,7 +2,6 @@
 import logging
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
@@ -10,7 +9,6 @@ from typing import Optional
 from io import BytesIO
 from pydantic import ValidationError
 
-from app.config import settings
 from app.database import get_db
 from app.models import Payment, Participant, Family
 from app.dependencies import get_current_event_id
@@ -18,11 +16,11 @@ from app.services.invoice_generator import InvoiceGenerator
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
 from app.schemas import PaymentCreateSchema, PaymentUpdateSchema
+from app.templates_config import templates
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/payments", tags=["payments"])
-templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse)

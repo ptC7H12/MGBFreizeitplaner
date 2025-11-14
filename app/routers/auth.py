@@ -1,16 +1,14 @@
 """Auth Router - Freizeit-Auswahl und -Erstellung"""
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from datetime import date, datetime
 
-from app.config import settings
 from app.database import get_db
 from app.models.event import Event
+from app.templates_config import templates
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse)

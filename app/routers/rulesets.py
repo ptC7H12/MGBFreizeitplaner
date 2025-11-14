@@ -2,7 +2,6 @@
 import logging
 from fastapi import APIRouter, Request, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, DataError
 from datetime import datetime
@@ -20,11 +19,11 @@ from app.services.ruleset_scanner import RulesetScanner
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
+from app.templates_config import templates
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/rulesets", tags=["rulesets"])
-templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse)

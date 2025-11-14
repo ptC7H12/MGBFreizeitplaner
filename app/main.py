@@ -1,7 +1,6 @@
 """Hauptanwendung für das Freizeit-Kassen-System"""
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 import logging
@@ -9,6 +8,7 @@ import secrets
 
 from app.config import settings
 from app.database import init_db
+from app.templates_config import templates
 from app.routers import dashboard, participants, families, rulesets, payments, expenses, incomes, auth, settings as settings_router, tasks, backups
 
 # Logging konfigurieren
@@ -35,13 +35,6 @@ app.add_middleware(
 # Static Files mounten
 app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
 
-# Templates konfigurieren
-templates = Jinja2Templates(directory=str(settings.templates_dir))
-
-# Flash-Messages als Template-Global registrieren
-from app.utils.flash import get_flashed_messages
-templates.env.globals['get_flashed_messages'] = get_flashed_messages
-
 # Router registrieren
 app.include_router(auth.router)
 app.include_router(dashboard.router)
@@ -63,6 +56,22 @@ async def startup_event():
     logger.info("Initialisiere Datenbank...")
     init_db()
     logger.info("Datenbank erfolgreich initialisiert!")
+
+    # Prüfen ob Demo-Daten erstellt werden sollen (nur beim ersten Start)
+    from app.database import SessionLocal
+    from app.models.event import Event
+    db = SessionLocal()
+    try:
+        event_count = db.query(Event).count()
+        if event_count == 0:
+            logger.info("Keine Events gefunden - erstelle Demo-Daten...")
+            from app.utils.seed_helper import create_demo_data
+            create_demo_data(db)
+            logger.info("Demo-Daten erfolgreich erstellt!")
+    except Exception as e:
+        logger.error(f"Fehler beim Erstellen der Demo-Daten: {e}")
+    finally:
+        db.close()
 
 
 @app.on_event("shutdown")
