@@ -451,265 +451,9 @@ async def suggest_role(
         return HTMLResponse(content="")
 
 
-@router.get("/{participant_id}", response_class=HTMLResponse)
-async def view_participant(
-    request: Request,
-    participant_id: int,
-    db: Session = Depends(get_db),
-    event_id: int = Depends(get_current_event_id)
-):
-    """Detailansicht eines Teilnehmers"""
-    participant = db.query(Participant).filter(
-        Participant.id == participant_id,
-        Participant.event_id == event_id
-    ).first()
+# ===== IMPORT/EXPORT ROUTES (müssen VOR /{participant_id} definiert werden) =====
+# Diese Routes haben spezifische Pfade und müssen vor parametrisierten Routes kommen
 
-    if not participant:
-        return RedirectResponse(url="/participants", status_code=303)
-
-    # Zahlungen des Teilnehmers
-    total_paid = sum(payment.amount for payment in participant.payments)
-
-    return templates.TemplateResponse(
-        "participants/detail.html",
-        {
-            "request": request,
-            "title": f"{participant.full_name}",
-            "participant": participant,
-            "total_paid": total_paid,
-            "outstanding": participant.final_price - total_paid
-        }
-    )
-
-
-@router.get("/{participant_id}/edit", response_class=HTMLResponse)
-async def edit_participant_form(
-    request: Request,
-    participant_id: int,
-    db: Session = Depends(get_db),
-    event_id: int = Depends(get_current_event_id)
-):
-    """Formular zum Bearbeiten eines Teilnehmers"""
-    participant = db.query(Participant).filter(
-        Participant.id == participant_id,
-        Participant.event_id == event_id
-    ).first()
-
-    if not participant:
-        return RedirectResponse(url="/participants", status_code=303)
-
-    roles = db.query(Role).filter(Role.is_active == True, Role.event_id == event_id).all()
-    event = db.query(Event).filter(Event.id == event_id).first()
-    families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
-
-    return templates.TemplateResponse(
-        "participants/edit.html",
-        {
-            "request": request,
-            "title": f"{participant.full_name} bearbeiten",
-            "participant": participant,
-            "roles": roles,
-            "event": event,
-            "families": families
-        }
-    )
-
-
-@router.post("/{participant_id}/edit", response_class=HTMLResponse)
-async def update_participant(
-    request: Request,
-    participant_id: int,
-    db: Session = Depends(get_db),
-    event_id: int = Depends(get_current_event_id),
-    first_name: str = Form(...),
-    last_name: str = Form(...),
-    birth_date: str = Form(...),
-    gender: Optional[str] = Form(None),
-    email: Optional[str] = Form(None),
-    phone: Optional[str] = Form(None),
-    address: Optional[str] = Form(None),
-    bildung_teilhabe_id: Optional[str] = Form(None),
-    allergies: Optional[str] = Form(None),
-    medical_notes: Optional[str] = Form(None),
-    notes: Optional[str] = Form(None),
-    discount_percent: float = Form(0.0),
-    discount_reason: Optional[str] = Form(None),
-    manual_price_override: Optional[float] = Form(None),
-    role_id: int = Form(...),
-    family_id: Optional[int] = Form(None)
-):
-    """Aktualisiert einen Teilnehmer"""
-    participant = db.query(Participant).filter(
-        Participant.id == participant_id,
-        Participant.event_id == event_id
-    ).first()
-
-    if not participant:
-        return RedirectResponse(url="/participants", status_code=303)
-
-    try:
-        # Pydantic-Validierung
-        participant_data = ParticipantUpdateSchema(
-            first_name=first_name,
-            last_name=last_name,
-            birth_date=birth_date,
-            gender=gender,
-            email=email,
-            phone=phone,
-            address=address,
-            bildung_teilhabe_id=bildung_teilhabe_id,
-            allergies=allergies,
-            medical_notes=medical_notes,
-            notes=notes,
-            discount_percent=discount_percent,
-            discount_reason=discount_reason,
-            manual_price_override=manual_price_override,
-            role_id=role_id,
-            family_id=family_id
-        )
-
-        # Preis neu berechnen (wenn sich relevante Daten geändert haben)
-        # birth_date ist bereits ein date-Objekt nach Pydantic-Validierung
-        calculated_price = _calculate_price_for_participant(
-            db=db,
-            event_id=event_id,
-            role_id=participant_data.role_id,
-            birth_date=participant_data.birth_date,
-            family_id=participant_data.family_id
-        )
-
-        # Teilnehmer aktualisieren (birth_date ist bereits ein date-Objekt)
-        participant.first_name = participant_data.first_name
-        participant.last_name = participant_data.last_name
-        participant.birth_date = participant_data.birth_date
-        participant.gender = participant_data.gender
-        participant.email = participant_data.email
-        participant.phone = participant_data.phone
-        participant.address = participant_data.address
-        participant.bildung_teilhabe_id = participant_data.bildung_teilhabe_id
-        participant.allergies = participant_data.allergies
-        participant.medical_notes = participant_data.medical_notes
-        participant.notes = participant_data.notes
-        participant.discount_percent = participant_data.discount_percent
-        participant.discount_reason = participant_data.discount_reason
-        participant.manual_price_override = participant_data.manual_price_override
-        # event_id bleibt unverändert (Sicherheit!)
-        participant.role_id = participant_data.role_id
-        participant.family_id = participant_data.family_id
-        participant.calculated_price = calculated_price
-
-        db.commit()
-
-        flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich aktualisiert", "success")
-        return RedirectResponse(url=f"/participants/{participant_id}", status_code=303)
-
-    except ValidationError as e:
-        # Pydantic-Validierungsfehler
-        logger.warning(f"Validation error updating participant: {e}", exc_info=True)
-        first_error = e.errors()[0]
-        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
-        error_msg = first_error['msg']
-        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
-        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=validation", status_code=303)
-
-    except IntegrityError as e:
-        db.rollback()
-        logger.error(f"Database integrity error updating participant: {e}", exc_info=True)
-        flash(request, "Teilnehmer konnte nicht aktualisiert werden (Datenbankfehler)", "error")
-        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=db_integrity", status_code=303)
-
-    except DataError as e:
-        db.rollback()
-        logger.error(f"Invalid data updating participant: {e}", exc_info=True)
-        flash(request, "Ungültige Daten eingegeben", "error")
-        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=invalid_data", status_code=303)
-
-    except Exception as e:
-        return handle_db_exception(e, f"/participants/{participant_id}/edit", "Updating participant", db, request)
-
-
-@router.post("/{participant_id}/delete")
-async def delete_participant(
-    participant_id: int,
-    db: Session = Depends(get_db),
-    event_id: int = Depends(get_current_event_id)
-):
-    """Löscht einen Teilnehmer"""
-    participant = db.query(Participant).filter(
-        Participant.id == participant_id,
-        Participant.event_id == event_id
-    ).first()
-
-    if not participant:
-        raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")
-
-    try:
-        participant_name = participant.full_name
-        db.delete(participant)
-        db.commit()
-        logger.info(f"Participant deleted: {participant_name} (ID: {participant_id})")
-        # Note: Flash-Message kann hier nicht gesetzt werden, da Request fehlt
-        return RedirectResponse(url="/participants", status_code=303)
-
-    except IntegrityError as e:
-        db.rollback()
-        logger.error(f"Cannot delete participant due to integrity constraint: {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail="Teilnehmer kann nicht gelöscht werden, da noch Zahlungen oder andere Verknüpfungen existieren")
-
-    except Exception as e:
-        db.rollback()
-        logger.exception(f"Error deleting participant: {e}")
-        raise HTTPException(status_code=500, detail="Fehler beim Löschen")
-
-@router.get("/{participant_id}/payment-qr", response_class=Response)
-async def generate_payment_qr_code(
-    participant_id: int,
-    db: Session = Depends(get_db),
-    event_id: int = Depends(get_current_event_id)
-):
-    """Generiert einen QR-Code für die Zahlung (SEPA EPC QR-Code)"""
-    # Teilnehmer laden
-    participant = db.query(Participant).filter(
-        Participant.id == participant_id,
-        Participant.event_id == event_id
-    ).first()
-
-    if not participant:
-        raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")
-
-    # Einstellungen laden
-    setting = db.query(Setting).filter(Setting.event_id == event_id).first()
-
-    if not setting or not setting.bank_iban:
-        raise HTTPException(status_code=400, detail="Bank-Daten nicht konfiguriert")
-
-    # Berechne offenen Betrag
-    total_paid = sum(payment.amount for payment in participant.payments)
-    outstanding = participant.final_price - total_paid
-
-    if outstanding <= 0:
-        outstanding = participant.final_price  # Zeige Gesamtpreis wenn bereits bezahlt
-
-    # Verwendungszweck erstellen
-    invoice_number = f"TN-{participant.id:06d}"
-    purpose = f"{participant.event.name} - {participant.full_name} - Rechnungsnr: {invoice_number}"
-
-    # QR-Code generieren
-    qr_code_data = QRCodeService.generate_sepa_qr_code(
-        recipient_name=setting.organization_name or "Freizeit-Organisation",
-        iban=setting.bank_iban,
-        amount=outstanding,
-        purpose=purpose,
-        bic=setting.bank_bic
-    )
-
-    return Response(
-        content=qr_code_data,
-        media_type="image/png",
-        headers={
-            "Content-Disposition": f"inline; filename=payment_qr_{participant_id}.png"
-        }
-    )
 
 
 @router.get("/import", response_class=HTMLResponse)
@@ -1352,3 +1096,265 @@ def _write_participant_row(ws, row_num: int, participant: Participant, event: Ev
 
     ws.cell(row=row_num, column=13, value=participant.address or "")
 
+
+# ===== PARAMETRISIERTE ROUTES (müssen NACH den spezifischen Routes kommen) =====
+
+@router.get("/{participant_id}", response_class=HTMLResponse)
+async def view_participant(
+    request: Request,
+    participant_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Detailansicht eines Teilnehmers"""
+    participant = db.query(Participant).filter(
+        Participant.id == participant_id,
+        Participant.event_id == event_id
+    ).first()
+
+    if not participant:
+        return RedirectResponse(url="/participants", status_code=303)
+
+    # Zahlungen des Teilnehmers
+    total_paid = sum(payment.amount for payment in participant.payments)
+
+    return templates.TemplateResponse(
+        "participants/detail.html",
+        {
+            "request": request,
+            "title": f"{participant.full_name}",
+            "participant": participant,
+            "total_paid": total_paid,
+            "outstanding": participant.final_price - total_paid
+        }
+    )
+
+
+@router.get("/{participant_id}/edit", response_class=HTMLResponse)
+async def edit_participant_form(
+    request: Request,
+    participant_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Formular zum Bearbeiten eines Teilnehmers"""
+    participant = db.query(Participant).filter(
+        Participant.id == participant_id,
+        Participant.event_id == event_id
+    ).first()
+
+    if not participant:
+        return RedirectResponse(url="/participants", status_code=303)
+
+    roles = db.query(Role).filter(Role.is_active == True, Role.event_id == event_id).all()
+    event = db.query(Event).filter(Event.id == event_id).first()
+    families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
+
+    return templates.TemplateResponse(
+        "participants/edit.html",
+        {
+            "request": request,
+            "title": f"{participant.full_name} bearbeiten",
+            "participant": participant,
+            "roles": roles,
+            "event": event,
+            "families": families
+        }
+    )
+
+
+@router.post("/{participant_id}/edit", response_class=HTMLResponse)
+async def update_participant(
+    request: Request,
+    participant_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    birth_date: str = Form(...),
+    gender: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    phone: Optional[str] = Form(None),
+    address: Optional[str] = Form(None),
+    bildung_teilhabe_id: Optional[str] = Form(None),
+    allergies: Optional[str] = Form(None),
+    medical_notes: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
+    discount_percent: float = Form(0.0),
+    discount_reason: Optional[str] = Form(None),
+    manual_price_override: Optional[float] = Form(None),
+    role_id: int = Form(...),
+    family_id: Optional[int] = Form(None)
+):
+    """Aktualisiert einen Teilnehmer"""
+    participant = db.query(Participant).filter(
+        Participant.id == participant_id,
+        Participant.event_id == event_id
+    ).first()
+
+    if not participant:
+        return RedirectResponse(url="/participants", status_code=303)
+
+    try:
+        # Pydantic-Validierung
+        participant_data = ParticipantUpdateSchema(
+            first_name=first_name,
+            last_name=last_name,
+            birth_date=birth_date,
+            gender=gender,
+            email=email,
+            phone=phone,
+            address=address,
+            bildung_teilhabe_id=bildung_teilhabe_id,
+            allergies=allergies,
+            medical_notes=medical_notes,
+            notes=notes,
+            discount_percent=discount_percent,
+            discount_reason=discount_reason,
+            manual_price_override=manual_price_override,
+            role_id=role_id,
+            family_id=family_id
+        )
+
+        # Preis neu berechnen (wenn sich relevante Daten geändert haben)
+        # birth_date ist bereits ein date-Objekt nach Pydantic-Validierung
+        calculated_price = _calculate_price_for_participant(
+            db=db,
+            event_id=event_id,
+            role_id=participant_data.role_id,
+            birth_date=participant_data.birth_date,
+            family_id=participant_data.family_id
+        )
+
+        # Teilnehmer aktualisieren (birth_date ist bereits ein date-Objekt)
+        participant.first_name = participant_data.first_name
+        participant.last_name = participant_data.last_name
+        participant.birth_date = participant_data.birth_date
+        participant.gender = participant_data.gender
+        participant.email = participant_data.email
+        participant.phone = participant_data.phone
+        participant.address = participant_data.address
+        participant.bildung_teilhabe_id = participant_data.bildung_teilhabe_id
+        participant.allergies = participant_data.allergies
+        participant.medical_notes = participant_data.medical_notes
+        participant.notes = participant_data.notes
+        participant.discount_percent = participant_data.discount_percent
+        participant.discount_reason = participant_data.discount_reason
+        participant.manual_price_override = participant_data.manual_price_override
+        # event_id bleibt unverändert (Sicherheit!)
+        participant.role_id = participant_data.role_id
+        participant.family_id = participant_data.family_id
+        participant.calculated_price = calculated_price
+
+        db.commit()
+
+        flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich aktualisiert", "success")
+        return RedirectResponse(url=f"/participants/{participant_id}", status_code=303)
+
+    except ValidationError as e:
+        # Pydantic-Validierungsfehler
+        logger.warning(f"Validation error updating participant: {e}", exc_info=True)
+        first_error = e.errors()[0]
+        field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
+        error_msg = first_error['msg']
+        flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
+        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=validation", status_code=303)
+
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Database integrity error updating participant: {e}", exc_info=True)
+        flash(request, "Teilnehmer konnte nicht aktualisiert werden (Datenbankfehler)", "error")
+        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data updating participant: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url=f"/participants/{participant_id}/edit?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, f"/participants/{participant_id}/edit", "Updating participant", db, request)
+
+
+@router.post("/{participant_id}/delete")
+async def delete_participant(
+    participant_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Löscht einen Teilnehmer"""
+    participant = db.query(Participant).filter(
+        Participant.id == participant_id,
+        Participant.event_id == event_id
+    ).first()
+
+    if not participant:
+        raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")
+
+    try:
+        participant_name = participant.full_name
+        db.delete(participant)
+        db.commit()
+        logger.info(f"Participant deleted: {participant_name} (ID: {participant_id})")
+        # Note: Flash-Message kann hier nicht gesetzt werden, da Request fehlt
+        return RedirectResponse(url="/participants", status_code=303)
+
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Cannot delete participant due to integrity constraint: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail="Teilnehmer kann nicht gelöscht werden, da noch Zahlungen oder andere Verknüpfungen existieren")
+
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Error deleting participant: {e}")
+        raise HTTPException(status_code=500, detail="Fehler beim Löschen")
+
+@router.get("/{participant_id}/payment-qr", response_class=Response)
+async def generate_payment_qr_code(
+    participant_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Generiert einen QR-Code für die Zahlung (SEPA EPC QR-Code)"""
+    # Teilnehmer laden
+    participant = db.query(Participant).filter(
+        Participant.id == participant_id,
+        Participant.event_id == event_id
+    ).first()
+
+    if not participant:
+        raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")
+
+    # Einstellungen laden
+    setting = db.query(Setting).filter(Setting.event_id == event_id).first()
+
+    if not setting or not setting.bank_iban:
+        raise HTTPException(status_code=400, detail="Bank-Daten nicht konfiguriert")
+
+    # Berechne offenen Betrag
+    total_paid = sum(payment.amount for payment in participant.payments)
+    outstanding = participant.final_price - total_paid
+
+    if outstanding <= 0:
+        outstanding = participant.final_price  # Zeige Gesamtpreis wenn bereits bezahlt
+
+    # Verwendungszweck erstellen
+    invoice_number = f"TN-{participant.id:06d}"
+    purpose = f"{participant.event.name} - {participant.full_name} - Rechnungsnr: {invoice_number}"
+
+    # QR-Code generieren
+    qr_code_data = QRCodeService.generate_sepa_qr_code(
+        recipient_name=setting.organization_name or "Freizeit-Organisation",
+        iban=setting.bank_iban,
+        amount=outstanding,
+        purpose=purpose,
+        bic=setting.bank_bic
+    )
+
+    return Response(
+        content=qr_code_data,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": f"inline; filename=payment_qr_{participant_id}.png"
+        }
+    )
