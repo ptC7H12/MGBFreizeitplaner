@@ -41,12 +41,17 @@ async def list_payments(
 
     payments = query.order_by(Payment.payment_date.desc()).all()
 
+    # Erwartete Einnahme berechnen (Summe aller final_price der Teilnehmer)
+    participants = db.query(Participant).filter(Participant.event_id == event_id).all()
+    expected_income = sum(p.final_price for p in participants)
+
     return templates.TemplateResponse(
         "payments/list.html",
         {
             "request": request,
             "title": "Zahlungen",
-            "payments": payments
+            "payments": payments,
+            "expected_income": expected_income
         }
     )
 

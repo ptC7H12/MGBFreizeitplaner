@@ -32,14 +32,21 @@
     </div>
     <div class="bg-white overflow-hidden shadow rounded-lg">
         <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Durchschnitt</dt>
+            <dt class="text-sm font-medium text-gray-500 truncate">Erwartete Einnahme</dt>
             <dd class="mt-1 text-3xl font-semibold text-blue-600">
-                {% if payments|length > 0 %}
-                    {{ "%.2f"|format(payments|sum(attribute='amount') / payments|length) }} €
-                {% else %}
-                    0.00 €
-                {% endif %}
+                {{ "%.2f"|format(expected_income) }} €
             </dd>
+            {% set total_received = payments|sum(attribute='amount') %}
+            {% set difference = expected_income - total_received %}
+            <p class="mt-2 text-sm {% if difference > 0 %}text-red-600{% elif difference < 0 %}text-green-600{% else %}text-gray-500{% endif %}">
+                {% if difference > 0 %}
+                    Noch ausstehend: {{ "%.2f"|format(difference) }} €
+                {% elif difference < 0 %}
+                    Überzahlung: {{ "%.2f"|format(-difference) }} €
+                {% else %}
+                    Vollständig bezahlt
+                {% endif %}
+            </p>
         </div>
     </div>
 </div>
