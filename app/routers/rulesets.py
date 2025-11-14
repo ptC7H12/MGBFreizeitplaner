@@ -46,7 +46,13 @@ async def import_ruleset_form(
     success: Optional[str] = None
 ):
     """Formular zum Importieren eines Regelwerks"""
+    from app.models import Setting
+
     event = db.query(Event).filter(Event.id == event_id).first()
+
+    # Load settings for default GitHub repo
+    setting = db.query(Setting).filter(Setting.event_id == event_id).first()
+    default_github_repo = setting.default_github_repo if setting else None
 
     return templates.TemplateResponse(
         "rulesets/import.html",
@@ -55,7 +61,8 @@ async def import_ruleset_form(
             "title": "Regelwerk importieren",
             "event": event,
             "error": error,
-            "success": success
+            "success": success,
+            "default_github_repo": default_github_repo
         }
     )
 

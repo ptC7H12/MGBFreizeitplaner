@@ -47,7 +47,8 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
         "outstanding_payments": [],
         "manual_price_override": [],
         "overdue_payments": [],
-        "income_subsidy_mismatch": []
+        "income_subsidy_mismatch": [],
+        "role_count_exceeded": []
     }
 
     # 1. Bildung & Teilhabe IDs vorhanden (müssen beantragt werden)
@@ -70,7 +71,7 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
     # 2. Rückzahlung von Ausgaben (nicht erstattete Ausgaben)
     unreimbursed_expenses = db.query(Expense).filter(
         Expense.event_id == event_id,
-        Expense.is_reimbursed == False,
+        Expense.is_settled == False,
         Expense.paid_by.isnot(None)
     ).all()
 
@@ -215,6 +216,48 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
                     "expected_discounts": expected_discounts
                 })
 
+    # 11. Rollenüberschreitungen (zu viele Teilnehmer einer Rolle zugewiesen)
+    from app.models import Ruleset
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.event_id == event_id,
+        Ruleset.is_active == True
+    ).first()
+
+    if ruleset and ruleset.role_discounts:
+        # Durchlaufe alle Rollen mit max_count im Regelwerk
+        for role_name_lower, role_config in ruleset.role_discounts.items():
+            max_count = role_config.get("max_count")
+
+            if max_count is not None:
+                # Finde die entsprechende Rolle in der Datenbank
+                role = db.query(Role).filter(
+                    Role.event_id == event_id,
+                    Role.name == role_name_lower
+                ).first()
+
+                if role:
+                    # Zähle aktive Teilnehmer mit dieser Rolle
+                    current_count = db.query(Participant).filter(
+                        Participant.event_id == event_id,
+                        Participant.role_id == role.id,
+                        Participant.is_active == True
+                    ).count()
+
+                    # Wenn die Anzahl das Maximum überschreitet
+                    if current_count > max_count:
+                        if not is_task_completed(completed_tasks, "role_count_exceeded", role.id):
+                            excess_count = current_count - max_count
+                            tasks["role_count_exceeded"].append({
+                                "id": role.id,
+                                "title": f"Zu viele {role.display_name} zugewiesen",
+                                "description": f"Aktuell: {current_count} | Maximum: {max_count} | Überschreitung: {excess_count}",
+                                "link": f"/participants?role_id={role.id}",
+                                "task_type": "role_count_exceeded",
+                                "current_count": current_count,
+                                "max_count": max_count,
+                                "excess_count": excess_count
+                            })
+
     # Zähle Gesamtaufgaben
     total_tasks = sum(len(task_list) for task_list in tasks.values())
 
@@ -269,7 +312,7 @@ async def complete_task(
     if task_type == "expense_reimbursement":
         expense = db.query(Expense).filter(Expense.id == reference_id).first()
         if expense:
-            expense.is_reimbursed = True
+            expense.is_settled = True
 
     db.commit()
     flash(request, "Aufgabe wurde als erledigt markiert", "success")
@@ -301,7 +344,7 @@ async def uncomplete_task(
         if task_type == "expense_reimbursement":
             expense = db.query(Expense).filter(Expense.id == reference_id).first()
             if expense:
-                expense.is_reimbursed = False
+                expense.is_settled = False
 
         db.commit()
         flash(request, "Aufgabe wurde wieder als offen markiert", "info")

@@ -28,6 +28,9 @@ class Setting(Base):
     invoice_subject_prefix = Column(String(100), nullable=True, default="Teilnahme an")
     invoice_footer_text = Column(Text, nullable=True, default="Vielen Dank für Ihre Zahlung!")
 
+    # Regelwerk-Einstellungen
+    default_github_repo = Column(String(500), nullable=True, default=None)
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

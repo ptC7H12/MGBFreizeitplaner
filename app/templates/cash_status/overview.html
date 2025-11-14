@@ -1,14 +1,93 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- Hauptkennzahlen Grid -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-    <!-- Netto-Kassenstand mit Status-Badge -->
-    <div class="bg-white overflow-hidden shadow rounded-lg">
+<!-- SOLL-Werte: Zu erwartende Werte -->
+<div class="mb-2">
+    <h2 class="text-lg font-semibold text-gray-700">Zu erwartende Werte (SOLL)</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <!-- Erwartete Einnahmen (Teilnehmer) -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-blue-400">
         <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Netto-Kassenstand</dt>
+            <dt class="text-sm font-medium text-gray-500 truncate">Einnahmen (Teilnehmer)</dt>
+            <dd class="mt-1 text-3xl font-semibold text-gray-900">
+                {{ "%.2f"|format(expected_income_participants) }} €
+            </dd>
+        </div>
+    </div>
+
+    <!-- Sonstige Einnahmen -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-blue-400">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Sonstige Einnahmen</dt>
+            <dd class="mt-1 text-3xl font-semibold text-gray-900">
+                {{ "%.2f"|format(expected_other_income) }} €
+            </dd>
+        </div>
+    </div>
+
+    <!-- Ausgaben (Gesamt) -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-blue-400">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Ausgaben</dt>
+            <dd class="mt-1 text-3xl font-semibold text-gray-900">
+                {{ "%.2f"|format(expected_expenses) }} €
+            </dd>
+        </div>
+    </div>
+
+    <!-- Erwarteter Saldo -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-blue-400">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Saldo</dt>
+            <dd class="mt-1 text-3xl font-semibold {% if expected_balance >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                {{ "%.2f"|format(expected_balance) }} €
+            </dd>
+        </div>
+    </div>
+</div>
+
+<!-- IST-Werte: Getätigte Zahlungen -->
+<div class="mb-2">
+    <h2 class="text-lg font-semibold text-gray-700">Getätigte Zahlungen (IST)</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <!-- Tatsächliche Einnahmen (Teilnehmer) -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-green-500">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Einnahmen (Teilnehmer)</dt>
+            <dd class="mt-1 text-3xl font-semibold text-green-600">
+                {{ "%.2f"|format(actual_income_participants) }} €
+            </dd>
+        </div>
+    </div>
+
+    <!-- Sonstige Einnahmen -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-green-500">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Sonstige Einnahmen</dt>
+            <dd class="mt-1 text-3xl font-semibold text-green-600">
+                {{ "%.2f"|format(actual_other_income) }} €
+            </dd>
+        </div>
+    </div>
+
+    <!-- Beglichene Ausgaben -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-green-500">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Ausgaben (Beglichene)</dt>
+            <dd class="mt-1 text-3xl font-semibold text-red-600">
+                {{ "%.2f"|format(actual_expenses) }} €
+            </dd>
+        </div>
+    </div>
+
+    <!-- Aktueller Saldo -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-green-500">
+        <div class="px-4 py-5 sm:p-6">
+            <dt class="text-sm font-medium text-gray-500 truncate">Saldo</dt>
             <dd class="mt-1 text-3xl font-semibold {% if status.color == 'green' %}text-green-600{% elif status.color == 'yellow' %}text-yellow-600{% else %}text-red-600{% endif %}">
-                {{ "%.2f"|format(net_balance) }} €
+                {{ "%.2f"|format(actual_balance) }} €
             </dd>
             <p class="mt-2 flex items-center text-sm">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if status.color == 'green' %}bg-green-100 text-green-800{% elif status.color == 'yellow' %}bg-yellow-100 text-yellow-800{% else %}bg-red-100 text-red-800{% endif %}">
@@ -17,80 +96,59 @@
             </p>
         </div>
     </div>
-
-    <!-- Einnahmen durch Zahlungen -->
-    <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Einnahmen (Zahlungen)</dt>
-            <dd class="mt-1 text-3xl font-semibold text-green-600">
-                {{ "%.2f"|format(total_payments) }} €
-            </dd>
-        </div>
-    </div>
-
-    <!-- Zuschüsse/Einnahmen -->
-    <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Zuschüsse/Förderungen</dt>
-            <dd class="mt-1 text-3xl font-semibold text-blue-600">
-                {{ "%.2f"|format(total_incomes) }} €
-            </dd>
-        </div>
-    </div>
-
-    <!-- Beglichene Ausgaben -->
-    <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Beglichene Ausgaben</dt>
-            <dd class="mt-1 text-3xl font-semibold text-red-600">
-                {{ "%.2f"|format(settled_expenses) }} €
-            </dd>
-        </div>
-    </div>
 </div>
 
-<!-- Zweite Zeile -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-    <!-- Offene Ausgaben -->
-    <div class="bg-white overflow-hidden shadow rounded-lg">
+<!-- DIFFERENZEN -->
+<div class="mb-2">
+    <h2 class="text-lg font-semibold text-gray-700">Differenzen (SOLL - IST)</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <!-- Ausstehende Einnahmen (Teilnehmer) -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-orange-400">
         <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Offene Ausgaben</dt>
-            <dd class="mt-1 text-3xl font-semibold text-yellow-600">
-                {{ "%.2f"|format(open_expenses) }} €
+            <dt class="text-sm font-medium text-gray-500 truncate">Einnahmen (ausstehend)</dt>
+            <dd class="mt-1 text-3xl font-semibold {% if outstanding_income_participants > 0 %}text-orange-600{% else %}text-gray-400{% endif %}">
+                {{ "%.2f"|format(outstanding_income_participants) }} €
             </dd>
         </div>
     </div>
 
-    <!-- Noch zu erwartende Zahlungen -->
-    <div class="bg-white overflow-hidden shadow rounded-lg">
+    <!-- Ausstehende Sonstige Einnahmen -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-orange-400">
         <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Noch zu erwarten</dt>
-            <dd class="mt-1 text-3xl font-semibold {% if outstanding_payments > 0 %}text-orange-600{% else %}text-gray-900{% endif %}">
-                {{ "%.2f"|format(outstanding_payments) }} €
+            <dt class="text-sm font-medium text-gray-500 truncate">Sonstige Einnahmen</dt>
+            <dd class="mt-1 text-3xl font-semibold text-gray-400">
+                {{ "%.2f"|format(outstanding_other_income) }} €
             </dd>
-            <p class="mt-1 text-xs text-gray-500">von {{ "%.2f"|format(expected_income) }} € erwartet</p>
         </div>
     </div>
 
-    <!-- Vorgestreckte Beträge -->
-    <div class="bg-white overflow-hidden shadow rounded-lg">
+    <!-- Noch zu begleichende Ausgaben -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-orange-400">
         <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Vorgestreckt</dt>
-            <dd class="mt-1 text-3xl font-semibold text-purple-600">
-                {{ "%.2f"|format(unreimbursed_expenses) }} €
+            <dt class="text-sm font-medium text-gray-500 truncate">Ausgaben (noch zu begleichen)</dt>
+            <dd class="mt-1 text-3xl font-semibold {% if outstanding_expenses > 0 %}text-yellow-600{% else %}text-gray-400{% endif %}">
+                {{ "%.2f"|format(outstanding_expenses) }} €
             </dd>
-            <p class="mt-1 text-xs text-gray-500">noch zu erstatten</p>
         </div>
     </div>
 
-    <!-- Brutto-Kassenstand -->
-    <div class="bg-white overflow-hidden shadow rounded-lg">
+    <!-- Saldo-Differenz -->
+    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-orange-400">
         <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Endstand (theoretisch)</dt>
-            <dd class="mt-1 text-3xl font-semibold {% if gross_balance >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
-                {{ "%.2f"|format(gross_balance) }} €
+            <dt class="text-sm font-medium text-gray-500 truncate">Saldo</dt>
+            <dd class="mt-1 text-3xl font-semibold {% if balance_difference > 0 %}text-orange-600{% elif balance_difference < 0 %}text-green-600{% else %}text-gray-400{% endif %}">
+                {{ "%.2f"|format(balance_difference) }} €
             </dd>
-            <p class="mt-1 text-xs text-gray-500">wenn alles bezahlt</p>
+            <p class="mt-1 text-xs text-gray-500">
+                {% if balance_difference > 0 %}
+                    noch zu erreichen
+                {% elif balance_difference < 0 %}
+                    über Erwartung
+                {% else %}
+                    ausgeglichen
+                {% endif %}
+            </p>
         </div>
     </div>
 </div>
@@ -137,22 +195,22 @@
 <!-- Erklärung -->
 <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
     <h3 class="text-sm font-semibold text-blue-900 mb-2">💡 Erklärung der Kennzahlen</h3>
-    <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-xs text-blue-800">
+    <dl class="space-y-2 text-xs text-blue-800">
         <div>
-            <dt class="font-semibold">Netto-Kassenstand:</dt>
-            <dd>Aktuell verfügbar = Zahlungen + Zuschüsse - Beglichene Ausgaben</dd>
+            <dt class="font-semibold">SOLL-Werte:</dt>
+            <dd>Die erwarteten Werte basierend auf geplanten Teilnehmerpreisen und bekannten Ausgaben</dd>
         </div>
         <div>
-            <dt class="font-semibold">Endstand (theoretisch):</dt>
-            <dd>Erwarteter Endstand = Erwartete Einnahmen + Zuschüsse - Alle Ausgaben</dd>
+            <dt class="font-semibold">IST-Werte:</dt>
+            <dd>Tatsächlich eingegangene Zahlungen und bereits beglichene Ausgaben</dd>
         </div>
         <div>
-            <dt class="font-semibold">Noch zu erwarten:</dt>
-            <dd>Ausstehende Teilnehmerzahlungen</dd>
+            <dt class="font-semibold">Differenzen:</dt>
+            <dd>Zeigt die Unterschiede zwischen SOLL und IST - ausstehende Zahlungen und noch zu begleichende Ausgaben</dd>
         </div>
         <div>
-            <dt class="font-semibold">Vorgestreckt:</dt>
-            <dd>Ausgaben, die von Personen vorgestreckt wurden und noch erstattet werden müssen</dd>
+            <dt class="font-semibold">Sonstige Einnahmen:</dt>
+            <dd>Zuschüsse, Förderungen und andere Einnahmen außerhalb der Teilnehmerbeiträge</dd>
         </div>
     </dl>
 </div>

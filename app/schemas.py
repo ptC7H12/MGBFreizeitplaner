@@ -209,6 +209,7 @@ class SettingUpdateSchema(BaseModel):
     bank_bic: Optional[str] = Field(None, min_length=8, max_length=11)
     invoice_subject_prefix: Optional[str] = Field(None, max_length=100)
     invoice_footer_text: Optional[str] = None
+    default_github_repo: Optional[str] = Field(None, max_length=500)
 
     @field_validator('organization_name', 'bank_account_holder')
     @classmethod

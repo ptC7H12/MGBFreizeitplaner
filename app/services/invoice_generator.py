@@ -151,19 +151,50 @@ class InvoiceGenerator:
         invoice_number = f"R-{participant.id:06d}-{datetime.now().year}"
         invoice_date = datetime.now().strftime("%d.%m.%Y")
 
+        # QR-Code für SEPA-Zahlung vorbereiten (falls offen)
+        total_paid = sum(payment.amount for payment in participant.payments)
+        outstanding = participant.final_price - total_paid
+        qr_image = None
+
+        if outstanding > 0:
+            try:
+                qr_code_bytes = QRCodeService.generate_sepa_qr_code(
+                    recipient_name=settings.bank_account_holder,
+                    iban=settings.bank_iban,
+                    amount=outstanding,
+                    purpose=invoice_number,
+                    bic=settings.bank_bic
+                )
+                qr_image = Image(BytesIO(qr_code_bytes), width=3.5*cm, height=3.5*cm)
+            except Exception as e:
+                print(f"Warnung: QR-Code konnte nicht generiert werden: {e}")
+
+        # Info-Tabelle links, QR-Code rechts
         info_data = [
             ["Rechnungsnummer:", invoice_number],
             ["Rechnungsdatum:", invoice_date],
             ["Teilnehmer-ID:", str(participant.id)]
         ]
-        info_table = Table(info_data, colWidths=[5*cm, 8*cm])
+        info_table = Table(info_data, colWidths=[5*cm, 6*cm])
         info_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ]))
-        story.append(info_table)
+
+        if qr_image:
+            # Info und QR-Code nebeneinander
+            combined_data = [[info_table, qr_image]]
+            combined_table = Table(combined_data, colWidths=[11*cm, 4*cm])
+            combined_table.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ]))
+            story.append(combined_table)
+        else:
+            story.append(info_table)
+
         story.append(Spacer(1, 1*cm))
 
         # Empfänger
@@ -182,9 +213,9 @@ class InvoiceGenerator:
         # Preis-Aufschlüsselung berechnen
         breakdown = self._calculate_price_breakdown(participant)
 
-        # Positions-Tabelle
+        # Positions-Tabelle (ohne Menge und Einzelpreis für kompaktere Darstellung)
         positions_data = [
-            ["Pos.", "Beschreibung", "Menge", "Einzelpreis", "Gesamtpreis"]
+            ["Pos.", "Beschreibung", "Gesamtpreis"]
         ]
 
         # Position: Teilnahmegebühr
@@ -219,13 +250,11 @@ class InvoiceGenerator:
         positions_data.append([
             "1",
             Paragraph(description, normal_style),  # Wrap in Paragraph to render HTML tags
-            "1",
-            f"{final_price:.2f} €",
             f"{final_price:.2f} €"
         ])
 
         # Positions-Tabelle erstellen
-        pos_table = Table(positions_data, colWidths=[1*cm, 10*cm, 1.5*cm, 2.5*cm, 2.5*cm])
+        pos_table = Table(positions_data, colWidths=[1.5*cm, 13*cm, 3*cm])
         pos_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -242,21 +271,18 @@ class InvoiceGenerator:
         story.append(Spacer(1, 0.5*cm))
 
         # Summen-Tabelle
-        total_paid = sum(payment.amount for payment in participant.payments)
-        outstanding = final_price - total_paid
-
         sum_data = [
-            ["", "", "", "Zwischensumme:", f"{final_price:.2f} €"],
-            ["", "", "", "Bereits bezahlt:", f"{total_paid:.2f} €"],
-            ["", "", "", "Offener Betrag:", f"{outstanding:.2f} €"],
+            ["", "Zwischensumme:", f"{final_price:.2f} €"],
+            ["", "Bereits bezahlt:", f"{total_paid:.2f} €"],
+            ["", "Offener Betrag:", f"{outstanding:.2f} €"],
         ]
-        sum_table = Table(sum_data, colWidths=[1*cm, 10*cm, 1.5*cm, 2.5*cm, 2.5*cm])
+        sum_table = Table(sum_data, colWidths=[1.5*cm, 13*cm, 3*cm])
         sum_table.setStyle(TableStyle([
-            ('ALIGN', (3, 0), (-1, -1), 'RIGHT'),
-            ('FONTNAME', (3, -1), (-1, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (3, -1), (-1, -1), 12),
-            ('LINEABOVE', (3, -1), (-1, -1), 2, colors.HexColor('#1e40af')),
-            ('TEXTCOLOR', (4, -1), (-1, -1), colors.HexColor('#1e40af')),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (1, -1), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (1, -1), (-1, -1), 12),
+            ('LINEABOVE', (1, -1), (-1, -1), 2, colors.HexColor('#1e40af')),
+            ('TEXTCOLOR', (2, -1), (-1, -1), colors.HexColor('#1e40af')),
         ]))
         story.append(sum_table)
         story.append(Spacer(1, 1.5*cm))
@@ -278,30 +304,12 @@ class InvoiceGenerator:
             {footer_text}
             """
             story.append(Paragraph(payment_text, normal_style))
-            story.append(Spacer(1, 0.5*cm))
-
-            # QR-Code für SEPA-Zahlung generieren
-            try:
-                qr_code_bytes = QRCodeService.generate_sepa_qr_code(
-                    recipient_name=settings.bank_account_holder,
-                    iban=settings.bank_iban,
-                    amount=outstanding,
-                    purpose=invoice_number,
-                    bic=settings.bank_bic
-                )
-
-                # QR-Code als Bild einfügen
-                qr_image = Image(BytesIO(qr_code_bytes), width=4*cm, height=4*cm)
-                story.append(Paragraph("<b>QR-Code für Banking-App:</b>", normal_style))
-                story.append(Spacer(1, 0.2*cm))
-                story.append(qr_image)
+            if qr_image:
+                story.append(Spacer(1, 0.3*cm))
                 story.append(Paragraph(
-                    f"Scannen Sie diesen QR-Code mit Ihrer Banking-App um die Überweisung von {outstanding:.2f} € direkt auszuführen.",
+                    f"<i>Tipp: Scannen Sie den QR-Code oben rechts mit Ihrer Banking-App um die Überweisung von {outstanding:.2f} € direkt auszuführen.</i>",
                     normal_style
                 ))
-            except Exception as e:
-                # Falls QR-Code-Generierung fehlschlägt, einfach überspringen
-                print(f"Warnung: QR-Code konnte nicht generiert werden: {e}")
         else:
             story.append(Paragraph("Status: Vollständig bezahlt", heading_style))
             story.append(Paragraph(footer_text, normal_style))
@@ -352,20 +360,58 @@ class InvoiceGenerator:
         invoice_number = f"SR-{family.id:06d}-{datetime.now().year}"
         invoice_date = datetime.now().strftime("%d.%m.%Y")
 
+        # Gesamtbetrag und ausstehenden Betrag für QR-Code berechnen
+        total_amount = sum(p.final_price for p in family.participants if p.is_active)
+        family_payments_sum = sum(payment.amount for payment in family.payments)
+        member_payments_sum = sum(
+            payment.amount
+            for participant in family.participants
+            for payment in participant.payments
+        )
+        total_paid_early = family_payments_sum + member_payments_sum
+        outstanding_early = total_amount - total_paid_early
+        qr_image = None
+
+        if outstanding_early > 0:
+            try:
+                qr_code_bytes = QRCodeService.generate_sepa_qr_code(
+                    recipient_name=settings.bank_account_holder,
+                    iban=settings.bank_iban,
+                    amount=outstanding_early,
+                    purpose=invoice_number,
+                    bic=settings.bank_bic
+                )
+                qr_image = Image(BytesIO(qr_code_bytes), width=3.5*cm, height=3.5*cm)
+            except Exception as e:
+                print(f"Warnung: QR-Code konnte nicht generiert werden: {e}")
+
+        # Info-Tabelle links, QR-Code rechts
         info_data = [
             ["Rechnungsnummer:", invoice_number],
             ["Rechnungsdatum:", invoice_date],
             ["Familien-ID:", str(family.id)],
             ["Art:", "Sammelrechnung"]
         ]
-        info_table = Table(info_data, colWidths=[5*cm, 8*cm])
+        info_table = Table(info_data, colWidths=[5*cm, 6*cm])
         info_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ]))
-        story.append(info_table)
+
+        if qr_image:
+            # Info und QR-Code nebeneinander
+            combined_data = [[info_table, qr_image]]
+            combined_table = Table(combined_data, colWidths=[11*cm, 4*cm])
+            combined_table.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ]))
+            story.append(combined_table)
+        else:
+            story.append(info_table)
+
         story.append(Spacer(1, 1*cm))
 
         # Empfänger
@@ -378,12 +424,11 @@ class InvoiceGenerator:
         story.append(Paragraph(recipient_text, normal_style))
         story.append(Spacer(1, 1*cm))
 
-        # Positions-Tabelle
+        # Positions-Tabelle (ohne Menge und Einzelpreis für kompaktere Darstellung)
         positions_data = [
-            ["Pos.", "Beschreibung", "Menge", "Einzelpreis", "Gesamtpreis"]
+            ["Pos.", "Beschreibung", "Gesamtpreis"]
         ]
 
-        total_amount = 0
         for idx, participant in enumerate(family.participants, 1):
             if not participant.is_active:
                 continue
@@ -418,18 +463,15 @@ class InvoiceGenerator:
                         description += f"  Grund: {participant.discount_reason}\n"
 
             price = participant.final_price
-            total_amount += price
 
             positions_data.append([
                 str(idx),
                 Paragraph(description, normal_style),  # Wrap in Paragraph to render HTML tags
-                "1",
-                f"{price:.2f} €",
                 f"{price:.2f} €"
             ])
 
         # Positions-Tabelle erstellen
-        pos_table = Table(positions_data, colWidths=[1*cm, 10*cm, 1.5*cm, 2.5*cm, 2.5*cm])
+        pos_table = Table(positions_data, colWidths=[1.5*cm, 13*cm, 3*cm])
         pos_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#059669')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -446,21 +488,28 @@ class InvoiceGenerator:
         story.append(Spacer(1, 0.5*cm))
 
         # Summen-Tabelle
-        total_paid = sum(payment.amount for payment in family.payments)
-        outstanding = total_amount - total_paid
+        # Zahlungen: Sowohl direkte Familienzahlungen als auch Zahlungen an einzelne Mitglieder
+        family_payments = sum(payment.amount for payment in family.payments)
+        member_payments = sum(
+            payment.amount
+            for participant in family.participants
+            for payment in participant.payments
+        )
+        total_paid = family_payments + member_payments
+        outstanding = total_amount - total_paid_early
 
         sum_data = [
-            ["", "", "", "Gesamtsumme:", f"{total_amount:.2f} €"],
-            ["", "", "", "Bereits bezahlt:", f"{total_paid:.2f} €"],
-            ["", "", "", "Offener Betrag:", f"{outstanding:.2f} €"],
+            ["", "Gesamtsumme:", f"{total_amount:.2f} €"],
+            ["", "Bereits bezahlt:", f"{total_paid:.2f} €"],
+            ["", "Offener Betrag:", f"{outstanding:.2f} €"],
         ]
-        sum_table = Table(sum_data, colWidths=[1*cm, 10*cm, 1.5*cm, 2.5*cm, 2.5*cm])
+        sum_table = Table(sum_data, colWidths=[1.5*cm, 13*cm, 3*cm])
         sum_table.setStyle(TableStyle([
-            ('ALIGN', (3, 0), (-1, -1), 'RIGHT'),
-            ('FONTNAME', (3, -1), (-1, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (3, -1), (-1, -1), 12),
-            ('LINEABOVE', (3, -1), (-1, -1), 2, colors.HexColor('#059669')),
-            ('TEXTCOLOR', (4, -1), (-1, -1), colors.HexColor('#059669')),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('FONTNAME', (1, -1), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (1, -1), (-1, -1), 12),
+            ('LINEABOVE', (1, -1), (-1, -1), 2, colors.HexColor('#059669')),
+            ('TEXTCOLOR', (2, -1), (-1, -1), colors.HexColor('#059669')),
         ]))
         story.append(sum_table)
         story.append(Spacer(1, 1*cm))
@@ -489,30 +538,12 @@ class InvoiceGenerator:
             {footer_text}
             """
             story.append(Paragraph(payment_text, normal_style))
-            story.append(Spacer(1, 0.5*cm))
-
-            # QR-Code für SEPA-Zahlung generieren
-            try:
-                qr_code_bytes = QRCodeService.generate_sepa_qr_code(
-                    recipient_name=settings.bank_account_holder,
-                    iban=settings.bank_iban,
-                    amount=outstanding,
-                    purpose=invoice_number,
-                    bic=settings.bank_bic
-                )
-
-                # QR-Code als Bild einfügen
-                qr_image = Image(BytesIO(qr_code_bytes), width=4*cm, height=4*cm)
-                story.append(Paragraph("<b>QR-Code für Banking-App:</b>", normal_style))
-                story.append(Spacer(1, 0.2*cm))
-                story.append(qr_image)
+            if qr_image:
+                story.append(Spacer(1, 0.3*cm))
                 story.append(Paragraph(
-                    f"Scannen Sie diesen QR-Code mit Ihrer Banking-App um die Überweisung von {outstanding:.2f} € direkt auszuführen.",
+                    f"<i>Tipp: Scannen Sie den QR-Code oben rechts mit Ihrer Banking-App um die Überweisung von {outstanding:.2f} € direkt auszuführen.</i>",
                     normal_style
                 ))
-            except Exception as e:
-                # Falls QR-Code-Generierung fehlschlägt, einfach überspringen
-                print(f"Warnung: QR-Code konnte nicht generiert werden: {e}")
         else:
             story.append(Paragraph("Status: Vollständig bezahlt", heading_style))
             story.append(Paragraph(footer_text, normal_style))
