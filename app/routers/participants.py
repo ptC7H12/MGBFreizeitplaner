@@ -97,15 +97,15 @@ async def list_participants(
     request: Request,
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id),
-    search: Optional[str] = None,
-    role_id: Optional[int] = None,
-    family_id: Optional[int] = None
+    search: Optional[str] = "",
+    role_id: Optional[str] = "",
+    family_id: Optional[str] = ""
 ):
     """Liste aller Teilnehmer mit Such- und Filterfunktionen"""
     query = db.query(Participant).filter(Participant.event_id == event_id)
 
     # Suchfilter
-    if search:
+    if search and search.strip():
         search_filter = f"%{search}%"
         query = query.filter(
             (Participant.first_name.ilike(search_filter)) |
@@ -113,13 +113,19 @@ async def list_participants(
             (Participant.email.ilike(search_filter))
         )
 
-    # Rollenfilter
-    if role_id:
-        query = query.filter(Participant.role_id == role_id)
+    # Rollenfilter (nur wenn nicht leer)
+    if role_id and role_id.strip():
+        try:
+            query = query.filter(Participant.role_id == int(role_id))
+        except ValueError:
+            pass  # Ungültige ID ignorieren
 
-    # Familienfilter
-    if family_id:
-        query = query.filter(Participant.family_id == family_id)
+    # Familienfilter (nur wenn nicht leer)
+    if family_id and family_id.strip():
+        try:
+            query = query.filter(Participant.family_id == int(family_id))
+        except ValueError:
+            pass  # Ungültige ID ignorieren
 
     participants = query.order_by(Participant.last_name).all()
 
@@ -213,10 +219,13 @@ async def create_participant(
 
         # Wenn "Als Familie erstellen" aktiviert ist, neue Familie erstellen
         if create_as_family == "true":
+            # Familienname aus Nachname + Vorname bilden (wegen möglicher Duplikate)
+            family_name = f"{last_name} {first_name}"
+
             # Prüfen ob Familie mit diesem Namen schon existiert
             existing_family = db.query(Family).filter(
                 Family.event_id == event_id,
-                Family.name == last_name
+                Family.name == family_name
             ).first()
 
             if existing_family:
@@ -225,7 +234,7 @@ async def create_participant(
             else:
                 # Neue Familie erstellen
                 new_family = Family(
-                    name=last_name,
+                    name=family_name,
                     event_id=event_id,
                     contact_person=f"{first_name} {last_name}",
                     email=email if email else None,
@@ -356,6 +365,85 @@ async def calculate_price_preview(
     except Exception as e:
         logger.error(f"Error calculating price preview: {e}", exc_info=True)
         return HTMLResponse(content=f'<div class="text-sm text-gray-500">Preis wird berechnet...</div>')
+
+
+@router.post("/suggest-role", response_class=HTMLResponse)
+async def suggest_role(
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
+    birth_date: str = Form(...)
+):
+    """
+    HTMX-Endpunkt der die passende Rolle basierend auf dem Alter vorschlägt
+    """
+    try:
+        # Datum parsen
+        birth_date_obj = datetime.strptime(birth_date, "%Y-%m-%d").date()
+
+        # Event laden
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            return HTMLResponse(content="")
+
+        # Alter berechnen
+        age = event.start_date.year - birth_date_obj.year
+        if (event.start_date.month, event.start_date.day) < (birth_date_obj.month, birth_date_obj.day):
+            age -= 1
+
+        # Aktives Regelwerk finden
+        ruleset = db.query(Ruleset).filter(
+            Ruleset.is_active == True,
+            Ruleset.valid_from <= event.start_date,
+            Ruleset.valid_until >= event.start_date
+        ).first()
+
+        if not ruleset or not ruleset.age_groups:
+            return HTMLResponse(content="")
+
+        # Passende Altersgruppe finden
+        suggested_role_name = None
+        for age_group in ruleset.age_groups:
+            min_age = age_group.get("min_age", 0)
+            max_age = age_group.get("max_age", 999)
+            if min_age <= age <= max_age:
+                suggested_role_name = age_group.get("role", "").lower()
+                break
+
+        if not suggested_role_name:
+            return HTMLResponse(content="")
+
+        # Rolle anhand des Namens finden
+        roles = db.query(Role).filter(
+            Role.event_id == event_id,
+            Role.is_active == True
+        ).all()
+
+        suggested_role_id = None
+        for role in roles:
+            if role.name.lower() == suggested_role_name:
+                suggested_role_id = role.id
+                break
+
+        if suggested_role_id:
+            # JavaScript zurückgeben, das die Rolle auswählt
+            return HTMLResponse(content=f"""
+                <script>
+                    document.getElementById('role_id').value = '{suggested_role_id}';
+                    // Trigger price calculation
+                    htmx.trigger('#role_id', 'change');
+                </script>
+            """)
+        else:
+            return HTMLResponse(content="")
+
+    except ValueError as e:
+        logger.warning(f"Invalid date input for role suggestion: {e}", exc_info=True)
+        return HTMLResponse(content="")
+
+    except Exception as e:
+        logger.error(f"Error suggesting role: {e}", exc_info=True)
+        return HTMLResponse(content="")
 
 
 @router.get("/{participant_id}", response_class=HTMLResponse)

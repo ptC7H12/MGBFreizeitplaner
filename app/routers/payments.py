@@ -1,5 +1,6 @@
 """Payments (Zahlungen) Router"""
 import logging
+import zipfile
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
@@ -207,13 +208,30 @@ async def delete_payment(payment_id: int, db: Session = Depends(get_db), event_i
 
 @router.get("/invoice/participant/{participant_id}", response_class=Response)
 async def generate_participant_invoice(participant_id: int, db: Session = Depends(get_db)):
-    """Generiert eine PDF-Rechnung für einen Teilnehmer"""
+    """Generiert eine PDF-Rechnung für einen Teilnehmer oder seine Familie"""
     participant = db.query(Participant).filter(Participant.id == participant_id).first()
 
     if not participant:
         raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")
 
-    # PDF generieren
+    # Wenn Teilnehmer zu einer Familie gehört, Familienrechnung generieren
+    if participant.family_id:
+        family = db.query(Family).filter(Family.id == participant.family_id).first()
+        if family:
+            generator = InvoiceGenerator(db)
+            pdf_bytes = generator.generate_family_invoice(family)
+
+            # PDF als Download zurückgeben
+            filename = f"Sammelrechnung_{family.name.replace(' ', '_')}.pdf"
+            return Response(
+                content=pdf_bytes,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"'
+                }
+            )
+
+    # Andernfalls Einzelrechnung generieren
     generator = InvoiceGenerator(db)
     pdf_bytes = generator.generate_participant_invoice(participant)
 
@@ -247,5 +265,54 @@ async def generate_family_invoice(family_id: int, db: Session = Depends(get_db))
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
+
+
+@router.get("/invoice/bulk", response_class=Response)
+async def generate_bulk_invoices(db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
+    """Generiert alle Rechnungen als ZIP: erst Familien, dann Einzelpersonen ohne Familie"""
+    generator = InvoiceGenerator(db)
+
+    # ZIP im Speicher erstellen
+    zip_buffer = BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # 1. Alle Familienrechnungen
+        families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
+
+        for family in families:
+            # Nur Familien mit Teilnehmern
+            if len(family.participants) > 0:
+                try:
+                    pdf_bytes = generator.generate_family_invoice(family)
+                    filename = f"Familien/Sammelrechnung_{family.name.replace(' ', '_').replace('/', '_')}.pdf"
+                    zip_file.writestr(filename, pdf_bytes)
+                except Exception as e:
+                    logger.error(f"Error generating invoice for family {family.id}: {e}")
+
+        # 2. Alle Einzelpersonen OHNE Familie
+        participants_without_family = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.family_id == None,
+            Participant.is_active == True
+        ).order_by(Participant.last_name, Participant.first_name).all()
+
+        for participant in participants_without_family:
+            try:
+                pdf_bytes = generator.generate_participant_invoice(participant)
+                filename = f"Einzelpersonen/Rechnung_{participant.last_name}_{participant.first_name}.pdf"
+                zip_file.writestr(filename, pdf_bytes)
+            except Exception as e:
+                logger.error(f"Error generating invoice for participant {participant.id}: {e}")
+
+    # ZIP zurücksetzen und zurückgeben
+    zip_buffer.seek(0)
+
+    return Response(
+        content=zip_buffer.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename=Alle_Rechnungen.zip"
         }
     )

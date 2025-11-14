@@ -41,11 +41,12 @@
                         name="birth_date"
                         required
                         class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        hx-post="/participants/calculate-price"
-                        hx-trigger="change delay:300ms"
-                        hx-target="#price-preview"
-                        hx-include="[name='role_id'],[name='family_id']"
+                        hx-post="/participants/suggest-role"
+                        hx-trigger="change delay:100ms"
+                        hx-target="#role-suggestion"
+                        hx-swap="innerHTML"
                     >
+                    <div id="role-suggestion"></div>
                 </div>
                 <div>
                     <label for="gender" class="block text-sm font-medium text-gray-700 mb-2">Geschlecht</label>
