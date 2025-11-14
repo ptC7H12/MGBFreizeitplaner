@@ -20,33 +20,36 @@
     <!-- Navigation -->
     {% include "components/navbar.html" %}
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- Page Header -->
-        {% block page_header %}
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">{{ title }}</h1>
-            {% block breadcrumb %}{% endblock %}
-        </div>
-        {% endblock %}
+    <!-- Main Content Area (shifts right on desktop to accommodate sidebar) -->
+    <div class="lg:pl-64">
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24 lg:pt-8">
+            <!-- Page Header -->
+            {% block page_header %}
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-900">{{ title }}</h1>
+                {% block breadcrumb %}{% endblock %}
+            </div>
+            {% endblock %}
 
-        <!-- Flash Messages -->
-        {% block messages %}
-        {% include "components/flash_messages.html" %}
-        {% endblock %}
+            <!-- Flash Messages -->
+            {% block messages %}
+            {% include "components/flash_messages.html" %}
+            {% endblock %}
 
-        <!-- Page Content -->
-        {% block content %}{% endblock %}
-    </main>
+            <!-- Page Content -->
+            {% block content %}{% endblock %}
+        </main>
 
-    <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200 mt-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <p class="text-center text-gray-500 text-sm">
-                &copy; 2024 Freizeit-Kassen-System v0.1.0
-            </p>
-        </div>
-    </footer>
+        <!-- Footer -->
+        <footer class="bg-white border-t border-gray-200 mt-12">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <p class="text-center text-gray-500 text-sm">
+                    &copy; 2024 Freizeit-Kassen-System v0.1.0
+                </p>
+            </div>
+        </footer>
+    </div>
 
     {% block extra_scripts %}{% endblock %}
 </body>
