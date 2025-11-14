@@ -58,34 +58,6 @@
         </div>
     </div>
 
-    <!-- Statistik-Karte: Events -->
-    <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="p-5">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <svg class="h-6 w-6 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
-                    </svg>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 truncate">
-                            Veranstaltungen
-                        </dt>
-                        <dd class="text-2xl font-semibold text-gray-900">
-                            {{ stats.total_events if stats else 0 }}
-                        </dd>
-                    </dl>
-                </div>
-            </div>
-        </div>
-        <div class="bg-gray-50 px-5 py-3">
-            <span class="text-sm text-gray-500">
-                Aktive Freizeiten
-            </span>
-        </div>
-    </div>
-
     <!-- Statistik-Karte: Einnahmen -->
     <div class="bg-white overflow-hidden shadow rounded-lg">
         <div class="p-5">
@@ -169,25 +141,33 @@
     <!-- Altersverteilung -->
     <div class="bg-white shadow rounded-lg p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Altersverteilung</h3>
-        <canvas id="ageChart" height="200"></canvas>
+        <div style="position: relative; height: 300px;">
+            <canvas id="ageChart"></canvas>
+        </div>
     </div>
 
     <!-- Rollen-Verteilung -->
     <div class="bg-white shadow rounded-lg p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Verteilung nach Rollen</h3>
-        <canvas id="roleChart" height="200"></canvas>
+        <div style="position: relative; height: 300px;">
+            <canvas id="roleChart"></canvas>
+        </div>
     </div>
 
     <!-- Zahlungsverlauf -->
     <div class="bg-white shadow rounded-lg p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Zahlungsverlauf (kumulativ)</h3>
-        <canvas id="paymentTimelineChart" height="200"></canvas>
+        <div style="position: relative; height: 300px;">
+            <canvas id="paymentTimelineChart"></canvas>
+        </div>
     </div>
 
     <!-- Ausgaben nach Kategorien -->
     <div class="bg-white shadow rounded-lg p-6">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Ausgaben nach Kategorien</h3>
-        <canvas id="expenseChart" height="200"></canvas>
+        <div style="position: relative; height: 300px;">
+            <canvas id="expenseChart"></canvas>
+        </div>
     </div>
 </div>
 
@@ -232,9 +212,13 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Chart-Instanzen speichern, um Duplikate zu vermeiden
+    const charts = {};
+
     const chartDefaults = {
         responsive: true,
-        maintainAspectRatio: false,
+        maintainAspectRatio: true,
+        aspectRatio: 2,
         plugins: {
             legend: {
                 position: 'bottom'
@@ -242,11 +226,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
+    // Hilfsfunktion zum Erstellen oder Aktualisieren eines Charts
+    function createOrUpdateChart(canvasId, config) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        // Zerstöre existierenden Chart, falls vorhanden
+        if (charts[canvasId]) {
+            charts[canvasId].destroy();
+        }
+
+        // Erstelle neuen Chart
+        charts[canvasId] = new Chart(canvas, config);
+    }
+
     // Altersverteilung Chart
     fetch('/dashboard/api/age-distribution')
         .then(res => res.json())
         .then(data => {
-            new Chart(document.getElementById('ageChart'), {
+            createOrUpdateChart('ageChart', {
                 type: 'bar',
                 data: {
                     labels: data.labels,
@@ -270,13 +268,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             });
-        });
+        })
+        .catch(err => console.error('Error loading age distribution:', err));
 
     // Rollen-Verteilung Chart
     fetch('/dashboard/api/role-distribution')
         .then(res => res.json())
         .then(data => {
-            new Chart(document.getElementById('roleChart'), {
+            createOrUpdateChart('roleChart', {
                 type: 'doughnut',
                 data: {
                     labels: data.labels,
@@ -293,13 +292,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 options: chartDefaults
             });
-        });
+        })
+        .catch(err => console.error('Error loading role distribution:', err));
 
     // Zahlungsverlauf Chart
     fetch('/dashboard/api/payment-timeline')
         .then(res => res.json())
         .then(data => {
-            new Chart(document.getElementById('paymentTimelineChart'), {
+            createOrUpdateChart('paymentTimelineChart', {
                 type: 'line',
                 data: {
                     labels: data.labels,
@@ -321,13 +321,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             });
-        });
+        })
+        .catch(err => console.error('Error loading payment timeline:', err));
 
     // Ausgaben Chart
     fetch('/dashboard/api/expense-categories')
         .then(res => res.json())
         .then(data => {
-            new Chart(document.getElementById('expenseChart'), {
+            createOrUpdateChart('expenseChart', {
                 type: 'pie',
                 data: {
                     labels: data.labels,
@@ -344,7 +345,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 options: chartDefaults
             });
-        });
+        })
+        .catch(err => console.error('Error loading expense categories:', err));
 });
 </script>
 {% endblock %}

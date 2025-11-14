@@ -79,7 +79,7 @@
                         <option value="">Kein Teilnehmer</option>
                         {% for participant in participants %}
                         <option value="{{ participant.id }}" {% if preselected_participant_id == participant.id %}selected{% endif %}>
-                            {{ participant.full_name }} ({{ participant.event.name }})
+                            {{ participant.full_name }}
                         </option>
                         {% endfor %}
                     </select>
@@ -146,6 +146,22 @@ document.addEventListener('DOMContentLoaded', function() {
         const today = new Date().toISOString().split('T')[0];
         dateInput.value = today;
     }
+
+    // Exklusive Auswahl: Nur Teilnehmer ODER Familie
+    const participantSelect = document.getElementById('participant_id');
+    const familySelect = document.getElementById('family_id');
+
+    participantSelect.addEventListener('change', function() {
+        if (this.value) {
+            familySelect.value = '';
+        }
+    });
+
+    familySelect.addEventListener('change', function() {
+        if (this.value) {
+            participantSelect.value = '';
+        }
+    });
 });
 </script>
 {% endblock %}
