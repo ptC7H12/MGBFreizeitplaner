@@ -103,6 +103,11 @@ echo   http://localhost:8000
 echo.
 echo Druecke Ctrl+C um die Anwendung zu beenden
 echo.
+echo [INFO] Browser wird automatisch geoeffnet...
+echo.
+
+REM Start browser in background after 3 seconds
+start "" cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:8000"
 
 python -m app.main
 

@@ -136,43 +136,8 @@
     </div>
 </div>
 
-<!-- Statistik-Charts -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-    <!-- Altersverteilung -->
-    <div class="bg-white shadow rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Altersverteilung</h3>
-        <div style="position: relative; height: 300px;">
-            <canvas id="ageChart"></canvas>
-        </div>
-    </div>
-
-    <!-- Rollen-Verteilung -->
-    <div class="bg-white shadow rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Verteilung nach Rollen</h3>
-        <div style="position: relative; height: 300px;">
-            <canvas id="roleChart"></canvas>
-        </div>
-    </div>
-
-    <!-- Zahlungsverlauf -->
-    <div class="bg-white shadow rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Zahlungsverlauf (kumulativ)</h3>
-        <div style="position: relative; height: 300px;">
-            <canvas id="paymentTimelineChart"></canvas>
-        </div>
-    </div>
-
-    <!-- Ausgaben nach Kategorien -->
-    <div class="bg-white shadow rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Ausgaben nach Kategorien</h3>
-        <div style="position: relative; height: 300px;">
-            <canvas id="expenseChart"></canvas>
-        </div>
-    </div>
-</div>
-
 <!-- Quick Actions -->
-<div class="bg-white shadow rounded-lg p-6">
+<div class="bg-white shadow rounded-lg p-6 mb-8">
     <h2 class="text-xl font-semibold text-gray-900 mb-4">Schnellzugriff</h2>
     <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <a href="/participants/create" class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition">
@@ -205,6 +170,41 @@
             </svg>
             Regelwerk importieren
         </a>
+    </div>
+</div>
+
+<!-- Statistik-Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <!-- Altersverteilung -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Altersverteilung</h3>
+        <div style="position: relative; height: 300px;">
+            <canvas id="ageChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Rollen-Verteilung -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Verteilung nach Rollen</h3>
+        <div style="position: relative; height: 300px;">
+            <canvas id="roleChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Zahlungsverlauf -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Zahlungsverlauf (kumulativ)</h3>
+        <div style="position: relative; height: 300px;">
+            <canvas id="paymentTimelineChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Ausgaben nach Kategorien -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Ausgaben nach Kategorien</h3>
+        <div style="position: relative; height: 300px;">
+            <canvas id="expenseChart"></canvas>
+        </div>
     </div>
 </div>
 
