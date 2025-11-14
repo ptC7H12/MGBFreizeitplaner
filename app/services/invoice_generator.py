@@ -218,7 +218,7 @@ class InvoiceGenerator:
         final_price = participant.final_price
         positions_data.append([
             "1",
-            description,
+            Paragraph(description, normal_style),  # Wrap in Paragraph to render HTML tags
             "1",
             f"{final_price:.2f} €",
             f"{final_price:.2f} €"
@@ -422,7 +422,7 @@ class InvoiceGenerator:
 
             positions_data.append([
                 str(idx),
-                description,
+                Paragraph(description, normal_style),  # Wrap in Paragraph to render HTML tags
                 "1",
                 f"{price:.2f} €",
                 f"{price:.2f} €"
