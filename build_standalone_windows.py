@@ -39,8 +39,6 @@ INCLUDE_ITEMS = [
     "requirements.txt",
     ".env.example",
     "README.md",
-    "PHASE7_README.md",
-    "PHASE7_STATUS.md",
 ]
 
 
