@@ -251,8 +251,10 @@ async def update_expense(
 
 
 @router.post("/{expense_id}/toggle-settled")
-async def toggle_settled(expense_id: int, db: Session = Depends(get_db)):
+async def toggle_settled(expense_id: int, db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
     """Toggelt den Beglichen-Status einer Ausgabe"""
+    from app.models import Task
+
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
 
     if not expense:
@@ -265,6 +267,52 @@ async def toggle_settled(expense_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Fehler beim Aktualisieren")
+
+
+@router.post("/{expense_id}/toggle-reimbursed")
+async def toggle_reimbursed(expense_id: int, db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
+    """Toggelt den Erstattet-Status einer Ausgabe und synchronisiert mit Tasks"""
+    from app.models import Task
+    from datetime import datetime
+
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+
+    if not expense:
+        raise HTTPException(status_code=404, detail="Ausgabe nicht gefunden")
+
+    try:
+        expense.is_reimbursed = not expense.is_reimbursed
+
+        # Synchronisiere mit Tasks
+        task = db.query(Task).filter(
+            Task.event_id == event_id,
+            Task.task_type == "expense_reimbursement",
+            Task.reference_id == expense_id
+        ).first()
+
+        if expense.is_reimbursed:
+            # Ausgabe wurde erstattet → Task als erledigt markieren/erstellen
+            if task:
+                task.is_completed = True
+                task.completed_at = datetime.utcnow()
+            else:
+                new_task = Task(
+                    task_type="expense_reimbursement",
+                    reference_id=expense_id,
+                    is_completed=True,
+                    event_id=event_id
+                )
+                db.add(new_task)
+        else:
+            # Ausgabe wurde als nicht erstattet markiert → Task löschen falls vorhanden
+            if task:
+                db.delete(task)
+
+        db.commit()
+        return RedirectResponse(url="/expenses", status_code=303)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Fehler beim Aktualisieren: {str(e)}")
 
 
 @router.post("/{expense_id}/delete")
