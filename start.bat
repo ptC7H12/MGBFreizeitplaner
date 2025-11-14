@@ -106,8 +106,8 @@ echo.
 echo [INFO] Browser wird automatisch geoeffnet...
 echo.
 
-REM Start browser in background after 3 seconds
-start "" cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:8000"
+REM Start browser in background after 3 seconds using PowerShell
+start /b powershell -WindowStyle Hidden -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:8000'"
 
 python -m app.main
 
