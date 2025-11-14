@@ -70,7 +70,7 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
     # 2. Rückzahlung von Ausgaben (nicht erstattete Ausgaben)
     unreimbursed_expenses = db.query(Expense).filter(
         Expense.event_id == event_id,
-        Expense.is_reimbursed == False,
+        Expense.is_settled == False,
         Expense.paid_by.isnot(None)
     ).all()
 
@@ -269,7 +269,7 @@ async def complete_task(
     if task_type == "expense_reimbursement":
         expense = db.query(Expense).filter(Expense.id == reference_id).first()
         if expense:
-            expense.is_reimbursed = True
+            expense.is_settled = True
 
     db.commit()
     flash(request, "Aufgabe wurde als erledigt markiert", "success")
@@ -301,7 +301,7 @@ async def uncomplete_task(
         if task_type == "expense_reimbursement":
             expense = db.query(Expense).filter(Expense.id == reference_id).first()
             if expense:
-                expense.is_reimbursed = False
+                expense.is_settled = False
 
         db.commit()
         flash(request, "Aufgabe wurde wieder als offen markiert", "info")

@@ -19,9 +19,8 @@ class Expense(Base):
     expense_date = Column(Date, default=date.today, nullable=False)
     category = Column(String(100), nullable=True)  # z.B. "Verpflegung", "Material", "Transport"
     receipt_number = Column(String(100), nullable=True)
-    paid_by = Column(String(200), nullable=True)  # Wer hat die Ausgabe getätigt
-    is_reimbursed = Column(Boolean, default=False, nullable=False)  # Wurde die Ausgabe erstattet?
-    is_settled = Column(Boolean, default=False, nullable=False)  # Wurde die Ausgabe aus der Freizeitkasse beglichen?
+    paid_by = Column(String(200), nullable=True)  # Wer hat die Ausgabe vorgestreckt (falls zutreffend)
+    is_settled = Column(Boolean, default=False, nullable=False)  # Wurde die Ausgabe beglichen/erstattet?
     notes = Column(Text, nullable=True)
 
     # Foreign Key
