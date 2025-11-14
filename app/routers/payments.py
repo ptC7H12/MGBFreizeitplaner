@@ -49,7 +49,7 @@ async def list_payments(
         "payments/list.html",
         {
             "request": request,
-            "title": "Zahlungen",
+            "title": "Zahlungseingänge",
             "payments": payments,
             "expected_income": expected_income
         }
