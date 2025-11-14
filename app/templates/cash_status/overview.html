@@ -95,88 +95,43 @@
     </div>
 </div>
 
-<!-- Details Grid -->
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-    <!-- Ausgaben nach Kategorie -->
-    <div class="bg-white shadow rounded-lg overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h2 class="text-xl font-semibold text-gray-900">Ausgaben nach Kategorie</h2>
-        </div>
-        {% if categories %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategorie</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anzahl</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Betrag</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for category in categories %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {{ category.name }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ category.count }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 text-right">
-                            {{ "%.2f"|format(category.total) }} €
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="px-6 py-12 text-center">
-            <p class="text-sm text-gray-500">Keine Ausgaben vorhanden</p>
-        </div>
-        {% endif %}
+<!-- Ausgaben nach Kategorie -->
+<div class="bg-white shadow rounded-lg overflow-hidden mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900">Ausgaben nach Kategorie</h2>
     </div>
-
-    <!-- Top 5 größte Ausgaben -->
-    <div class="bg-white shadow rounded-lg overflow-hidden">
-        <div class="px-6 py-4 border-b border-gray-200">
-            <h2 class="text-xl font-semibold text-gray-900">Top 5 Ausgaben</h2>
-        </div>
-        {% if top_expenses %}
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Titel</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datum</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Betrag</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for expense in top_expenses %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 text-sm text-gray-900">
-                            <div class="font-medium">{{ expense.title }}</div>
-                            {% if expense.category %}
-                            <div class="text-xs text-gray-500">{{ expense.category }}</div>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ expense.expense_date.strftime('%d.%m.%Y') }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 text-right">
-                            {{ "%.2f"|format(expense.amount) }} €
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="px-6 py-12 text-center">
-            <p class="text-sm text-gray-500">Keine Ausgaben vorhanden</p>
-        </div>
-        {% endif %}
+    {% if categories %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategorie</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Anzahl</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Betrag</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for category in categories %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {{ category.name }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ category.count }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600 text-right">
+                        {{ "%.2f"|format(category.total) }} €
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
+    {% else %}
+    <div class="px-6 py-12 text-center">
+        <p class="text-sm text-gray-500">Keine Ausgaben vorhanden</p>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Erklärung -->

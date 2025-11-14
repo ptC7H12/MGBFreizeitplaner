@@ -95,11 +95,6 @@ async def cash_status(
     # Nach Betrag sortieren
     categories.sort(key=lambda x: x["total"], reverse=True)
 
-    # Top 5 größte Ausgaben
-    top_expenses = db.query(Expense).filter(
-        Expense.event_id == event_id
-    ).order_by(Expense.amount.desc()).limit(5).all()
-
     return templates.TemplateResponse(
         "cash_status/overview.html",
         {
@@ -115,7 +110,6 @@ async def cash_status(
             "net_balance": net_balance,
             "gross_balance": gross_balance,
             "status": status,
-            "categories": categories,
-            "top_expenses": top_expenses
+            "categories": categories
         }
     )
