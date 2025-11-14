@@ -24,6 +24,7 @@ VERSION = "1.0.0"
 INCLUDE_ITEMS = [
     "app/",
     "rulesets/",
+    "seed_data.py",
     "requirements.txt",
     ".env.example",
     "README.md",
@@ -313,7 +314,7 @@ def create_platform_package(platform: str):
 
     # Erstelle ZIP-Archiv
     timestamp = datetime.now().strftime("%Y%m%d")
-    zip_name = f"MGBFreizeitplaner-{VERSION}-{platform}-{timestamp}.zip"
+    zip_name = f"MGBFreizeitplaner-{VERSION}-{platform}-portable-{timestamp}.zip"
     zip_path = RELEASE_DIR / zip_name
 
     print(f"🗜️  Erstelle ZIP-Archiv: {zip_name}")

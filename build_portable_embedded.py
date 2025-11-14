@@ -51,6 +51,7 @@ PYTHON_VERSIONS = {
 INCLUDE_ITEMS = [
     "app/",
     "rulesets/",
+    "seed_data.py",
     "requirements.txt",
     ".env.example",
     "README.md",
@@ -166,8 +167,16 @@ def setup_embedded_python_windows(platform_dir: Path) -> bool:
         content = pth_file.read_text()
         # Uncomment "import site" Zeile
         content = content.replace("#import site", "import site")
+
+        # Füge notwendige Pfade hinzu (wie in build_standalone_windows.py)
+        if "Lib\\site-packages" not in content:
+            content += "\nLib\\site-packages\n"
+        # Füge Parent-Directory hinzu (wo app/ liegt)
+        if ".." not in content:
+            content += "..\n"
+
         pth_file.write_text(content)
-        print(f"✅ Site-packages aktiviert in {pth_file.name}")
+        print(f"✅ Site-packages aktiviert und Pfade konfiguriert in {pth_file.name}")
 
     print("✅ Embedded Python für Windows eingerichtet")
     return True

@@ -36,6 +36,7 @@ PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
 INCLUDE_ITEMS = [
     "app/",
     "rulesets/",
+    "seed_data.py",
     "requirements.txt",
     ".env.example",
     "README.md",
@@ -393,7 +394,7 @@ def create_package():
 
         # Erstelle ZIP
         timestamp = datetime.now().strftime("%Y%m%d")
-        zip_name = f"MGBFreizeitplaner-{VERSION}-Windows-Standalone-{timestamp}.zip"
+        zip_name = f"MGBFreizeitplaner-{VERSION}-windows-standalone-{timestamp}.zip"
         zip_path = RELEASE_DIR / zip_name
 
         print(f"\n🗜️  Erstelle ZIP-Archiv: {zip_name}")
