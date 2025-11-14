@@ -108,7 +108,8 @@ async def update_settings(
     bank_iban: str = Form(...),
     bank_bic: Optional[str] = Form(None),
     invoice_subject_prefix: Optional[str] = Form(None),
-    invoice_footer_text: Optional[str] = Form(None)
+    invoice_footer_text: Optional[str] = Form(None),
+    default_github_repo: Optional[str] = Form(None)
 ):
     """Aktualisiert die Einstellungen"""
     setting = db.query(Setting).filter(Setting.event_id == event_id).first()
@@ -127,7 +128,8 @@ async def update_settings(
             bank_iban=bank_iban,
             bank_bic=bank_bic,
             invoice_subject_prefix=invoice_subject_prefix,
-            invoice_footer_text=invoice_footer_text
+            invoice_footer_text=invoice_footer_text,
+            default_github_repo=default_github_repo
         )
 
         # Einstellungen aktualisieren
@@ -138,6 +140,7 @@ async def update_settings(
         setting.bank_bic = setting_data.bank_bic
         setting.invoice_subject_prefix = setting_data.invoice_subject_prefix if setting_data.invoice_subject_prefix else "Teilnahme an"
         setting.invoice_footer_text = setting_data.invoice_footer_text if setting_data.invoice_footer_text else "Vielen Dank für Ihre Zahlung!"
+        setting.default_github_repo = setting_data.default_github_repo
 
         db.commit()
 

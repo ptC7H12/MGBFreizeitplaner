@@ -124,6 +124,27 @@
 
         <hr class="border-gray-200">
 
+        <!-- Regelwerk-Einstellungen -->
+        <div>
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Regelwerk-Einstellungen</h3>
+            <div class="space-y-4">
+                <div>
+                    <label for="default_github_repo" class="block text-sm font-medium text-gray-700">Standard GitHub-Repository</label>
+                    <input
+                        type="url"
+                        name="default_github_repo"
+                        id="default_github_repo"
+                        value="{{ setting.default_github_repo or '' }}"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                        placeholder="https://raw.githubusercontent.com/user/repo/main/ruleset.yaml"
+                    >
+                    <p class="mt-1 text-sm text-gray-500">Wird beim Regelwerk-Import automatisch vorausgefüllt</p>
+                </div>
+            </div>
+        </div>
+
+        <hr class="border-gray-200">
+
         <!-- Hinweis -->
         <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <div class="flex">
