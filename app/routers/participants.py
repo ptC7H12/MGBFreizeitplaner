@@ -1,7 +1,8 @@
 """Participants (Teilnehmer) Router"""
 import logging
 import json
-from io import BytesIO
+import csv
+from io import BytesIO, StringIO
 from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
@@ -729,18 +730,48 @@ async def import_participants_form(
 @router.get("/import/template")
 async def download_import_template(
     db: Session = Depends(get_db),
-    event_id: int = Depends(get_current_event_id)
+    event_id: int = Depends(get_current_event_id),
+    format: str = "xlsx"
 ):
-    """Generiert eine Excel-Vorlage zum Herunterladen"""
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Teilnehmer"
+    """Generiert eine Excel- oder CSV-Vorlage zum Herunterladen"""
 
-    # Header-Zeile mit Formatierung
     headers = [
         "Vorname*", "Nachname*", "Geburtsdatum* (TT.MM.JJJJ)",
         "Geschlecht", "E-Mail", "Telefon", "Adresse", "Familien-Nr"
     ]
+
+    example_data = [
+        ["Max", "Mustermann", "15.03.2010", "männlich", "max@example.com", "0123456789", "Musterstraße 1, 12345 Stadt", "1"],
+        ["Maria", "Mustermann", "20.07.2012", "weiblich", "maria@example.com", "", "Musterstraße 1, 12345 Stadt", "1"],
+        ["Anna", "Schmidt", "05.09.2011", "weiblich", "anna@example.com", "0987654321", "", ""]
+    ]
+
+    # CSV-Format
+    if format == "csv":
+        csv_buffer = StringIO()
+        csv_writer = csv.writer(csv_buffer, delimiter=';', quoting=csv.QUOTE_MINIMAL)
+
+        # Header schreiben
+        csv_writer.writerow(headers)
+
+        # Beispieldaten schreiben
+        for row in example_data:
+            csv_writer.writerow(row)
+
+        csv_content = csv_buffer.getvalue()
+
+        return Response(
+            content=csv_content.encode('utf-8-sig'),  # BOM für Excel-Kompatibilität
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=Teilnehmer_Import_Vorlage.csv"
+            }
+        )
+
+    # Excel-Format (Standard)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Teilnehmer"
 
     header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(color="FFFFFF", bold=True)
@@ -756,12 +787,7 @@ async def download_import_template(
     for col_num, width in enumerate(column_widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=col_num).column_letter].width = width
 
-    # Beispieldaten hinzufügen
-    example_data = [
-        ["Max", "Mustermann", "15.03.2010", "männlich", "max@example.com", "0123456789", "Musterstraße 1, 12345 Stadt", "1"],
-        ["Maria", "Mustermann", "20.07.2012", "weiblich", "maria@example.com", "", "Musterstraße 1, 12345 Stadt", "1"],
-        ["Anna", "Schmidt", "05.09.2011", "weiblich", "anna@example.com", "0987654321", "", ""]
-    ]
+    # Beispieldaten hinzufügen (bereits definiert oben)
 
     for row_num, row_data in enumerate(example_data, 2):
         for col_num, value in enumerate(row_data, 1):
@@ -817,6 +843,98 @@ async def download_import_template(
     )
 
 
+def _parse_csv_data(csv_content: str):
+    """Hilfsfunktion zum Parsen von CSV-Inhalten"""
+    csv_reader = csv.reader(StringIO(csv_content), delimiter=';')
+    rows = list(csv_reader)
+
+    # Fallback: Versuche Komma als Delimiter wenn Semikolon keine Spalten ergibt
+    if rows and len(rows[0]) <= 1:
+        csv_reader = csv.reader(StringIO(csv_content), delimiter=',')
+        rows = list(csv_reader)
+
+    return rows
+
+
+def _process_import_row(row, row_num, participants_data, errors, families_dict):
+    """Hilfsfunktion zum Verarbeiten einer Import-Zeile (Excel oder CSV)"""
+    # Leere Zeilen überspringen
+    if not any(row):
+        return
+
+    first_name = str(row[0]).strip() if row[0] else ""
+    last_name = str(row[1]).strip() if row[1] else ""
+    birth_date_str = str(row[2]).strip() if row[2] else ""
+    gender = str(row[3]).strip() if row[3] and len(row) > 3 else ""
+    email = str(row[4]).strip() if row[4] and len(row) > 4 else ""
+    phone = str(row[5]).strip() if row[5] and len(row) > 5 else ""
+    address = str(row[6]).strip() if row[6] and len(row) > 6 else ""
+    family_number = str(row[7]).strip() if row[7] and len(row) > 7 else ""
+
+    # Validierung
+    row_errors = []
+    has_error = False
+
+    if not first_name:
+        row_errors.append("Vorname fehlt")
+        has_error = True
+
+    if not last_name:
+        row_errors.append("Nachname fehlt")
+        has_error = True
+
+    # Geburtsdatum parsen
+    birth_date = None
+    if birth_date_str:
+        try:
+            # Versuche verschiedene Formate
+            for fmt in ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"]:
+                try:
+                    birth_date = datetime.strptime(birth_date_str, fmt).date()
+                    break
+                except ValueError:
+                    continue
+
+            if not birth_date:
+                row_errors.append(f"Ungültiges Datumsformat: {birth_date_str}")
+                has_error = True
+        except Exception as e:
+            row_errors.append(f"Fehler beim Datum: {str(e)}")
+            has_error = True
+    else:
+        row_errors.append("Geburtsdatum fehlt")
+        has_error = True
+
+    if row_errors:
+        errors.append({
+            "row": row_num,
+            "message": ", ".join(row_errors)
+        })
+
+    # Teilnehmer zur Liste hinzufügen
+    participant_data = {
+        "first_name": first_name,
+        "last_name": last_name,
+        "birth_date": birth_date.strftime("%d.%m.%Y") if birth_date else birth_date_str,
+        "birth_date_obj": birth_date,
+        "gender": gender if gender else None,
+        "email": email if email else None,
+        "phone": phone if phone else None,
+        "address": address if address else None,
+        "family_number": family_number if family_number else None,
+        "has_error": has_error,
+        "row": row_num
+    }
+
+    participants_data.append(participant_data)
+
+    # Familien gruppieren
+    if family_number and not has_error:
+        if family_number not in families_dict:
+            families_dict[family_number] = []
+        families_dict[family_number].append(participant_data)
+
+
 @router.post("/import", response_class=HTMLResponse)
 async def upload_import_file(
     request: Request,
@@ -824,103 +942,48 @@ async def upload_import_file(
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id)
 ):
-    """Verarbeitet die hochgeladene Excel-Datei und zeigt eine Vorschau"""
+    """Verarbeitet die hochgeladene Excel- oder CSV-Datei und zeigt eine Vorschau"""
     try:
         # Datei validieren
-        if not file.filename.endswith(('.xlsx', '.xls')):
-            flash(request, "Bitte laden Sie eine Excel-Datei (.xlsx oder .xls) hoch", "error")
+        is_csv = file.filename.endswith('.csv')
+        is_excel = file.filename.endswith(('.xlsx', '.xls'))
+
+        if not (is_csv or is_excel):
+            flash(request, "Bitte laden Sie eine Excel-Datei (.xlsx, .xls) oder CSV-Datei (.csv) hoch", "error")
             return RedirectResponse(url="/participants/import", status_code=303)
 
-        # Excel-Datei lesen
+        # Datei lesen
         contents = await file.read()
-        wb = load_workbook(BytesIO(contents), data_only=True)
-        ws = wb.active
 
         # Daten parsen
         participants_data = []
         errors = []
         families_dict = {}  # family_number -> [participants]
 
-        # Header prüfen (erste Zeile)
-        header_row = [cell.value for cell in ws[1]]
+        # CSV-Datei
+        if is_csv:
+            csv_content = contents.decode('utf-8-sig')  # UTF-8 mit BOM Support
+            rows = _parse_csv_data(csv_content)
 
-        # Ab Zeile 2 lesen (Zeile 1 ist Header)
-        for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-            # Leere Zeilen überspringen
-            if not any(row):
-                continue
+            if not rows or len(rows) < 2:
+                flash(request, "CSV-Datei ist leer oder enthält keine Daten", "error")
+                return RedirectResponse(url="/participants/import", status_code=303)
 
-            first_name = str(row[0]).strip() if row[0] else ""
-            last_name = str(row[1]).strip() if row[1] else ""
-            birth_date_str = str(row[2]).strip() if row[2] else ""
-            gender = str(row[3]).strip() if row[3] and len(row) > 3 else ""
-            email = str(row[4]).strip() if row[4] and len(row) > 4 else ""
-            phone = str(row[5]).strip() if row[5] and len(row) > 5 else ""
-            address = str(row[6]).strip() if row[6] and len(row) > 6 else ""
-            family_number = str(row[7]).strip() if row[7] and len(row) > 7 else ""
+            # Header ist Zeile 0, Daten ab Zeile 1
+            for row_num, row in enumerate(rows[1:], start=2):
+                _process_import_row(row, row_num, participants_data, errors, families_dict)
 
-            # Validierung
-            row_errors = []
-            has_error = False
+        # Excel-Datei
+        else:
+            wb = load_workbook(BytesIO(contents), data_only=True)
+            ws = wb.active
 
-            if not first_name:
-                row_errors.append("Vorname fehlt")
-                has_error = True
+            # Header prüfen (erste Zeile)
+            header_row = [cell.value for cell in ws[1]]
 
-            if not last_name:
-                row_errors.append("Nachname fehlt")
-                has_error = True
-
-            # Geburtsdatum parsen
-            birth_date = None
-            if birth_date_str:
-                try:
-                    # Versuche verschiedene Formate
-                    for fmt in ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"]:
-                        try:
-                            birth_date = datetime.strptime(birth_date_str, fmt).date()
-                            break
-                        except ValueError:
-                            continue
-
-                    if not birth_date:
-                        row_errors.append(f"Ungültiges Datumsformat: {birth_date_str}")
-                        has_error = True
-                except Exception as e:
-                    row_errors.append(f"Fehler beim Datum: {str(e)}")
-                    has_error = True
-            else:
-                row_errors.append("Geburtsdatum fehlt")
-                has_error = True
-
-            if row_errors:
-                errors.append({
-                    "row": row_num,
-                    "message": ", ".join(row_errors)
-                })
-
-            # Teilnehmer zur Liste hinzufügen
-            participant_data = {
-                "first_name": first_name,
-                "last_name": last_name,
-                "birth_date": birth_date.strftime("%d.%m.%Y") if birth_date else birth_date_str,
-                "birth_date_obj": birth_date,
-                "gender": gender if gender else None,
-                "email": email if email else None,
-                "phone": phone if phone else None,
-                "address": address if address else None,
-                "family_number": family_number if family_number else None,
-                "has_error": has_error,
-                "row": row_num
-            }
-
-            participants_data.append(participant_data)
-
-            # Familien gruppieren
-            if family_number and not has_error:
-                if family_number not in families_dict:
-                    families_dict[family_number] = []
-                families_dict[family_number].append(participant_data)
+            # Ab Zeile 2 lesen (Zeile 1 ist Header)
+            for row_num, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                _process_import_row(row, row_num, participants_data, errors, families_dict)
 
         if not participants_data:
             flash(request, "Keine Teilnehmer in der Datei gefunden", "error")
