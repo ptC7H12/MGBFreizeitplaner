@@ -67,12 +67,20 @@ class PriceCalculator:
 
     @staticmethod
     def _get_family_discount(child_position: int, family_discount_config: dict) -> float:
-        """Ermittelt den Familienrabatt in Prozent"""
+        """
+        Ermittelt den Familienrabatt in Prozent
+
+        Unterstützt Rabatte für:
+        - Erstes Kind (first_child_percent, optional, Standard: 0%)
+        - Zweites Kind (second_child_percent)
+        - Drittes und weitere Kinder (third_plus_child_percent)
+        """
         if not family_discount_config.get("enabled", False):
             return 0.0
 
         if child_position == 1:
-            return 0.0  # Erstes Kind: kein Rabatt
+            # Erstes Kind: Rabatt optional (Standard: 0%)
+            return float(family_discount_config.get("first_child_percent", 0))
         elif child_position == 2:
             return float(family_discount_config.get("second_child_percent", 0))
         else:  # 3. Kind und weitere

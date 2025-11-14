@@ -200,6 +200,7 @@ role_discounts:
 ```yaml
 family_discount:
   enabled: true                    # Aktivierung (Boolean, erforderlich)
+  first_child_percent: 0           # Rabatt 1. Kind (Float, optional, Standard: 0)
   second_child_percent: 10         # Rabatt 2. Kind (Float, erforderlich wenn enabled)
   third_plus_child_percent: 20     # Rabatt ab 3. Kind (Float, erforderlich wenn enabled)
 ```
@@ -208,6 +209,11 @@ family_discount:
 - `enabled` (Boolean, erforderlich): Aktiviert/deaktiviert Familienrabatte
   - `true`: Familienrabatte werden angewendet
   - `false`: Keine Familienrabatte
+
+- `first_child_percent` (Float, optional): Rabatt für das erste Kind
+  - Wertebereich: 0.0 bis 100.0
+  - **Standard**: 0.0 (kein Rabatt für erstes Kind)
+  - **Neu ab Version 1.1**: Ermöglicht Rabatt bereits ab dem ersten Kind
 
 - `second_child_percent` (Float, erforderlich wenn enabled): Rabatt für das zweite Kind
   - Wertebereich: 0.0 bis 100.0
@@ -219,18 +225,25 @@ family_discount:
 
 **Hinweise**:
 - Die Reihenfolge wird nach Geburtsdatum bestimmt (ältestes = erstes Kind)
-- Das erste Kind erhält keinen Familienrabatt
 - Familienrabatt wird **vom Basispreis** berechnet (nicht vom bereits reduzierten Preis!)
 - Nur Teilnehmer derselben Familie profitieren
+- **Rückwärtskompatibilität**: Bestehende Regelwerke ohne `first_child_percent` funktionieren weiterhin (Standard: 0%)
 
 **Beispiele**:
 
 ```yaml
-# Standard-Staffelung
+# Standard-Staffelung (ab 2. Kind)
 family_discount:
   enabled: true
   second_child_percent: 10      # 2. Kind: 10% Rabatt
   third_plus_child_percent: 20  # ab 3. Kind: 20% Rabatt
+
+# Mit Rabatt ab 1. Kind (NEU)
+family_discount:
+  enabled: true
+  first_child_percent: 5        # 1. Kind: 5% Rabatt
+  second_child_percent: 15      # 2. Kind: 15% Rabatt
+  third_plus_child_percent: 25  # ab 3. Kind: 25% Rabatt
 
 # Großzügige Staffelung
 family_discount:
@@ -243,7 +256,7 @@ family_discount:
   enabled: false
 ```
 
-**Berechnungsbeispiel**:
+**Berechnungsbeispiel 1 - Standard (ohne first_child_percent)**:
 ```
 Familie mit 3 Kindern, alle 10 Jahre alt, Basispreis 150€:
 
@@ -252,6 +265,18 @@ Kind 2:            150€ - 10% Familienrabatt = 135€
 Kind 3:            150€ - 20% Familienrabatt = 120€
 
 Gesamt: 405€ statt 450€ (Ersparnis: 45€)
+```
+
+**Berechnungsbeispiel 2 - Mit Rabatt ab 1. Kind (NEU)**:
+```
+Familie mit 3 Kindern, alle 10 Jahre alt, Basispreis 140€:
+(first_child_percent: 5, second_child_percent: 15, third_plus_child_percent: 25)
+
+Kind 1 (ältestes): 140€ - 5% Familienrabatt = 133€
+Kind 2:            140€ - 15% Familienrabatt = 119€
+Kind 3:            140€ - 25% Familienrabatt = 105€
+
+Gesamt: 357€ statt 420€ (Ersparnis: 63€)
 ```
 
 ## Preisberechnung
