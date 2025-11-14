@@ -1,18 +1,16 @@
 """Dashboard Router"""
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract
 from datetime import date, timedelta
 
-from app.config import settings
 from app.database import get_db
 from app.models import Participant, Payment, Expense, Event, Family, Role
 from app.dependencies import get_current_event_id
+from app.templates_config import templates
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
-templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse)

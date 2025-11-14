@@ -2,19 +2,18 @@
 import logging
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_event_id
 from app.services.backup_service import BackupService
 from app.utils.flash import flash
+from app.templates_config import templates
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/backups", tags=["backups"])
-templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 # Backup-Service initialisieren
 backup_service = BackupService(

@@ -1,7 +1,6 @@
 """Hauptanwendung für das Freizeit-Kassen-System"""
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 import logging
@@ -9,6 +8,7 @@ import secrets
 
 from app.config import settings
 from app.database import init_db
+from app.templates_config import templates
 from app.routers import dashboard, participants, families, rulesets, payments, expenses, incomes, auth, settings as settings_router, tasks, backups
 
 # Logging konfigurieren
@@ -34,13 +34,6 @@ app.add_middleware(
 
 # Static Files mounten
 app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
-
-# Templates konfigurieren
-templates = Jinja2Templates(directory=str(settings.templates_dir))
-
-# Flash-Messages als Template-Global registrieren
-from app.utils.flash import get_flashed_messages
-templates.env.globals['get_flashed_messages'] = get_flashed_messages
 
 # Router registrieren
 app.include_router(auth.router)

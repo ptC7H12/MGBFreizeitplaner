@@ -2,7 +2,6 @@
 import logging
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, DataError
 from typing import Optional
@@ -15,11 +14,11 @@ from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
 from app.schemas import SettingUpdateSchema
+from app.templates_config import templates
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
-templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
 def _get_or_create_setting(db: Session, event_id: int) -> Setting:

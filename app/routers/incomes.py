@@ -1,7 +1,6 @@
 """Router für Einnahmen (Zuschüsse, Spenden, etc.)"""
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 from datetime import date as date_type
 
@@ -10,10 +9,9 @@ from app.models.income import Income
 from app.models.role import Role
 from app.dependencies import get_current_event_id
 from app.utils.flash import flash
-from app.config import settings
+from app.templates_config import templates
 
 router = APIRouter(prefix="/incomes", tags=["incomes"])
-templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
 @router.get("/", response_class=HTMLResponse)

@@ -1,19 +1,17 @@
 """Tasks Router - Offene Aufgaben"""
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from datetime import datetime, date, timedelta
 
-from app.config import settings
 from app.database import get_db
 from app.models import Participant, Payment, Expense, Event, Task, Income, Role
 from app.dependencies import get_current_event_id
 from app.utils.flash import flash
+from app.templates_config import templates
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
-templates = Jinja2Templates(directory=str(settings.templates_dir))
 
 
 def get_completed_tasks(db: Session, event_id: int) -> dict:
