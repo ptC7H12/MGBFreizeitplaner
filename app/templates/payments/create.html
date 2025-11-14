@@ -79,7 +79,7 @@
                         <option value="">Kein Teilnehmer</option>
                         {% for participant in participants %}
                         <option value="{{ participant.id }}" {% if preselected_participant_id == participant.id %}selected{% endif %}>
-                            {{ participant.full_name }} ({{ participant.event.name }})
+                            {{ participant.full_name }}
                         </option>
                         {% endfor %}
                     </select>
