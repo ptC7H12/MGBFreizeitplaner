@@ -102,14 +102,12 @@ async def create_payment(
             family_id=family_id
         )
 
-        # Datum parsen (bereits validiert durch Pydantic)
-        payment_date_obj = datetime.strptime(payment_data.payment_date, "%Y-%m-%d").date()
-
         # Neue Zahlung erstellen
+        # payment_date ist bereits ein date-Objekt durch Pydantic-Validierung
         payment = Payment(
             event_id=event_id,
             amount=payment_data.amount,
-            payment_date=payment_date_obj,
+            payment_date=payment_data.payment_date,
             payment_method=payment_data.payment_method,
             reference=payment_data.reference,
             notes=payment_data.notes,
