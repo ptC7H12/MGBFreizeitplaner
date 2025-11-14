@@ -9,7 +9,7 @@ class ParticipantCreateSchema(BaseModel):
     """Schema für das Erstellen eines Teilnehmers"""
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
-    birth_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    birth_date: Union[str, date] = Field(...)
     gender: Optional[str] = Field(None, max_length=20)
     email: Optional[str] = Field(None, max_length=200)
     phone: Optional[str] = Field(None, max_length=50)
@@ -26,24 +26,27 @@ class ParticipantCreateSchema(BaseModel):
 
     @field_validator('birth_date')
     @classmethod
-    def validate_birth_date(cls, v: str) -> str:
+    def validate_birth_date(cls, v: Union[str, date]) -> date:
         """Validiert das Geburtsdatum"""
-        try:
-            birth_date_obj = datetime.strptime(v, "%Y-%m-%d").date()
-
-            # Datum darf nicht in der Zukunft liegen
-            if birth_date_obj > date.today():
-                raise ValueError("Geburtsdatum darf nicht in der Zukunft liegen")
-
-            # Datum muss nach 1900 sein
-            if birth_date_obj.year < 1900:
-                raise ValueError("Geburtsdatum muss nach 1900 liegen")
-
-            return v
-        except ValueError as e:
-            if "does not match format" in str(e):
+        # Wenn bereits ein date-Objekt, validiere direkt
+        if isinstance(v, date):
+            birth_date_obj = v
+        else:
+            # String zu date konvertieren
+            try:
+                birth_date_obj = datetime.strptime(v, "%Y-%m-%d").date()
+            except ValueError:
                 raise ValueError("Geburtsdatum muss im Format YYYY-MM-DD vorliegen")
-            raise
+
+        # Datum darf nicht in der Zukunft liegen
+        if birth_date_obj > date.today():
+            raise ValueError("Geburtsdatum darf nicht in der Zukunft liegen")
+
+        # Datum muss nach 1900 sein
+        if birth_date_obj.year < 1900:
+            raise ValueError("Geburtsdatum muss nach 1900 liegen")
+
+        return birth_date_obj
 
     @field_validator('email')
     @classmethod
@@ -108,7 +111,7 @@ class FamilyUpdateSchema(FamilyCreateSchema):
 class PaymentCreateSchema(BaseModel):
     """Schema für das Erstellen einer Zahlung"""
     amount: float = Field(..., gt=0.0)
-    payment_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
+    payment_date: Union[str, date] = Field(...)
     payment_method: Optional[str] = Field(None, max_length=50)
     reference: Optional[str] = Field(None, max_length=200)
     notes: Optional[str] = None
@@ -117,20 +120,23 @@ class PaymentCreateSchema(BaseModel):
 
     @field_validator('payment_date')
     @classmethod
-    def validate_payment_date(cls, v: str) -> str:
+    def validate_payment_date(cls, v: Union[str, date]) -> date:
         """Validiert das Zahlungsdatum"""
-        try:
-            payment_date_obj = datetime.strptime(v, "%Y-%m-%d").date()
-
-            # Datum darf nicht in der Zukunft liegen
-            if payment_date_obj > date.today():
-                raise ValueError("Zahlungsdatum darf nicht in der Zukunft liegen")
-
-            return v
-        except ValueError as e:
-            if "does not match format" in str(e):
+        # Wenn bereits ein date-Objekt, validiere direkt
+        if isinstance(v, date):
+            payment_date_obj = v
+        else:
+            # String zu date konvertieren
+            try:
+                payment_date_obj = datetime.strptime(v, "%Y-%m-%d").date()
+            except ValueError:
                 raise ValueError("Zahlungsdatum muss im Format YYYY-MM-DD vorliegen")
-            raise
+
+        # Datum darf nicht in der Zukunft liegen
+        if payment_date_obj > date.today():
+            raise ValueError("Zahlungsdatum darf nicht in der Zukunft liegen")
+
+        return payment_date_obj
 
     @model_validator(mode='after')
     def validate_participant_or_family(self):
