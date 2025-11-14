@@ -370,31 +370,25 @@ def create_demo_data(db: Session):
     # 8. Beispiel-Einnahmen
     incomes = [
         Income(
-            title="Zuschuss Jugendamt",
-            description="Förderung für Kinder- und Jugendarbeit",
+            name="Zuschuss Jugendamt",
+            description="Förderung für Kinder- und Jugendarbeit (Quelle: Jugendamt Stadt Beispielstadt)",
             amount=500.00,
             date=date(2024, 6, 1),
-            category="Zuschuss",
-            source="Jugendamt Stadt Beispielstadt",
             role_id=roles["kind"].id,
             event_id=event.id
         ),
         Income(
-            title="Spende Förderverein",
-            description="Spende des Fördervereins für Freizeitaktivitäten",
+            name="Spende Förderverein",
+            description="Spende des Fördervereins für Freizeitaktivitäten (Quelle: Förderverein Jugendarbeit e.V.)",
             amount=250.00,
             date=date(2024, 5, 15),
-            category="Spende",
-            source="Förderverein Jugendarbeit e.V.",
             event_id=event.id
         ),
         Income(
-            title="Zuschuss Kirchengemeinde",
-            description="Förderung kirchliche Jugendarbeit",
+            name="Zuschuss Kirchengemeinde",
+            description="Förderung kirchliche Jugendarbeit (Quelle: Ev. Kirchengemeinde Beispielstadt)",
             amount=300.00,
             date=date(2024, 6, 10),
-            category="Zuschuss",
-            source="Ev. Kirchengemeinde Beispielstadt",
             role_id=roles["jugendlicher"].id,
             event_id=event.id
         )

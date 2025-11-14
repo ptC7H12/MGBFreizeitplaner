@@ -1175,3 +1175,180 @@ async def confirm_import(
         logger.exception(f"Error during import: {e}")
         flash(request, f"Fehler beim Import: {str(e)}", "error")
         return RedirectResponse(url="/participants/import", status_code=303)
+
+
+@router.get("/export")
+async def export_participants_excel(
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Exportiert alle Teilnehmer als Excel-Datei, gruppiert nach Familien"""
+    try:
+        # Event laden
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            raise HTTPException(status_code=404, detail="Event nicht gefunden")
+
+        # Alle aktiven Teilnehmer laden
+        all_participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True
+        ).order_by(Participant.last_name, Participant.first_name).all()
+
+        # Workbook erstellen
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Teilnehmerliste"
+
+        # Header-Zeile
+        headers = [
+            "Nachname", "Vorname", "Geburtsdatum", "Alter", "Geschlecht",
+            "Rolle", "Familie", "E-Mail", "Telefon", "Preis (€)",
+            "Bezahlt (€)", "Offen (€)", "Adresse"
+        ]
+
+        # Header-Formatierung
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True, size=11)
+        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_alignment
+
+        # Spaltenbreiten
+        column_widths = [15, 15, 12, 6, 10, 15, 20, 25, 15, 10, 10, 10, 30]
+        for col_num, width in enumerate(column_widths, 1):
+            ws.column_dimensions[ws.cell(row=1, column=col_num).column_letter].width = width
+
+        # Familien gruppieren
+        families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
+
+        row_num = 2
+        family_fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
+
+        # Zuerst: Familien mit ihren Mitgliedern
+        for family in families:
+            family_participants = [p for p in all_participants if p.family_id == family.id]
+
+            if not family_participants:
+                continue
+
+            # Familie-Header-Zeile
+            ws.cell(row=row_num, column=1, value=f"Familie {family.name}").font = Font(bold=True, size=11)
+            for col in range(1, len(headers) + 1):
+                ws.cell(row=row_num, column=col).fill = family_fill
+            row_num += 1
+
+            # Familienmitglieder
+            for participant in sorted(family_participants, key=lambda p: p.birth_date):
+                _write_participant_row(ws, row_num, participant, event)
+                row_num += 1
+
+        # Dann: Einzelpersonen ohne Familie
+        individual_participants = [p for p in all_participants if p.family_id is None]
+
+        if individual_participants:
+            # Leerzeile
+            row_num += 1
+
+            # Einzelpersonen-Header
+            ws.cell(row=row_num, column=1, value="Einzelpersonen").font = Font(bold=True, size=11)
+            for col in range(1, len(headers) + 1):
+                ws.cell(row=row_num, column=col).fill = family_fill
+            row_num += 1
+
+            for participant in individual_participants:
+                _write_participant_row(ws, row_num, participant, event)
+                row_num += 1
+
+        # Summarium am Ende
+        row_num += 1
+        summary_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+        summary_font = Font(bold=True)
+
+        ws.cell(row=row_num, column=1, value="GESAMT").font = summary_font
+        ws.cell(row=row_num, column=1).fill = summary_fill
+
+        # Gesamtanzahl
+        ws.cell(row=row_num, column=7, value=f"{len(all_participants)} Teilnehmer").font = summary_font
+        ws.cell(row=row_num, column=7).fill = summary_fill
+
+        # Gesamtpreise
+        total_price = sum(p.final_price for p in all_participants)
+        total_paid = sum(sum(pay.amount for pay in p.payments) for p in all_participants)
+        total_outstanding = total_price - total_paid
+
+        ws.cell(row=row_num, column=10, value=total_price).font = summary_font
+        ws.cell(row=row_num, column=10).fill = summary_fill
+        ws.cell(row=row_num, column=10).number_format = '#,##0.00'
+
+        ws.cell(row=row_num, column=11, value=total_paid).font = summary_font
+        ws.cell(row=row_num, column=11).fill = summary_fill
+        ws.cell(row=row_num, column=11).number_format = '#,##0.00'
+
+        ws.cell(row=row_num, column=12, value=total_outstanding).font = summary_font
+        ws.cell(row=row_num, column=12).fill = summary_fill
+        ws.cell(row=row_num, column=12).number_format = '#,##0.00'
+
+        # Excel in BytesIO speichern
+        excel_buffer = BytesIO()
+        wb.save(excel_buffer)
+        excel_buffer.seek(0)
+
+        # Dateiname mit Event-Name und Datum
+        filename = f"Teilnehmerliste_{event.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+
+        return Response(
+            content=excel_buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+
+    except Exception as e:
+        logger.exception(f"Error exporting participants: {e}")
+        raise HTTPException(status_code=500, detail=f"Fehler beim Export: {str(e)}")
+
+
+def _write_participant_row(ws, row_num: int, participant: Participant, event: Event):
+    """Hilfsfunktion zum Schreiben einer Teilnehmer-Zeile"""
+    # Alter berechnen
+    age = event.start_date.year - participant.birth_date.year
+    if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+        age -= 1
+
+    # Zahlungen berechnen
+    total_paid = sum(payment.amount for payment in participant.payments)
+    outstanding = participant.final_price - total_paid
+
+    # Daten in Zellen schreiben
+    ws.cell(row=row_num, column=1, value=participant.last_name)
+    ws.cell(row=row_num, column=2, value=participant.first_name)
+    ws.cell(row=row_num, column=3, value=participant.birth_date.strftime("%d.%m.%Y"))
+    ws.cell(row=row_num, column=4, value=age)
+    ws.cell(row=row_num, column=5, value=participant.gender or "")
+    ws.cell(row=row_num, column=6, value=participant.role.display_name if participant.role else "")
+    ws.cell(row=row_num, column=7, value=participant.family.name if participant.family else "")
+    ws.cell(row=row_num, column=8, value=participant.email or "")
+    ws.cell(row=row_num, column=9, value=participant.phone or "")
+
+    # Preise mit Formatierung
+    price_cell = ws.cell(row=row_num, column=10, value=participant.final_price)
+    price_cell.number_format = '#,##0.00'
+
+    paid_cell = ws.cell(row=row_num, column=11, value=total_paid)
+    paid_cell.number_format = '#,##0.00'
+
+    outstanding_cell = ws.cell(row=row_num, column=12, value=outstanding)
+    outstanding_cell.number_format = '#,##0.00'
+
+    # Offener Betrag rot markieren wenn > 0
+    if outstanding > 0:
+        outstanding_cell.font = Font(color="FF0000", bold=True)
+
+    ws.cell(row=row_num, column=13, value=participant.address or "")
+

@@ -440,31 +440,25 @@ def seed_incomes(db, event):
 
         incomes = [
             Income(
-                title="Zuschuss Jugendamt",
-                description="Förderung für Kinder- und Jugendarbeit",
+                name="Zuschuss Jugendamt",
+                description="Förderung für Kinder- und Jugendarbeit (Quelle: Jugendamt Stadt Beispielstadt)",
                 amount=500.00,
                 date=date(2024, 6, 1),
-                category="Zuschuss",
-                source="Jugendamt Stadt Beispielstadt",
                 role_id=role_kind.id if role_kind else None,
                 event_id=event.id
             ),
             Income(
-                title="Spende Förderverein",
-                description="Spende des Fördervereins für Freizeitaktivitäten",
+                name="Spende Förderverein",
+                description="Spende des Fördervereins für Freizeitaktivitäten (Quelle: Förderverein Jugendarbeit e.V.)",
                 amount=250.00,
                 date=date(2024, 5, 15),
-                category="Spende",
-                source="Förderverein Jugendarbeit e.V.",
                 event_id=event.id
             ),
             Income(
-                title="Zuschuss Kirchengemeinde",
-                description="Förderung kirchliche Jugendarbeit",
+                name="Zuschuss Kirchengemeinde",
+                description="Förderung kirchliche Jugendarbeit (Quelle: Ev. Kirchengemeinde Beispielstadt)",
                 amount=300.00,
                 date=date(2024, 6, 10),
-                category="Zuschuss",
-                source="Ev. Kirchengemeinde Beispielstadt",
                 role_id=role_jugendlicher.id if role_jugendlicher else None,
                 event_id=event.id
             )
@@ -472,8 +466,7 @@ def seed_incomes(db, event):
 
         for income in incomes:
             db.add(income)
-            source_info = f" von {income.source}" if income.source else ""
-            print(f"✓ Einnahme erstellt: {income.title} ({income.amount}€){source_info}")
+            print(f"✓ Einnahme erstellt: {income.name} ({income.amount}€)")
 
         db.commit()
 
