@@ -146,22 +146,90 @@ def create_demo_data(db: Session):
     db.add(participant_schmidt)
     db.commit()
 
-    # Einzelperson - Betreuer
-    betreuer = Participant(
-        first_name="Sarah",
-        last_name="Meyer",
-        birth_date=date(1995, 11, 5),
-        email="sarah.meyer@example.com",
-        phone="0555-123456",
-        role=roles["betreuer"],
-        event=event,
-        calculated_price=75.00
+    # Familie Weber (mit verschiedenen Altersgruppen für bessere Charts)
+    family_weber = Family(
+        name="Weber",
+        contact_person="Klaus Weber",
+        email="klaus.weber@example.com",
+        phone="0176-9876543",
+        event_id=event.id
     )
-    db.add(betreuer)
+    db.add(family_weber)
     db.commit()
 
-    # 6. Beispiel-Zahlungen
+    participants_weber = [
+        Participant(
+            first_name="Emma",
+            last_name="Weber",
+            birth_date=date(2019, 2, 10),  # 5 Jahre
+            role=roles["kind"],
+            family=family_weber,
+            event=event,
+            calculated_price=120.00
+        ),
+        Participant(
+            first_name="Noah",
+            last_name="Weber",
+            birth_date=date(2016, 9, 18),  # 8 Jahre
+            role=roles["kind"],
+            family=family_weber,
+            event=event,
+            calculated_price=140.00
+        ),
+        Participant(
+            first_name="Mia",
+            last_name="Weber",
+            birth_date=date(2009, 6, 25),  # 15 Jahre
+            role=roles["kind"],
+            family=family_weber,
+            event=event,
+            calculated_price=150.00
+        )
+    ]
+    for p in participants_weber:
+        db.add(p)
+    db.commit()
+
+    # Einzelpersonen - verschiedene Rollen
+    einzelpersonen = [
+        Participant(
+            first_name="Sarah",
+            last_name="Meyer",
+            birth_date=date(1995, 11, 5),  # 29 Jahre
+            email="sarah.meyer@example.com",
+            phone="0555-123456",
+            role=roles["betreuer"],
+            event=event,
+            calculated_price=75.00
+        ),
+        Participant(
+            first_name="Michael",
+            last_name="Fischer",
+            birth_date=date(2003, 4, 15),  # 21 Jahre
+            email="michael.fischer@example.com",
+            phone="0172-2345678",
+            role=roles["betreuer"],
+            event=event,
+            calculated_price=75.00
+        ),
+        Participant(
+            first_name="Julia",
+            last_name="Becker",
+            birth_date=date(1978, 8, 30),  # 46 Jahre
+            email="julia.becker@example.com",
+            phone="0160-7654321",
+            role=roles["kueche"],
+            event=event,
+            calculated_price=50.00
+        )
+    ]
+    for ep in einzelpersonen:
+        db.add(ep)
+    db.commit()
+
+    # 6. Beispiel-Zahlungen (über verschiedene Zeiträume für Timeline-Chart)
     payments = [
+        # Familie Müller
         Payment(
             amount=200.00,
             payment_date=date(2024, 5, 15),
@@ -171,6 +239,15 @@ def create_demo_data(db: Session):
             event_id=event.id
         ),
         Payment(
+            amount=90.00,
+            payment_date=date(2024, 7, 1),
+            payment_method="Bar",
+            reference="Restzahlung",
+            family_id=family_mueller.id,
+            event_id=event.id
+        ),
+        # Familie Schmidt
+        Payment(
             amount=150.00,
             payment_date=date(2024, 5, 20),
             payment_method="Überweisung",
@@ -178,12 +255,54 @@ def create_demo_data(db: Session):
             family_id=family_schmidt.id,
             event_id=event.id
         ),
+        # Familie Weber
+        Payment(
+            amount=100.00,
+            payment_date=date(2024, 5, 25),
+            payment_method="Überweisung",
+            reference="Anzahlung Weber",
+            family_id=family_weber.id,
+            event_id=event.id
+        ),
+        Payment(
+            amount=150.00,
+            payment_date=date(2024, 6, 10),
+            payment_method="Überweisung",
+            reference="2. Rate Weber",
+            family_id=family_weber.id,
+            event_id=event.id
+        ),
+        Payment(
+            amount=160.00,
+            payment_date=date(2024, 6, 28),
+            payment_method="Bar",
+            reference="Restzahlung Weber",
+            family_id=family_weber.id,
+            event_id=event.id
+        ),
+        # Einzelpersonen
         Payment(
             amount=75.00,
             payment_date=date(2024, 6, 5),
             payment_method="Überweisung",
-            reference=f"Teilnahmegebühr {betreuer.full_name}",
-            participant_id=betreuer.id,
+            reference=f"Teilnahmegebühr {einzelpersonen[0].full_name}",
+            participant_id=einzelpersonen[0].id,
+            event_id=event.id
+        ),
+        Payment(
+            amount=75.00,
+            payment_date=date(2024, 6, 12),
+            payment_method="PayPal",
+            reference=f"Teilnahmegebühr {einzelpersonen[1].full_name}",
+            participant_id=einzelpersonen[1].id,
+            event_id=event.id
+        ),
+        Payment(
+            amount=50.00,
+            payment_date=date(2024, 6, 18),
+            payment_method="Bar",
+            reference=f"Teilnahmegebühr {einzelpersonen[2].full_name}",
+            participant_id=einzelpersonen[2].id,
             event_id=event.id
         )
     ]
@@ -212,6 +331,36 @@ def create_demo_data(db: Session):
             paid_by="Peter Schmidt",
             is_settled=False,
             event_id=event.id
+        ),
+        Expense(
+            title="Spielgeräte",
+            description="Bälle, Frisbees und Outdoorspielzeug",
+            amount=120.00,
+            expense_date=date(2024, 7, 8),
+            category="Material",
+            paid_by="Sarah Meyer",
+            is_settled=True,
+            event_id=event.id
+        ),
+        Expense(
+            title="Getränke",
+            description="Wasser und Saftschorlen",
+            amount=95.00,
+            expense_date=date(2024, 7, 12),
+            category="Verpflegung",
+            paid_by="Anna Müller",
+            is_settled=False,
+            event_id=event.id
+        ),
+        Expense(
+            title="Erste-Hilfe Material",
+            description="Pflaster, Verbandsmaterial",
+            amount=42.30,
+            expense_date=date(2024, 7, 3),
+            category="Sonstiges",
+            paid_by="Sarah Meyer",
+            is_settled=True,
+            event_id=event.id
         )
     ]
     for expense in expenses:
@@ -237,6 +386,16 @@ def create_demo_data(db: Session):
             date=date(2024, 5, 15),
             category="Spende",
             source="Förderverein Jugendarbeit e.V.",
+            event_id=event.id
+        ),
+        Income(
+            title="Zuschuss Kirchengemeinde",
+            description="Förderung kirchliche Jugendarbeit",
+            amount=300.00,
+            date=date(2024, 6, 10),
+            category="Zuschuss",
+            source="Ev. Kirchengemeinde Beispielstadt",
+            role_id=roles["jugendlicher"].id,
             event_id=event.id
         )
     ]
