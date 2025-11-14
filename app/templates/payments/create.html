@@ -146,6 +146,22 @@ document.addEventListener('DOMContentLoaded', function() {
         const today = new Date().toISOString().split('T')[0];
         dateInput.value = today;
     }
+
+    // Exklusive Auswahl: Nur Teilnehmer ODER Familie
+    const participantSelect = document.getElementById('participant_id');
+    const familySelect = document.getElementById('family_id');
+
+    participantSelect.addEventListener('change', function() {
+        if (this.value) {
+            familySelect.value = '';
+        }
+    });
+
+    familySelect.addEventListener('change', function() {
+        if (this.value) {
+            participantSelect.value = '';
+        }
+    });
 });
 </script>
 {% endblock %}

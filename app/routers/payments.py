@@ -91,6 +91,11 @@ async def create_payment(
 ):
     """Erstellt eine neue Zahlung"""
     try:
+        # Validierung: Nur Teilnehmer ODER Familie, nicht beides
+        if participant_id and family_id:
+            flash(request, "Eine Zahlung kann entweder einem Teilnehmer oder einer Familie zugeordnet werden, nicht beides", "error")
+            return RedirectResponse(url="/payments/create?error=double_assignment", status_code=303)
+
         # Pydantic-Validierung
         payment_data = PaymentCreateSchema(
             amount=amount,
