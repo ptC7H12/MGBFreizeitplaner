@@ -206,6 +206,7 @@ async def create_participant(
             discount_percent=discount_percent,
             discount_reason=discount_reason,
             manual_price_override=manual_price_override,
+            event_id=event_id,  # From session dependency
             role_id=role_id,
             family_id=family_id
         )
