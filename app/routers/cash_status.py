@@ -20,56 +20,68 @@ async def cash_status(
 ):
     """Zeigt den aktuellen Kassenstand mit detaillierter Aufschlüsselung"""
 
-    # 1. Einnahmen durch Zahlungen
-    total_payments = db.query(func.sum(Payment.amount)).filter(
-        Payment.event_id == event_id
-    ).scalar() or 0.0
+    # === SOLL-Werte (Zu erwartende Werte) ===
 
-    # 2. Zuschüsse/Einnahmen (Incomes)
-    total_incomes = db.query(func.sum(Income.amount)).filter(
+    # Erwartete Einnahmen durch Teilnehmer
+    participants = db.query(Participant).filter(
+        Participant.event_id == event_id,
+        Participant.is_active == True
+    ).all()
+    expected_income_participants = sum(p.final_price for p in participants)
+
+    # Sonstige Einnahmen (Zuschüsse/Förderungen)
+    other_income = db.query(func.sum(Income.amount)).filter(
         Income.event_id == event_id
     ).scalar() or 0.0
 
-    # 3. Beglichene Ausgaben
+    # Alle Ausgaben (gesamt)
+    total_expenses = db.query(func.sum(Expense.amount)).filter(
+        Expense.event_id == event_id
+    ).scalar() or 0.0
+
+    # Erwarteter Saldo
+    expected_balance = expected_income_participants + other_income - total_expenses
+
+    # === IST-Werte (Getätigte Zahlungen) ===
+
+    # Tatsächliche Einnahmen durch Teilnehmer-Zahlungen
+    actual_income_participants = db.query(func.sum(Payment.amount)).filter(
+        Payment.event_id == event_id
+    ).scalar() or 0.0
+
+    # Sonstige Einnahmen (gleich wie Soll, da diese direkt gebucht werden)
+    actual_other_income = other_income
+
+    # Beglichene Ausgaben
     settled_expenses = db.query(func.sum(Expense.amount)).filter(
         Expense.event_id == event_id,
         Expense.is_settled == True
     ).scalar() or 0.0
 
-    # 4. Offene Ausgaben
+    # Aktueller Saldo
+    actual_balance = actual_income_participants + actual_other_income - settled_expenses
+
+    # === DIFFERENZEN ===
+
+    # Ausstehende Einnahmen (Teilnehmer)
+    outstanding_income_participants = expected_income_participants - actual_income_participants
+
+    # Ausstehende sonstige Einnahmen (immer 0, da direkt gebucht)
+    outstanding_other_income = 0.0
+
+    # Noch zu begleichende Ausgaben
     open_expenses = db.query(func.sum(Expense.amount)).filter(
         Expense.event_id == event_id,
         Expense.is_settled == False
     ).scalar() or 0.0
 
-    # 5. Vorgestreckte Beträge (nicht erstattete Ausgaben)
-    unreimbursed_expenses = db.query(func.sum(Expense.amount)).filter(
-        Expense.event_id == event_id,
-        Expense.is_reimbursed == False,
-        Expense.paid_by.isnot(None)
-    ).scalar() or 0.0
+    # Differenz Saldo
+    balance_difference = expected_balance - actual_balance
 
-    # 6. Erwartete Einnahme durch Teilnehmer
-    participants = db.query(Participant).filter(
-        Participant.event_id == event_id,
-        Participant.is_active == True
-    ).all()
-    expected_income = sum(p.final_price for p in participants)
-
-    # 7. Noch zu erwartende Zahlungen
-    outstanding_payments = expected_income - total_payments
-
-    # 8. Netto-Kassenstand (aktuell verfügbar)
-    net_balance = total_payments + total_incomes - settled_expenses
-
-    # 9. Brutto-Kassenstand (theoretischer Endstand)
-    total_expenses_all = settled_expenses + open_expenses
-    gross_balance = expected_income + total_incomes - total_expenses_all
-
-    # Status-Badge berechnen
-    if net_balance < 0:
+    # Status-Badge berechnen (basierend auf aktuellem Saldo)
+    if actual_balance < 0:
         status = {"text": "Kritisch", "color": "red"}
-    elif net_balance < 500:
+    elif actual_balance < 500:
         status = {"text": "Knapp", "color": "yellow"}
     else:
         status = {"text": "Gesund", "color": "green"}
@@ -100,15 +112,22 @@ async def cash_status(
         {
             "request": request,
             "title": "Kassenstand",
-            "total_payments": total_payments,
-            "total_incomes": total_incomes,
-            "settled_expenses": settled_expenses,
-            "open_expenses": open_expenses,
-            "unreimbursed_expenses": unreimbursed_expenses,
-            "expected_income": expected_income,
-            "outstanding_payments": outstanding_payments,
-            "net_balance": net_balance,
-            "gross_balance": gross_balance,
+            # SOLL-Werte
+            "expected_income_participants": expected_income_participants,
+            "expected_other_income": other_income,
+            "expected_expenses": total_expenses,
+            "expected_balance": expected_balance,
+            # IST-Werte
+            "actual_income_participants": actual_income_participants,
+            "actual_other_income": actual_other_income,
+            "actual_expenses": settled_expenses,
+            "actual_balance": actual_balance,
+            # DIFFERENZEN
+            "outstanding_income_participants": outstanding_income_participants,
+            "outstanding_other_income": outstanding_other_income,
+            "outstanding_expenses": open_expenses,
+            "balance_difference": balance_difference,
+            # Status und Kategorien
             "status": status,
             "categories": categories
         }
