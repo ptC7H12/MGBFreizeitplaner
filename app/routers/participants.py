@@ -300,13 +300,13 @@ async def create_participant(
 
     except IntegrityError as e:
         db.rollback()
-        logger.error(f"Database integrity error creating participant: {e}", exc_info=True)
+        logger.exception(f"Database integrity error creating participant: {e}")
         flash(request, "Teilnehmer konnte nicht erstellt werden (Datenbankfehler)", "error")
         return RedirectResponse(url="/participants/create?error=db_integrity", status_code=303)
 
     except DataError as e:
         db.rollback()
-        logger.error(f"Invalid data creating participant: {e}", exc_info=True)
+        logger.exception(f"Invalid data creating participant: {e}")
         flash(request, "Ungültige Daten eingegeben", "error")
         return RedirectResponse(url="/participants/create?error=invalid_data", status_code=303)
 
@@ -368,7 +368,7 @@ async def calculate_price_preview(
         return HTMLResponse(content=f'<div class="text-sm text-red-500">Ungültiges Datum</div>')
 
     except Exception as e:
-        logger.error(f"Error calculating price preview: {e}", exc_info=True)
+        logger.exception(f"Error calculating price preview: {e}")
         return HTMLResponse(content=f'<div class="text-sm text-gray-500">Preis wird berechnet...</div>')
 
 
@@ -447,7 +447,7 @@ async def suggest_role(
         return HTMLResponse(content="")
 
     except Exception as e:
-        logger.error(f"Error suggesting role: {e}", exc_info=True)
+        logger.exception(f"Error suggesting role: {e}")
         return HTMLResponse(content="")
 
 
@@ -846,14 +846,21 @@ async def confirm_import(
                         max_age = age_group.get("max_age", 999)
                         if min_age <= age <= max_age:
                             role_name = age_group.get("role", "").lower()
-                            role = db.query(Role).filter(Role.name == role_name).first()
+                            role = db.query(Role).filter(
+                                Role.event_id == event_id,
+                                Role.name == role_name,
+                                Role.is_active == True
+                            ).first()
                             if role:
                                 role_id = role.id
                                 break
 
                 # Fallback: Erste Rolle verwenden
                 if not role_id:
-                    first_role = db.query(Role).first()
+                    first_role = db.query(Role).filter(
+                        Role.event_id == event_id,
+                        Role.is_active == True
+                    ).first()
                     if first_role:
                         role_id = first_role.id
 
@@ -894,7 +901,7 @@ async def confirm_import(
                 imported_count += 1
 
             except Exception as e:
-                logger.error(f"Error importing participant {participant_data.get('first_name')} {participant_data.get('last_name')}: {e}")
+                logger.exception(f"Error importing participant {participant_data.get('first_name')} {participant_data.get('last_name')}: {e}")
                 skipped_count += 1
                 continue
 
@@ -910,7 +917,7 @@ async def confirm_import(
         return RedirectResponse(url="/participants", status_code=303)
 
     except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON in import data: {e}")
+        logger.exception(f"Invalid JSON in import data: {e}")
         flash(request, "Ungültige Import-Daten", "error")
         return RedirectResponse(url="/participants/import", status_code=303)
 
@@ -1262,13 +1269,13 @@ async def update_participant(
 
     except IntegrityError as e:
         db.rollback()
-        logger.error(f"Database integrity error updating participant: {e}", exc_info=True)
+        logger.exception(f"Database integrity error updating participant: {e}")
         flash(request, "Teilnehmer konnte nicht aktualisiert werden (Datenbankfehler)", "error")
         return RedirectResponse(url=f"/participants/{participant_id}/edit?error=db_integrity", status_code=303)
 
     except DataError as e:
         db.rollback()
-        logger.error(f"Invalid data updating participant: {e}", exc_info=True)
+        logger.exception(f"Invalid data updating participant: {e}")
         flash(request, "Ungültige Daten eingegeben", "error")
         return RedirectResponse(url=f"/participants/{participant_id}/edit?error=invalid_data", status_code=303)
 
@@ -1278,6 +1285,7 @@ async def update_participant(
 
 @router.post("/{participant_id}/delete")
 async def delete_participant(
+    request: Request,
     participant_id: int,
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id)
@@ -1289,25 +1297,28 @@ async def delete_participant(
     ).first()
 
     if not participant:
-        raise HTTPException(status_code=404, detail="Teilnehmer nicht gefunden")
+        flash(request, "Teilnehmer nicht gefunden", "error")
+        return RedirectResponse(url="/participants", status_code=303)
 
     try:
         participant_name = participant.full_name
         db.delete(participant)
         db.commit()
         logger.info(f"Participant deleted: {participant_name} (ID: {participant_id})")
-        # Note: Flash-Message kann hier nicht gesetzt werden, da Request fehlt
+        flash(request, f"Teilnehmer {participant_name} wurde erfolgreich gelöscht", "success")
         return RedirectResponse(url="/participants", status_code=303)
 
     except IntegrityError as e:
         db.rollback()
-        logger.error(f"Cannot delete participant due to integrity constraint: {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail="Teilnehmer kann nicht gelöscht werden, da noch Zahlungen oder andere Verknüpfungen existieren")
+        logger.exception(f"Cannot delete participant due to integrity constraint: {e}")
+        flash(request, "Teilnehmer kann nicht gelöscht werden, da noch Zahlungen oder andere Verknüpfungen existieren", "error")
+        return RedirectResponse(url="/participants", status_code=303)
 
     except Exception as e:
         db.rollback()
         logger.exception(f"Error deleting participant: {e}")
-        raise HTTPException(status_code=500, detail="Fehler beim Löschen")
+        flash(request, "Fehler beim Löschen des Teilnehmers", "error")
+        return RedirectResponse(url="/participants", status_code=303)
 
 @router.get("/{participant_id}/payment-qr", response_class=Response)
 async def generate_payment_qr_code(
