@@ -176,6 +176,26 @@ async def view_family(
     )
     total_paid = family_payments + member_payments
 
+    # Alle Zahlungen für die Historie sammeln (Familie + alle Teilnehmer)
+    all_payments = []
+    # Familienzahlungen
+    for payment in family.payments:
+        all_payments.append({
+            'payment': payment,
+            'type': 'Familie',
+            'name': family.name
+        })
+    # Teilnehmerzahlungen
+    for participant in family.participants:
+        for payment in participant.payments:
+            all_payments.append({
+                'payment': payment,
+                'type': 'Teilnehmer',
+                'name': participant.full_name
+            })
+    # Nach Datum sortieren (neueste zuerst)
+    all_payments.sort(key=lambda x: x['payment'].payment_date, reverse=True)
+
     return templates.TemplateResponse(
         "families/detail.html",
         {
@@ -184,7 +204,8 @@ async def view_family(
             "family": family,
             "total_price": total_price,
             "total_paid": total_paid,
-            "outstanding": total_price - total_paid
+            "outstanding": total_price - total_paid,
+            "all_payments": all_payments
         }
     )
 
