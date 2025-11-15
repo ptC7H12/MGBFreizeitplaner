@@ -1,0 +1,64 @@
+# Alembic Migrations Configuration
+# Kopiere diese Datei zu alembic.ini und passe sie an
+
+[alembic]
+# Pfad zum Migrations-Verzeichnis
+script_location = migrations
+
+# Template für neue Migration-Dateien
+file_template = %%(year)d%%(month).2d%%(day).2d_%%(hour).2d%%(minute).2d_%%(rev)s_%%(slug)s
+
+# sys.path Einträge, falls benötigt
+# prepend_sys_path = .
+
+# Timezone für Revision Timestamps
+# timezone =
+
+# max length of characters to apply to the
+# "slug" field
+# truncate_slug_length = 40
+
+# SQLAlchemy URL - wird aus .env gelesen
+sqlalchemy.url = sqlite:///./freizeit_kassen.db
+
+[post_write_hooks]
+# Format generated code with black
+# hooks = black
+# black.type = console_scripts
+# black.entrypoint = black
+# black.options = -l 100
+
+# Logging configuration
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARN
+handlers = console
+qualname =
+
+[logger_sqlalchemy]
+level = WARN
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
