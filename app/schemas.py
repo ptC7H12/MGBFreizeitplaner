@@ -2,7 +2,8 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, Union
 from datetime import date, datetime
-import re
+
+from app.utils.validators import Validators
 
 
 class ParticipantCreateSchema(BaseModel):
@@ -51,22 +52,14 @@ class ParticipantCreateSchema(BaseModel):
     @field_validator('email')
     @classmethod
     def validate_email(cls, v: Optional[str]) -> Optional[str]:
-        """Validiert die E-Mail-Adresse"""
-        if v and v.strip():
-            # Einfache E-Mail-Validierung
-            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-            if not re.match(email_pattern, v.strip()):
-                raise ValueError("Ungültige E-Mail-Adresse")
-            return v.strip()
-        return None
+        """Validiert die E-Mail-Adresse (nutzt zentrale Validators)"""
+        return Validators.validate_email(v)
 
     @field_validator('first_name', 'last_name')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        """Validiert Namen (keine Leerzeichen am Anfang/Ende)"""
-        if not v or not v.strip():
-            raise ValueError("Name darf nicht leer sein")
-        return v.strip()
+        """Validiert Namen (nutzt zentrale Validators)"""
+        return Validators.validate_name(v, "Name")
 
 
 class ParticipantUpdateSchema(ParticipantCreateSchema):
@@ -86,21 +79,14 @@ class FamilyCreateSchema(BaseModel):
     @field_validator('name')
     @classmethod
     def validate_name(cls, v: str) -> str:
-        """Validiert den Familiennamen"""
-        if not v or not v.strip():
-            raise ValueError("Familienname darf nicht leer sein")
-        return v.strip()
+        """Validiert den Familiennamen (nutzt zentrale Validators)"""
+        return Validators.validate_name(v, "Familienname")
 
     @field_validator('email')
     @classmethod
     def validate_email(cls, v: Optional[str]) -> Optional[str]:
-        """Validiert die E-Mail-Adresse"""
-        if v and v.strip():
-            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-            if not re.match(email_pattern, v.strip()):
-                raise ValueError("Ungültige E-Mail-Adresse")
-            return v.strip()
-        return None
+        """Validiert die E-Mail-Adresse (nutzt zentrale Validators)"""
+        return Validators.validate_email(v)
 
 
 class FamilyUpdateSchema(FamilyCreateSchema):
@@ -214,43 +200,17 @@ class SettingUpdateSchema(BaseModel):
     @field_validator('organization_name', 'bank_account_holder')
     @classmethod
     def validate_required_text(cls, v: str) -> str:
-        """Validiert Pflicht-Textfelder"""
-        if not v or not v.strip():
-            raise ValueError("Feld darf nicht leer sein")
-        return v.strip()
+        """Validiert Pflicht-Textfelder (nutzt zentrale Validators)"""
+        return Validators.validate_required_text(v, "Feld")
 
     @field_validator('bank_iban')
     @classmethod
     def validate_iban(cls, v: str) -> str:
-        """Validiert die IBAN"""
-        if not v or not v.strip():
-            raise ValueError("IBAN darf nicht leer sein")
-
-        # Leerzeichen entfernen für Validierung
-        iban = v.strip().replace(" ", "")
-
-        # IBAN muss mit 2 Buchstaben beginnen, gefolgt von Ziffern
-        iban_pattern = r'^[A-Z]{2}[0-9]{2}[A-Z0-9]+$'
-        if not re.match(iban_pattern, iban):
-            raise ValueError("Ungültige IBAN (Format: DE89370400440532013000)")
-
-        # Länge prüfen (15-34 Zeichen)
-        if len(iban) < 15 or len(iban) > 34:
-            raise ValueError("IBAN muss zwischen 15 und 34 Zeichen lang sein")
-
-        return iban  # Ohne Leerzeichen zurückgeben
+        """Validiert die IBAN (nutzt zentrale Validators)"""
+        return Validators.validate_iban(v)
 
     @field_validator('bank_bic')
     @classmethod
     def validate_bic(cls, v: Optional[str]) -> Optional[str]:
-        """Validiert die BIC"""
-        if v and v.strip():
-            bic = v.strip().replace(" ", "")
-
-            # BIC muss 8 oder 11 Zeichen lang sein
-            bic_pattern = r'^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$'
-            if not re.match(bic_pattern, bic):
-                raise ValueError("Ungültige BIC (Format: COBADEFFXXX)")
-
-            return bic
-        return None
+        """Validiert die BIC (nutzt zentrale Validators)"""
+        return Validators.validate_bic(v)

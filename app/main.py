@@ -1,4 +1,5 @@
 """Hauptanwendung für das Freizeit-Kassen-System"""
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -7,53 +8,34 @@ import logging
 import secrets
 
 from app.config import settings
+from app.logging_config import setup_logging
 from app.database import init_db
 from app.templates_config import templates
 from app.routers import dashboard, participants, families, rulesets, payments, expenses, incomes, auth, settings as settings_router, tasks, backups, cash_status
 
-# Logging konfigurieren
-logging.basicConfig(
-    level=logging.INFO if settings.debug else logging.WARNING,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+# Logging konfigurieren (strukturiert mit Datei-Rotation)
+setup_logging(debug=settings.debug)
 logger = logging.getLogger(__name__)
 
-# FastAPI App erstellen
-app = FastAPI(
-    title=settings.app_name,
-    version=settings.app_version,
-    debug=settings.debug
-)
 
-# Session Middleware hinzufügen
-# WICHTIG: In Produktion sollte der secret_key aus einer Umgebungsvariable kommen!
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.secret_key if hasattr(settings, 'secret_key') else secrets.token_urlsafe(32)
-)
-
-# Static Files mounten
-app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
-
-# Router registrieren
-app.include_router(auth.router)
-app.include_router(dashboard.router)
-app.include_router(tasks.router)
-app.include_router(participants.router)
-app.include_router(families.router)
-app.include_router(rulesets.router)
-app.include_router(payments.router)
-app.include_router(expenses.router)
-app.include_router(incomes.router)
-app.include_router(cash_status.router)
-app.include_router(settings_router.router)
-app.include_router(backups.router)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Wird beim Start der Anwendung ausgeführt"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan Context Manager für Startup und Shutdown Events.
+    Ersetzt die deprecated @app.on_event("startup") und @app.on_event("shutdown") Dekoratoren.
+    """
+    # ===== STARTUP =====
     logger.info(f"Starte {settings.app_name} v{settings.app_version}")
+
+    # Warnung wenn SECRET_KEY nicht gesetzt ist
+    if not settings.is_secret_key_from_env():
+        logger.warning("=" * 80)
+        logger.warning("⚠️  SECRET_KEY ist nicht in .env gesetzt!")
+        logger.warning("⚠️  Sessions gehen bei jedem Neustart verloren!")
+        logger.warning("⚠️  Bitte SECRET_KEY in .env setzen für persistente Sessions.")
+        logger.warning("⚠️  Generieren: python generate_secret_key.py")
+        logger.warning("=" * 80)
+
     logger.info("Initialisiere Datenbank...")
     init_db()
     logger.info("Datenbank erfolgreich initialisiert!")
@@ -74,11 +56,43 @@ async def startup_event():
     finally:
         db.close()
 
+    # App läuft...
+    yield
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Wird beim Beenden der Anwendung ausgeführt"""
+    # ===== SHUTDOWN =====
     logger.info(f"Beende {settings.app_name}")
+
+
+# FastAPI App erstellen
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    debug=settings.debug,
+    lifespan=lifespan
+)
+
+# Session Middleware hinzufügen
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.secret_key
+)
+
+# Static Files mounten
+app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
+
+# Router registrieren
+app.include_router(auth.router)
+app.include_router(dashboard.router)
+app.include_router(tasks.router)
+app.include_router(participants.router)
+app.include_router(families.router)
+app.include_router(rulesets.router)
+app.include_router(payments.router)
+app.include_router(expenses.router)
+app.include_router(incomes.router)
+app.include_router(cash_status.router)
+app.include_router(settings_router.router)
+app.include_router(backups.router)
 
 
 @app.get("/health")

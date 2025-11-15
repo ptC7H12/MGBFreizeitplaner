@@ -1,6 +1,6 @@
 """Family (Familie) Model"""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -20,8 +20,12 @@ class Family(Base):
     address = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
 
+    # Status
+    is_active = Column(Boolean, default=True, nullable=False, index=True)  # Index für Filter
+    deleted_at = Column(DateTime, nullable=True, index=True)  # Index für Soft-Delete Queries
+
     # Foreign Key
-    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -156,7 +156,10 @@ async def view_family(
     event_id: int = Depends(get_current_event_id)
 ):
     """Detailansicht einer Familie"""
-    family = db.query(Family).filter(
+    family = db.query(Family).options(
+        joinedload(Family.participants),
+        joinedload(Family.payments)
+    ).filter(
         Family.id == family_id,
         Family.event_id == event_id
     ).first()
@@ -218,7 +221,9 @@ async def edit_family_form(
     event_id: int = Depends(get_current_event_id)
 ):
     """Formular zum Bearbeiten einer Familie"""
-    family = db.query(Family).filter(
+    family = db.query(Family).options(
+        joinedload(Family.participants)
+    ).filter(
         Family.id == family_id,
         Family.event_id == event_id
     ).first()
@@ -250,7 +255,9 @@ async def update_family(
     notes: Optional[str] = Form(None)
 ):
     """Aktualisiert eine Familie"""
-    family = db.query(Family).filter(
+    family = db.query(Family).options(
+        joinedload(Family.participants)
+    ).filter(
         Family.id == family_id,
         Family.event_id == event_id
     ).first()
@@ -318,7 +325,9 @@ async def delete_family(
     event_id: int = Depends(get_current_event_id)
 ):
     """Löscht eine Familie"""
-    family = db.query(Family).filter(
+    family = db.query(Family).options(
+        joinedload(Family.participants)
+    ).filter(
         Family.id == family_id,
         Family.event_id == event_id
     ).first()
@@ -326,24 +335,22 @@ async def delete_family(
     if not family:
         raise HTTPException(status_code=404, detail="Familie nicht gefunden")
 
-    # Prüfen, ob noch Teilnehmer zugeordnet sind
-    if len(family.participants) > 0:
+    # Prüfen, ob noch aktive Teilnehmer zugeordnet sind
+    active_participants = [p for p in family.participants if p.is_active]
+    if len(active_participants) > 0:
         raise HTTPException(
             status_code=400,
-            detail="Familie kann nicht gelöscht werden, solange noch Teilnehmer zugeordnet sind"
+            detail="Familie kann nicht gelöscht werden, solange noch aktive Teilnehmer zugeordnet sind"
         )
 
     try:
         family_name = family.name
-        db.delete(family)
+        # Soft-Delete: Statt db.delete() markieren wir als gelöscht
+        family.is_active = False
+        family.deleted_at = datetime.utcnow()
         db.commit()
-        logger.info(f"Family deleted: {family_name} (ID: {family_id})")
+        logger.info(f"Family soft-deleted: {family_name} (ID: {family_id})")
         return RedirectResponse(url="/families", status_code=303)
-
-    except IntegrityError as e:
-        db.rollback()
-        logger.error(f"Cannot delete family due to integrity constraint: {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail="Familie kann nicht gelöscht werden, da noch Zahlungen oder andere Verknüpfungen existieren")
 
     except Exception as e:
         db.rollback()

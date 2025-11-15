@@ -5,7 +5,7 @@ import csv
 from io import BytesIO, StringIO
 from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
 from typing import Optional
@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
-from app.database import get_db
+from app.database import get_db, transaction
 from app.models import Participant, Role, Event, Family, Ruleset, Setting
 from app.services.price_calculator import PriceCalculator
 from app.services.qrcode_service import QRCodeService
@@ -132,7 +132,13 @@ async def list_participants(
         except ValueError:
             pass  # Ungültige ID ignorieren
 
-    participants = query.order_by(Participant.last_name).all()
+    # Eager Loading für related objects um N+1 Queries zu vermeiden
+    participants = query.options(
+        joinedload(Participant.role),
+        joinedload(Participant.family),
+        joinedload(Participant.event),
+        joinedload(Participant.payments)
+    ).order_by(Participant.last_name).all()
 
     # Für Filter-Dropdown (auch nach event_id gefiltert)
     roles = db.query(Role).filter(Role.is_active == True, Role.event_id == event_id).all()
@@ -281,9 +287,11 @@ async def create_participant(
             calculated_price=calculated_price
         )
 
-        db.add(participant)
-        db.commit()
-        db.refresh(participant)
+        # Transaction Context Manager: Auto-commit bei Erfolg, auto-rollback bei Exception
+        with transaction(db):
+            db.add(participant)
+            db.flush()  # Generiert ID ohne zu committen
+        # Auto-commit erfolgt hier
 
         flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich erstellt", "success")
         return RedirectResponse(url=f"/participants/{participant.id}", status_code=303)
@@ -940,8 +948,12 @@ async def export_participants_excel(
         if not event:
             raise HTTPException(status_code=404, detail="Event nicht gefunden")
 
-        # Alle aktiven Teilnehmer laden
-        all_participants = db.query(Participant).filter(
+        # Alle aktiven Teilnehmer laden mit Eager Loading
+        all_participants = db.query(Participant).options(
+            joinedload(Participant.role),
+            joinedload(Participant.family),
+            joinedload(Participant.payments)
+        ).filter(
             Participant.event_id == event_id,
             Participant.is_active == True
         ).order_by(Participant.last_name, Participant.first_name).all()
@@ -1114,7 +1126,12 @@ async def view_participant(
     event_id: int = Depends(get_current_event_id)
 ):
     """Detailansicht eines Teilnehmers"""
-    participant = db.query(Participant).filter(
+    participant = db.query(Participant).options(
+        joinedload(Participant.role),
+        joinedload(Participant.family),
+        joinedload(Participant.event),
+        joinedload(Participant.payments)
+    ).filter(
         Participant.id == participant_id,
         Participant.event_id == event_id
     ).first()
@@ -1145,7 +1162,11 @@ async def edit_participant_form(
     event_id: int = Depends(get_current_event_id)
 ):
     """Formular zum Bearbeiten eines Teilnehmers"""
-    participant = db.query(Participant).filter(
+    participant = db.query(Participant).options(
+        joinedload(Participant.role),
+        joinedload(Participant.family),
+        joinedload(Participant.event)
+    ).filter(
         Participant.id == participant_id,
         Participant.event_id == event_id
     ).first()
@@ -1194,7 +1215,10 @@ async def update_participant(
     family_id: Optional[int] = Form(None)
 ):
     """Aktualisiert einen Teilnehmer"""
-    participant = db.query(Participant).filter(
+    participant = db.query(Participant).options(
+        joinedload(Participant.role),
+        joinedload(Participant.family)
+    ).filter(
         Participant.id == participant_id,
         Participant.event_id == event_id
     ).first()
@@ -1302,16 +1326,12 @@ async def delete_participant(
 
     try:
         participant_name = participant.full_name
-        db.delete(participant)
+        # Soft-Delete: Statt db.delete() markieren wir als gelöscht
+        participant.is_active = False
+        participant.deleted_at = datetime.utcnow()
         db.commit()
-        logger.info(f"Participant deleted: {participant_name} (ID: {participant_id})")
+        logger.info(f"Participant soft-deleted: {participant_name} (ID: {participant_id})")
         flash(request, f"Teilnehmer {participant_name} wurde erfolgreich gelöscht", "success")
-        return RedirectResponse(url="/participants", status_code=303)
-
-    except IntegrityError as e:
-        db.rollback()
-        logger.exception(f"Cannot delete participant due to integrity constraint: {e}")
-        flash(request, "Teilnehmer kann nicht gelöscht werden, da noch Zahlungen oder andere Verknüpfungen existieren", "error")
         return RedirectResponse(url="/participants", status_code=303)
 
     except Exception as e:
