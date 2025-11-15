@@ -153,6 +153,15 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
                     })
 
     # 10. Zuschuss-Validierung (prüfe ob Einnahmen mit Rabatten übereinstimmen)
+    # Hole das Regelwerk für diesen Event
+    from app.models import Ruleset
+    from app.services.price_calculator import PriceCalculator
+
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.event_id == event_id,
+        Ruleset.is_active == True
+    ).first()
+
     # Hole alle Einnahmen mit Rollenverknüpfung
     role_incomes = db.query(
         Role.id,
@@ -178,26 +187,20 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
         ).all()
 
         expected_discounts = 0.0
-        for participant in participants_with_role:
-            if participant.calculated_price and participant.base_price:
-                # Rabatt = Basispreis - berechneter Preis (enthält alle Rabatte)
-                # Wir müssen den Rollenrabatt isolieren
-                # Da alle Rabatte vom Basispreis berechnet werden, müssen wir anders vorgehen
+        if ruleset and ruleset.data:
+            role_discounts = ruleset.data.get("role_discounts", {})
+            age_groups = ruleset.data.get("age_groups", [])
 
-                # Hole das Regelwerk für diesen Event
-                from app.models import Ruleset
-                ruleset = db.query(Ruleset).filter(
-                    Ruleset.event_id == event_id,
-                    Ruleset.is_active == True
-                ).first()
+            for participant in participants_with_role:
+                if participant.calculated_price and participant.age_at_event is not None:
+                    # Berechne Basispreis aus Altersgruppen
+                    base_price = PriceCalculator._get_base_price_by_age(participant.age_at_event, age_groups)
 
-                if ruleset and ruleset.data:
-                    role_discounts = ruleset.data.get("role_discounts", {})
+                    # Hole Rollenrabatt-Prozentsatz
                     role_name_lower = participant.role.name.lower() if participant.role else ""
-
                     if role_name_lower in role_discounts:
                         discount_percent = role_discounts[role_name_lower].get("discount_percent", 0)
-                        role_discount_amount = participant.base_price * (discount_percent / 100)
+                        role_discount_amount = base_price * (discount_percent / 100)
                         expected_discounts += role_discount_amount
 
         # Berechne Differenz
