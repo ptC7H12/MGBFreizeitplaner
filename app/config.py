@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # App-Grundeinstellungen
     app_name: str = "Freizeit-Kassen-System"
     app_version: str = "0.1.0"
-    debug: bool = True
+    debug: bool = False  # In Entwicklung: DEBUG=true in .env setzen
 
     # Datenbank
     database_url: str = "sqlite:///./freizeit_kassen.db"
