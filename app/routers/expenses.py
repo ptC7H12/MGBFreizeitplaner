@@ -1,7 +1,8 @@
 """Expenses (Ausgaben) Router"""
 import logging
-from fastapi import APIRouter, Request, Depends, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from pathlib import Path
+from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
@@ -13,6 +14,7 @@ from app.models import Expense, Event
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
+from app.utils.file_upload import save_receipt_file, delete_receipt_file
 from app.schemas import ExpenseCreateSchema, ExpenseUpdateSchema
 from app.templates_config import templates
 
@@ -86,6 +88,7 @@ async def create_expense(
     receipt_number: Optional[str] = Form(None),
     paid_by: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
+    receipt_file: Optional[UploadFile] = File(None),
 ):
     """Erstellt eine neue Ausgabe"""
     try:
@@ -117,6 +120,23 @@ async def create_expense(
         db.add(expense)
         db.commit()
         db.refresh(expense)
+
+        # Beleg-Upload verarbeiten (falls vorhanden)
+        if receipt_file and receipt_file.filename:
+            file_path, error = await save_receipt_file(
+                receipt_file,
+                event_id,
+                expense.id,
+                "expenses"
+            )
+
+            if error:
+                logger.warning(f"Failed to upload receipt for expense {expense.id}: {error}")
+                flash(request, f"Ausgabe erstellt, aber Beleg-Upload fehlgeschlagen: {error}", "warning")
+            else:
+                expense.receipt_file_path = file_path
+                db.commit()
+                logger.info(f"Receipt uploaded for expense {expense.id}: {file_path}")
 
         flash(request, f"Ausgabe '{expense.title}' über {expense_data.amount}€ wurde erfolgreich erfasst", "success")
         return RedirectResponse(url="/expenses", status_code=303)
@@ -185,6 +205,8 @@ async def update_expense(
     receipt_number: Optional[str] = Form(None),
     paid_by: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
+    receipt_file: Optional[UploadFile] = File(None),
+    remove_receipt: Optional[str] = Form(None),
 ):
     """Aktualisiert eine Ausgabe"""
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
@@ -214,6 +236,33 @@ async def update_expense(
         expense.receipt_number = expense_data.receipt_number
         expense.paid_by = expense_data.paid_by
         expense.notes = expense_data.notes
+
+        # Beleg entfernen, falls gewünscht
+        if remove_receipt == "true" and expense.receipt_file_path:
+            delete_receipt_file(expense.receipt_file_path)
+            expense.receipt_file_path = None
+            logger.info(f"Receipt removed from expense {expense_id}")
+
+        # Neuen Beleg hochladen, falls vorhanden
+        if receipt_file and receipt_file.filename:
+            # Alten Beleg löschen
+            if expense.receipt_file_path:
+                delete_receipt_file(expense.receipt_file_path)
+
+            # Neuen Beleg speichern
+            file_path, error = await save_receipt_file(
+                receipt_file,
+                expense.event_id,
+                expense.id,
+                "expenses"
+            )
+
+            if error:
+                logger.warning(f"Failed to upload receipt for expense {expense.id}: {error}")
+                flash(request, f"Ausgabe aktualisiert, aber Beleg-Upload fehlgeschlagen: {error}", "warning")
+            else:
+                expense.receipt_file_path = file_path
+                logger.info(f"Receipt updated for expense {expense.id}: {file_path}")
 
         db.commit()
 
@@ -302,6 +351,41 @@ async def toggle_settled(expense_id: int, db: Session = Depends(get_db), event_i
         raise HTTPException(status_code=500, detail=f"Fehler beim Aktualisieren: {str(e)}")
 
 
+@router.get("/{expense_id}/receipt/download")
+async def download_expense_receipt(expense_id: int, db: Session = Depends(get_db)):
+    """Lädt den Beleg einer Ausgabe herunter"""
+    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+
+    if not expense:
+        raise HTTPException(status_code=404, detail="Ausgabe nicht gefunden")
+
+    if not expense.receipt_file_path:
+        raise HTTPException(status_code=404, detail="Kein Beleg vorhanden")
+
+    file_path = Path(expense.receipt_file_path)
+
+    if not file_path.exists():
+        logger.error(f"Receipt file not found: {expense.receipt_file_path}")
+        raise HTTPException(status_code=404, detail="Beleg-Datei wurde nicht gefunden")
+
+    # MIME-Type basierend auf Dateiendung
+    mime_type = "application/octet-stream"
+    if file_path.suffix.lower() == '.pdf':
+        mime_type = "application/pdf"
+    elif file_path.suffix.lower() in ['.jpg', '.jpeg']:
+        mime_type = "image/jpeg"
+    elif file_path.suffix.lower() == '.png':
+        mime_type = "image/png"
+
+    logger.info(f"Downloading receipt for expense {expense_id}: {expense.receipt_file_path}")
+
+    return FileResponse(
+        path=file_path,
+        media_type=mime_type,
+        filename=file_path.name
+    )
+
+
 @router.post("/{expense_id}/delete")
 async def delete_expense(expense_id: int, db: Session = Depends(get_db)):
     """Löscht eine Ausgabe"""
@@ -312,6 +396,12 @@ async def delete_expense(expense_id: int, db: Session = Depends(get_db)):
 
     try:
         expense_title = expense.title
+
+        # Beleg löschen, falls vorhanden
+        if expense.receipt_file_path:
+            delete_receipt_file(expense.receipt_file_path)
+            logger.info(f"Receipt deleted for expense {expense_id}")
+
         db.delete(expense)
         db.commit()
         logger.info(f"Expense deleted: {expense_title} (ID: {expense_id})")
