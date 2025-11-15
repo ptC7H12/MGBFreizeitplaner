@@ -9,8 +9,23 @@ from app.services.ruleset_parser import RulesetParser
 
 def create_demo_data(db: Session):
     """
-    Erstellt Demo-Daten beim ersten Start der Anwendung
-    Diese Funktion wird nur ausgeführt, wenn keine Events vorhanden sind
+    Erstellt Demo-Daten beim ersten Start der Anwendung.
+
+    Diese Funktion erstellt ein komplettes Demo-Setup mit:
+    - Event (Sommerfreizeit 2024)
+    - Systemeinstellungen
+    - Regelwerk aus JSON-Datei
+    - Rollen (Kinder, Jugendliche, Erwachsene, Betreuer)
+    - Demo-Familien mit Teilnehmern
+    - Beispiel-Zahlungen und Ausgaben
+
+    Args:
+        db: Datenbank-Session
+
+    Note:
+        - Wird nur beim ersten Start ausgeführt (wenn keine Events existieren)
+        - Aufgerufen in app/main.py im lifespan startup
+        - Ruleset wird aus rulesets/default.json geladen
     """
     # 1. Event erstellen
     event = Event(
