@@ -21,7 +21,7 @@ class Participant(Base):
     gender = Column(String(20), nullable=True)  # "männlich", "weiblich"
 
     # Kontaktdaten
-    email = Column(String(200), nullable=True)
+    email = Column(String(200), nullable=True, index=True)  # Index für Suche
     phone = Column(String(50), nullable=True)
     address = Column(Text, nullable=True)
 
@@ -38,14 +38,14 @@ class Participant(Base):
     discount_reason = Column(String(200), nullable=True)
 
     # Status
-    is_active = Column(Boolean, default=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)  # Index für Filter
     registration_date = Column(Date, default=date.today, nullable=False)
-    deleted_at = Column(DateTime, nullable=True)  # Soft-Delete: Zeitpunkt der Löschung
+    deleted_at = Column(DateTime, nullable=True, index=True)  # Index für Soft-Delete Queries
 
     # Foreign Keys
-    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
-    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
-    family_id = Column(Integer, ForeignKey("families.id"), nullable=True)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False, index=True)
+    family_id = Column(Integer, ForeignKey("families.id"), nullable=True, index=True)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

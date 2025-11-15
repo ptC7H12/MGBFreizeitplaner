@@ -21,11 +21,11 @@ class Family(Base):
     notes = Column(Text, nullable=True)
 
     # Status
-    is_active = Column(Boolean, default=True, nullable=False)
-    deleted_at = Column(DateTime, nullable=True)  # Soft-Delete: Zeitpunkt der Löschung
+    is_active = Column(Boolean, default=True, nullable=False, index=True)  # Index für Filter
+    deleted_at = Column(DateTime, nullable=True, index=True)  # Index für Soft-Delete Queries
 
     # Foreign Key
-    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
