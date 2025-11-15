@@ -8,15 +8,13 @@ import logging
 import secrets
 
 from app.config import settings
+from app.logging_config import setup_logging
 from app.database import init_db
 from app.templates_config import templates
 from app.routers import dashboard, participants, families, rulesets, payments, expenses, incomes, auth, settings as settings_router, tasks, backups, cash_status
 
-# Logging konfigurieren
-logging.basicConfig(
-    level=logging.INFO if settings.debug else logging.WARNING,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+# Logging konfigurieren (strukturiert mit Datei-Rotation)
+setup_logging(debug=settings.debug)
 logger = logging.getLogger(__name__)
 
 
