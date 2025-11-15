@@ -156,7 +156,10 @@ async def view_family(
     event_id: int = Depends(get_current_event_id)
 ):
     """Detailansicht einer Familie"""
-    family = db.query(Family).filter(
+    family = db.query(Family).options(
+        joinedload(Family.participants),
+        joinedload(Family.payments)
+    ).filter(
         Family.id == family_id,
         Family.event_id == event_id
     ).first()
@@ -218,7 +221,9 @@ async def edit_family_form(
     event_id: int = Depends(get_current_event_id)
 ):
     """Formular zum Bearbeiten einer Familie"""
-    family = db.query(Family).filter(
+    family = db.query(Family).options(
+        joinedload(Family.participants)
+    ).filter(
         Family.id == family_id,
         Family.event_id == event_id
     ).first()
@@ -250,7 +255,9 @@ async def update_family(
     notes: Optional[str] = Form(None)
 ):
     """Aktualisiert eine Familie"""
-    family = db.query(Family).filter(
+    family = db.query(Family).options(
+        joinedload(Family.participants)
+    ).filter(
         Family.id == family_id,
         Family.event_id == event_id
     ).first()
@@ -318,7 +325,9 @@ async def delete_family(
     event_id: int = Depends(get_current_event_id)
 ):
     """Löscht eine Familie"""
-    family = db.query(Family).filter(
+    family = db.query(Family).options(
+        joinedload(Family.participants)
+    ).filter(
         Family.id == family_id,
         Family.event_id == event_id
     ).first()

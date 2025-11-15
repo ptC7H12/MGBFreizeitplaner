@@ -1,7 +1,7 @@
 """Dashboard Router"""
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, extract
 from datetime import date, timedelta
 
@@ -48,7 +48,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db), event_id: i
 @router.get("/api/age-distribution", response_class=JSONResponse)
 async def get_age_distribution(db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
     """API: Altersverteilung der Teilnehmer"""
-    participants = db.query(Participant).filter(
+    participants = db.query(Participant).options(
+        joinedload(Participant.event)
+    ).filter(
         Participant.event_id == event_id,
         Participant.is_active == True
     ).all()

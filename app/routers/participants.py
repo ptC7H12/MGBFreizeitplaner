@@ -5,7 +5,7 @@ import csv
 from io import BytesIO, StringIO
 from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
 from typing import Optional
@@ -132,7 +132,13 @@ async def list_participants(
         except ValueError:
             pass  # Ungültige ID ignorieren
 
-    participants = query.order_by(Participant.last_name).all()
+    # Eager Loading für related objects um N+1 Queries zu vermeiden
+    participants = query.options(
+        joinedload(Participant.role),
+        joinedload(Participant.family),
+        joinedload(Participant.event),
+        joinedload(Participant.payments)
+    ).order_by(Participant.last_name).all()
 
     # Für Filter-Dropdown (auch nach event_id gefiltert)
     roles = db.query(Role).filter(Role.is_active == True, Role.event_id == event_id).all()
@@ -940,8 +946,12 @@ async def export_participants_excel(
         if not event:
             raise HTTPException(status_code=404, detail="Event nicht gefunden")
 
-        # Alle aktiven Teilnehmer laden
-        all_participants = db.query(Participant).filter(
+        # Alle aktiven Teilnehmer laden mit Eager Loading
+        all_participants = db.query(Participant).options(
+            joinedload(Participant.role),
+            joinedload(Participant.family),
+            joinedload(Participant.payments)
+        ).filter(
             Participant.event_id == event_id,
             Participant.is_active == True
         ).order_by(Participant.last_name, Participant.first_name).all()
@@ -1114,7 +1124,12 @@ async def view_participant(
     event_id: int = Depends(get_current_event_id)
 ):
     """Detailansicht eines Teilnehmers"""
-    participant = db.query(Participant).filter(
+    participant = db.query(Participant).options(
+        joinedload(Participant.role),
+        joinedload(Participant.family),
+        joinedload(Participant.event),
+        joinedload(Participant.payments)
+    ).filter(
         Participant.id == participant_id,
         Participant.event_id == event_id
     ).first()
@@ -1145,7 +1160,11 @@ async def edit_participant_form(
     event_id: int = Depends(get_current_event_id)
 ):
     """Formular zum Bearbeiten eines Teilnehmers"""
-    participant = db.query(Participant).filter(
+    participant = db.query(Participant).options(
+        joinedload(Participant.role),
+        joinedload(Participant.family),
+        joinedload(Participant.event)
+    ).filter(
         Participant.id == participant_id,
         Participant.event_id == event_id
     ).first()
@@ -1194,7 +1213,10 @@ async def update_participant(
     family_id: Optional[int] = Form(None)
 ):
     """Aktualisiert einen Teilnehmer"""
-    participant = db.query(Participant).filter(
+    participant = db.query(Participant).options(
+        joinedload(Participant.role),
+        joinedload(Participant.family)
+    ).filter(
         Participant.id == participant_id,
         Participant.event_id == event_id
     ).first()
