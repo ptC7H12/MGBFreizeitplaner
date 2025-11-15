@@ -14,6 +14,7 @@ class Income(Base):
     amount = Column(Float, nullable=False)
     date = Column(Date, nullable=False)
     description = Column(Text, nullable=True)
+    receipt_file_path = Column(String(500), nullable=True)  # Pfad zum hochgeladenen Beleg (PDF/Bild)
 
     # Optional: Verknüpfung mit Rolle (z.B. "50% Zuschuss für alle Kinder")
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=True, index=True)

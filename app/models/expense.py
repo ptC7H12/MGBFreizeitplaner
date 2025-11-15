@@ -22,6 +22,7 @@ class Expense(Base):
     paid_by = Column(String(200), nullable=True)  # Wer hat die Ausgabe vorgestreckt (falls zutreffend)
     is_settled = Column(Boolean, default=False, nullable=False)  # Wurde die Ausgabe beglichen/erstattet?
     notes = Column(Text, nullable=True)
+    receipt_file_path = Column(String(500), nullable=True)  # Pfad zum hochgeladenen Beleg (PDF/Bild)
 
     # Foreign Key
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False)

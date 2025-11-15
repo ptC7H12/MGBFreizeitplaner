@@ -1,15 +1,21 @@
 """Router für Einnahmen (Zuschüsse, Spenden, etc.)"""
-from fastapi import APIRouter, Request, Depends, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+import logging
+from pathlib import Path
+from fastapi import APIRouter, Request, Depends, Form, HTTPException, UploadFile, File
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from sqlalchemy.orm import Session, joinedload
 from datetime import date as date_type
+from typing import Optional
 
 from app.database import get_db
 from app.models.income import Income
 from app.models.role import Role
 from app.dependencies import get_current_event_id
 from app.utils.flash import flash
+from app.utils.file_upload import save_receipt_file, delete_receipt_file
 from app.templates_config import templates
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/incomes", tags=["incomes"])
 
@@ -82,6 +88,7 @@ async def create_income(
     date: date_type = Form(...),
     description: str = Form(None),
     role_id: int = Form(None),
+    receipt_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id)
 ):
@@ -104,6 +111,24 @@ async def create_income(
 
     db.add(income)
     db.commit()
+    db.refresh(income)
+
+    # Beleg-Upload verarbeiten (falls vorhanden)
+    if receipt_file and receipt_file.filename:
+        file_path, error = await save_receipt_file(
+            receipt_file,
+            event_id,
+            income.id,
+            "incomes"
+        )
+
+        if error:
+            logger.warning(f"Failed to upload receipt for income {income.id}: {error}")
+            flash(request, f"Einnahme erstellt, aber Beleg-Upload fehlgeschlagen: {error}", "warning")
+        else:
+            income.receipt_file_path = file_path
+            db.commit()
+            logger.info(f"Receipt uploaded for income {income.id}: {file_path}")
 
     flash(request, f"Einnahme '{name}' erfolgreich erstellt", "success")
     return RedirectResponse(url="/incomes", status_code=303)
@@ -142,6 +167,8 @@ async def update_income(
     date: date_type = Form(...),
     description: str = Form(None),
     role_id: int = Form(None),
+    receipt_file: Optional[UploadFile] = File(None),
+    remove_receipt: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id)
 ):
@@ -163,10 +190,72 @@ async def update_income(
     income.description = description
     income.role_id = role_id if role_id else None
 
+    # Beleg entfernen, falls gewünscht
+    if remove_receipt == "true" and income.receipt_file_path:
+        delete_receipt_file(income.receipt_file_path)
+        income.receipt_file_path = None
+        logger.info(f"Receipt removed from income {income_id}")
+
+    # Neuen Beleg hochladen, falls vorhanden
+    if receipt_file and receipt_file.filename:
+        # Alten Beleg löschen
+        if income.receipt_file_path:
+            delete_receipt_file(income.receipt_file_path)
+
+        # Neuen Beleg speichern
+        file_path, error = await save_receipt_file(
+            receipt_file,
+            event_id,
+            income.id,
+            "incomes"
+        )
+
+        if error:
+            logger.warning(f"Failed to upload receipt for income {income.id}: {error}")
+            flash(request, f"Einnahme aktualisiert, aber Beleg-Upload fehlgeschlagen: {error}", "warning")
+        else:
+            income.receipt_file_path = file_path
+            logger.info(f"Receipt updated for income {income.id}: {file_path}")
+
     db.commit()
 
     flash(request, f"Einnahme '{name}' erfolgreich aktualisiert", "success")
     return RedirectResponse(url="/incomes", status_code=303)
+
+
+@router.get("/{income_id}/receipt/download")
+async def download_income_receipt(income_id: int, db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
+    """Lädt den Beleg einer Einnahme herunter"""
+    income = db.query(Income).filter(Income.id == income_id, Income.event_id == event_id).first()
+
+    if not income:
+        raise HTTPException(status_code=404, detail="Einnahme nicht gefunden")
+
+    if not income.receipt_file_path:
+        raise HTTPException(status_code=404, detail="Kein Beleg vorhanden")
+
+    file_path = Path(income.receipt_file_path)
+
+    if not file_path.exists():
+        logger.error(f"Receipt file not found: {income.receipt_file_path}")
+        raise HTTPException(status_code=404, detail="Beleg-Datei wurde nicht gefunden")
+
+    # MIME-Type basierend auf Dateiendung
+    mime_type = "application/octet-stream"
+    if file_path.suffix.lower() == '.pdf':
+        mime_type = "application/pdf"
+    elif file_path.suffix.lower() in ['.jpg', '.jpeg']:
+        mime_type = "image/jpeg"
+    elif file_path.suffix.lower() == '.png':
+        mime_type = "image/png"
+
+    logger.info(f"Downloading receipt for income {income_id}: {income.receipt_file_path}")
+
+    return FileResponse(
+        path=file_path,
+        media_type=mime_type,
+        filename=file_path.name
+    )
 
 
 @router.post("/{income_id}/delete")
@@ -182,6 +271,12 @@ async def delete_income(
         raise HTTPException(status_code=404, detail="Einnahme nicht gefunden")
 
     name = income.name
+
+    # Beleg löschen, falls vorhanden
+    if income.receipt_file_path:
+        delete_receipt_file(income.receipt_file_path)
+        logger.info(f"Receipt deleted for income {income_id}")
+
     db.delete(income)
     db.commit()
 
