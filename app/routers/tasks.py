@@ -187,9 +187,9 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
         ).all()
 
         expected_discounts = 0.0
-        if ruleset and ruleset.data:
-            role_discounts = ruleset.data.get("role_discounts", {})
-            age_groups = ruleset.data.get("age_groups", [])
+        if ruleset and ruleset.age_groups:
+            role_discounts = ruleset.role_discounts or {}
+            age_groups = ruleset.age_groups or []
 
             for participant in participants_with_role:
                 if participant.calculated_price and participant.age_at_event is not None:
