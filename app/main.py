@@ -26,10 +26,9 @@ app = FastAPI(
 )
 
 # Session Middleware hinzufügen
-# WICHTIG: In Produktion sollte der secret_key aus einer Umgebungsvariable kommen!
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.secret_key if hasattr(settings, 'secret_key') else secrets.token_urlsafe(32)
+    secret_key=settings.secret_key
 )
 
 # Static Files mounten
@@ -54,6 +53,16 @@ app.include_router(backups.router)
 async def startup_event():
     """Wird beim Start der Anwendung ausgeführt"""
     logger.info(f"Starte {settings.app_name} v{settings.app_version}")
+
+    # Warnung wenn SECRET_KEY nicht gesetzt ist
+    if not settings.is_secret_key_from_env():
+        logger.warning("=" * 80)
+        logger.warning("⚠️  SECRET_KEY ist nicht in .env gesetzt!")
+        logger.warning("⚠️  Sessions gehen bei jedem Neustart verloren!")
+        logger.warning("⚠️  Bitte SECRET_KEY in .env setzen für persistente Sessions.")
+        logger.warning("⚠️  Generieren: python generate_secret_key.py")
+        logger.warning("=" * 80)
+
     logger.info("Initialisiere Datenbank...")
     init_db()
     logger.info("Datenbank erfolgreich initialisiert!")

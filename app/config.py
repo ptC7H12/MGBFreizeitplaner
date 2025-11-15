@@ -1,5 +1,6 @@
 """Konfiguration für das Freizeit-Kassen-System"""
 import secrets
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 from pathlib import Path
@@ -39,6 +40,10 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False
     )
+
+    def is_secret_key_from_env(self) -> bool:
+        """Prüft ob SECRET_KEY aus Umgebungsvariable gesetzt wurde"""
+        return bool(os.getenv("SECRET_KEY"))
 
 
 settings = Settings()
