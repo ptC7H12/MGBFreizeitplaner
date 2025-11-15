@@ -802,8 +802,10 @@ async def confirm_import(
             if not members:
                 continue
 
-            # Ersten Teilnehmer der Familie nehmen für Familiennamen
-            first_member = members[0]
+            # Ersten Teilnehmer der Familie nehmen für Familiennamen (sortiert nach Zeilennummer)
+            # Damit ist sichergestellt, dass der erste in der Excel/CSV auch als erster verwendet wird
+            sorted_members = sorted(members, key=lambda m: m.get('row', 0))
+            first_member = sorted_members[0]
             family_name = f"{first_member['last_name']} {first_member['first_name']}"
 
             # Familie erstellen
