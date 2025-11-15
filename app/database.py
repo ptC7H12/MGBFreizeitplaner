@@ -1,7 +1,8 @@
 """Datenbank-Setup und Session-Management"""
+from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 from app.config import settings
 
@@ -29,6 +30,32 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+@contextmanager
+def transaction(db: Session):
+    """
+    Context Manager für sichere Datenbank-Transaktionen.
+
+    Verwendung:
+        with transaction(db):
+            db.add(participant)
+            db.flush()  # Für ID-Generierung
+            # Weitere Operationen...
+        # Auto-commit bei Erfolg, auto-rollback bei Exception
+
+    Vorteil:
+        - Automatisches commit() bei Erfolg
+        - Automatisches rollback() bei Exceptions
+        - Keine vergessenen commits/rollbacks mehr
+        - Sauberere Code-Struktur
+    """
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def init_db():

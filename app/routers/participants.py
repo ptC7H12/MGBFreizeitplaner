@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
-from app.database import get_db
+from app.database import get_db, transaction
 from app.models import Participant, Role, Event, Family, Ruleset, Setting
 from app.services.price_calculator import PriceCalculator
 from app.services.qrcode_service import QRCodeService
@@ -287,9 +287,11 @@ async def create_participant(
             calculated_price=calculated_price
         )
 
-        db.add(participant)
-        db.commit()
-        db.refresh(participant)
+        # Transaction Context Manager: Auto-commit bei Erfolg, auto-rollback bei Exception
+        with transaction(db):
+            db.add(participant)
+            db.flush()  # Generiert ID ohne zu committen
+        # Auto-commit erfolgt hier
 
         flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich erstellt", "success")
         return RedirectResponse(url=f"/participants/{participant.id}", status_code=303)
