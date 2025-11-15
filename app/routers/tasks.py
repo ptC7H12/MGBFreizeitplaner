@@ -48,7 +48,9 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
         "manual_price_override": [],
         "overdue_payments": [],
         "income_subsidy_mismatch": [],
-        "role_count_exceeded": []
+        "role_count_exceeded": [],
+        "birthday_gifts": [],
+        "kitchen_team_gift": []
     }
 
     # 1. Bildung & Teilhabe IDs vorhanden (müssen beantragt werden)
@@ -257,6 +259,76 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
                                 "max_count": max_count,
                                 "excess_count": excess_count
                             })
+
+    # 12. Geschenke für Geburtstagskinder während der Freizeit
+    if event and event.start_date and event.end_date:
+        # Finde alle Teilnehmer, die während der Freizeit Geburtstag haben
+        all_participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True,
+            Participant.birth_date.isnot(None)
+        ).all()
+
+        birthday_children = []
+        for participant in all_participants:
+            # Prüfe, ob der Geburtstag (Tag und Monat) im Event-Zeitraum liegt
+            birth_month = participant.birth_date.month
+            birth_day = participant.birth_date.day
+
+            # Erstelle Datumsobjekte für Vergleich (mit Event-Jahr)
+            try:
+                birthday_this_year = date(event.start_date.year, birth_month, birth_day)
+
+                # Prüfe, ob Geburtstag im Event-Zeitraum liegt
+                if event.start_date <= birthday_this_year <= event.end_date:
+                    birthday_children.append({
+                        "name": participant.full_name,
+                        "date": birthday_this_year,
+                        "age": participant.age_at_event + 1  # Alter nach Geburtstag
+                    })
+            except ValueError:
+                # Ungültiges Datum (z.B. 29. Februar in Nicht-Schaltjahr)
+                continue
+
+        if birthday_children and not is_task_completed(completed_tasks, "birthday_gifts", event_id):
+            # Sortiere nach Geburtsdatum
+            birthday_children.sort(key=lambda x: x["date"])
+
+            # Erstelle Liste der Namen
+            names_list = ", ".join([f"{child['name']} ({child['date'].strftime('%d.%m.')})" for child in birthday_children])
+
+            tasks["birthday_gifts"].append({
+                "id": event_id,
+                "title": f"Geschenke für {len(birthday_children)} Geburtstagskind(er)",
+                "description": f"Geburtstagskinder während der Freizeit: {names_list}",
+                "link": f"/participants",
+                "task_type": "birthday_gifts",
+                "count": len(birthday_children)
+            })
+
+    # 13. Geschenk für das Küchenteam
+    # Finde Rolle "Küche" (verschiedene mögliche Namen)
+    kitchen_role_names = ["kueche", "küche", "kitchen"]
+    kitchen_participants = db.query(Participant).join(
+        Role, Participant.role_id == Role.id
+    ).filter(
+        Participant.event_id == event_id,
+        Participant.is_active == True,
+        Role.name.in_(kitchen_role_names)
+    ).all()
+
+    if kitchen_participants and not is_task_completed(completed_tasks, "kitchen_team_gift", event_id):
+        # Erstelle Liste der Namen
+        names_list = ", ".join([p.full_name for p in kitchen_participants])
+
+        tasks["kitchen_team_gift"].append({
+            "id": event_id,
+            "title": f"Geschenk für das Küchenteam ({len(kitchen_participants)} Personen)",
+            "description": f"Küchenteam-Mitglieder: {names_list}",
+            "link": f"/participants?role_id={kitchen_participants[0].role_id if kitchen_participants else ''}",
+            "task_type": "kitchen_team_gift",
+            "count": len(kitchen_participants)
+        })
 
     # Zähle Gesamtaufgaben
     total_tasks = sum(len(task_list) for task_list in tasks.values())

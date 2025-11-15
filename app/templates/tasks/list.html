@@ -285,6 +285,82 @@
 </div>
 {% endif %}
 
+<!-- Geschenke für Geburtstagskinder -->
+{% if tasks.birthday_gifts|length > 0 %}
+<div class="bg-white shadow rounded-lg p-6 mb-6">
+    <div class="flex items-center mb-4">
+        <svg class="h-6 w-6 text-pink-600 mr-3" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
+        </svg>
+        <h2 class="text-lg font-semibold text-gray-900">Geschenke für Geburtstagskinder</h2>
+        <span class="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 text-pink-800">
+            {{ tasks.birthday_gifts|length }}
+        </span>
+    </div>
+    <p class="text-sm text-gray-600 mb-4">Teilnehmer, die während der Freizeit Geburtstag haben.</p>
+    <div class="space-y-3">
+        {% for task in tasks.birthday_gifts %}
+        <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+            <div class="flex-1">
+                <a href="{{ task.link }}" class="text-sm font-medium text-pink-600 hover:text-pink-800">
+                    {{ task.title }}
+                </a>
+                <p class="text-sm text-gray-600">{{ task.description }}</p>
+            </div>
+            <form method="POST" action="/tasks/complete" class="ml-4">
+                <input type="hidden" name="task_type" value="{{ task.task_type }}">
+                <input type="hidden" name="reference_id" value="{{ task.id }}">
+                <button type="submit" class="inline-flex items-center px-3 py-2 border border-green-300 shadow-sm text-sm leading-4 font-medium rounded-md text-green-700 bg-white hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    Erledigt
+                </button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Geschenk für das Küchenteam -->
+{% if tasks.kitchen_team_gift|length > 0 %}
+<div class="bg-white shadow rounded-lg p-6 mb-6">
+    <div class="flex items-center mb-4">
+        <svg class="h-6 w-6 text-teal-600 mr-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+        </svg>
+        <h2 class="text-lg font-semibold text-gray-900">Geschenk für das Küchenteam</h2>
+        <span class="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800">
+            {{ tasks.kitchen_team_gift|length }}
+        </span>
+    </div>
+    <p class="text-sm text-gray-600 mb-4">Geschenk als Dankeschön für das Küchenteam organisieren.</p>
+    <div class="space-y-3">
+        {% for task in tasks.kitchen_team_gift %}
+        <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
+            <div class="flex-1">
+                <a href="{{ task.link }}" class="text-sm font-medium text-teal-600 hover:text-teal-800">
+                    {{ task.title }}
+                </a>
+                <p class="text-sm text-gray-600">{{ task.description }}</p>
+            </div>
+            <form method="POST" action="/tasks/complete" class="ml-4">
+                <input type="hidden" name="task_type" value="{{ task.task_type }}">
+                <input type="hidden" name="reference_id" value="{{ task.id }}">
+                <button type="submit" class="inline-flex items-center px-3 py-2 border border-green-300 shadow-sm text-sm leading-4 font-medium rounded-md text-green-700 bg-white hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    Erledigt
+                </button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Keine offenen Aufgaben -->
 {% if total_tasks == 0 %}
 <div class="bg-white shadow rounded-lg p-12 text-center">
