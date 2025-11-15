@@ -335,24 +335,22 @@ async def delete_family(
     if not family:
         raise HTTPException(status_code=404, detail="Familie nicht gefunden")
 
-    # Prüfen, ob noch Teilnehmer zugeordnet sind
-    if len(family.participants) > 0:
+    # Prüfen, ob noch aktive Teilnehmer zugeordnet sind
+    active_participants = [p for p in family.participants if p.is_active]
+    if len(active_participants) > 0:
         raise HTTPException(
             status_code=400,
-            detail="Familie kann nicht gelöscht werden, solange noch Teilnehmer zugeordnet sind"
+            detail="Familie kann nicht gelöscht werden, solange noch aktive Teilnehmer zugeordnet sind"
         )
 
     try:
         family_name = family.name
-        db.delete(family)
+        # Soft-Delete: Statt db.delete() markieren wir als gelöscht
+        family.is_active = False
+        family.deleted_at = datetime.utcnow()
         db.commit()
-        logger.info(f"Family deleted: {family_name} (ID: {family_id})")
+        logger.info(f"Family soft-deleted: {family_name} (ID: {family_id})")
         return RedirectResponse(url="/families", status_code=303)
-
-    except IntegrityError as e:
-        db.rollback()
-        logger.error(f"Cannot delete family due to integrity constraint: {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail="Familie kann nicht gelöscht werden, da noch Zahlungen oder andere Verknüpfungen existieren")
 
     except Exception as e:
         db.rollback()

@@ -40,6 +40,7 @@ class Participant(Base):
     # Status
     is_active = Column(Boolean, default=True, nullable=False)
     registration_date = Column(Date, default=date.today, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)  # Soft-Delete: Zeitpunkt der Löschung
 
     # Foreign Keys
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False)

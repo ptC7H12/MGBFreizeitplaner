@@ -1324,16 +1324,12 @@ async def delete_participant(
 
     try:
         participant_name = participant.full_name
-        db.delete(participant)
+        # Soft-Delete: Statt db.delete() markieren wir als gelöscht
+        participant.is_active = False
+        participant.deleted_at = datetime.utcnow()
         db.commit()
-        logger.info(f"Participant deleted: {participant_name} (ID: {participant_id})")
+        logger.info(f"Participant soft-deleted: {participant_name} (ID: {participant_id})")
         flash(request, f"Teilnehmer {participant_name} wurde erfolgreich gelöscht", "success")
-        return RedirectResponse(url="/participants", status_code=303)
-
-    except IntegrityError as e:
-        db.rollback()
-        logger.exception(f"Cannot delete participant due to integrity constraint: {e}")
-        flash(request, "Teilnehmer kann nicht gelöscht werden, da noch Zahlungen oder andere Verknüpfungen existieren", "error")
         return RedirectResponse(url="/participants", status_code=303)
 
     except Exception as e:
