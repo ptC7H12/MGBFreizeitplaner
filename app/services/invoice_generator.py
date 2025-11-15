@@ -371,28 +371,32 @@ class InvoiceGenerator:
         invoice_number = f"SR-{family.id:06d}-{datetime.now().year}"
         invoice_date = datetime.now().strftime("%d.%m.%Y")
 
-        # Gesamtbetrag und ausstehenden Betrag für QR-Code berechnen
+        # Gesamtbetrag und ausstehenden Betrag berechnen
         total_amount = sum(p.final_price for p in family.participants if p.is_active)
-        family_payments_sum = sum(payment.amount for payment in family.payments)
-        member_payments_sum = sum(
+
+        # Zahlungen: Sowohl direkte Familienzahlungen als auch Zahlungen an einzelne Mitglieder
+        family_payments = sum(payment.amount for payment in family.payments)
+        member_payments = sum(
             payment.amount
             for participant in family.participants
             for payment in participant.payments
         )
-        total_paid_early = family_payments_sum + member_payments_sum
-        outstanding_early = total_amount - total_paid_early
+        total_paid = family_payments + member_payments
+        outstanding = total_amount - total_paid
+
         qr_image = None
 
         # Verwendungszweck: Präfix + Familienname
         subject_prefix = settings.invoice_subject_prefix or "Teilnahmegebühr"
         payment_reference = f"{subject_prefix} Familie {family.name}"
 
-        if outstanding_early > 0:
+        # QR-Code für SEPA-Zahlung generieren (falls offen)
+        if outstanding > 0:
             try:
                 qr_code_bytes = QRCodeService.generate_sepa_qr_code(
                     recipient_name=settings.bank_account_holder,
                     iban=settings.bank_iban,
-                    amount=outstanding_early,
+                    amount=outstanding,
                     purpose=payment_reference,
                     bic=settings.bank_bic
                 )
@@ -511,16 +515,7 @@ class InvoiceGenerator:
         story.append(Spacer(1, 0.5*cm))
 
         # Summen-Tabelle
-        # Zahlungen: Sowohl direkte Familienzahlungen als auch Zahlungen an einzelne Mitglieder
-        family_payments = sum(payment.amount for payment in family.payments)
-        member_payments = sum(
-            payment.amount
-            for participant in family.participants
-            for payment in participant.payments
-        )
-        total_paid = family_payments + member_payments
-        outstanding = total_amount - total_paid_early
-
+        # (total_amount, total_paid und outstanding wurden bereits oben berechnet)
         sum_data = [
             ["", "Gesamtsumme:", f"{total_amount:.2f} €"],
             ["", "Bereits bezahlt:", f"{total_paid:.2f} €"],
