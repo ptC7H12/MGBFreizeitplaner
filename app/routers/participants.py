@@ -257,12 +257,13 @@ async def create_participant(
                 family_id = new_family.id
 
         # Automatische Preisberechnung (birth_date ist bereits ein date-Objekt)
+        # Verwende die lokale family_id Variable (kann durch "Als Familie erstellen" gesetzt sein)
         calculated_price = _calculate_price_for_participant(
             db=db,
             event_id=event_id,
             role_id=participant_data.role_id,
             birth_date=participant_data.birth_date,
-            family_id=participant_data.family_id
+            family_id=family_id
         )
 
         # Neuen Teilnehmer erstellen (birth_date ist bereits ein date-Objekt)
@@ -283,7 +284,7 @@ async def create_participant(
             manual_price_override=participant_data.manual_price_override,
             event_id=event_id,  # Aus Session, nicht aus Formular!
             role_id=participant_data.role_id,
-            family_id=participant_data.family_id,
+            family_id=family_id,  # Verwende lokale Variable statt participant_data.family_id
             calculated_price=calculated_price
         )
 
@@ -901,7 +902,7 @@ async def confirm_import(
                     address=participant_data.get("address"),
                     role_id=role_id,
                     family_id=family_id,
-                    final_price=final_price,
+                    calculated_price=final_price,  # final_price ist eine Property, nicht ein DB-Feld
                     is_active=True
                 )
 
