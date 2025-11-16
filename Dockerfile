@@ -1,31 +1,49 @@
 # Multi-stage Build für optimale Image-Größe
-FROM python:3.11-slim as base
+# Stage 1: Builder - Installiert Dependencies
+FROM python:3.11-slim as builder
 
-# Setze Arbeitsverzeichnis
+# Arbeitsverzeichnis für Build
 WORKDIR /app
 
-# Umgebungsvariablen
+# Umgebungsvariablen für Build
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Installiere System-Dependencies
+# Installiere Build-Dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Kopiere Requirements und installiere Python-Dependencies
+# Kopiere Requirements und installiere Dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+
+# Stage 2: Runtime - Finales schlankes Image
+FROM python:3.11-slim as runtime
+
+# Arbeitsverzeichnis
+WORKDIR /app
+
+# Umgebungsvariablen für Runtime
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH=/root/.local/bin:$PATH
+
+# Kopiere installierte Python-Packages vom Builder
+COPY --from=builder /root/.local /root/.local
 
 # Kopiere Anwendungscode
 COPY ./app /app/app
 COPY ./rulesets /app/rulesets
+COPY ./migrations /app/migrations
+COPY ./alembic.ini /app/alembic.ini
 
-# Erstelle Verzeichnis für Datenbank
-RUN mkdir -p /app/data
+# Erstelle notwendige Verzeichnisse
+RUN mkdir -p /app/data /app/uploads
 
 # Exponiere Port
 EXPOSE 8000
