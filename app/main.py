@@ -47,6 +47,18 @@ async def lifespan(app: FastAPI):
     init_db()
     logger.info("Datenbank erfolgreich initialisiert!")
 
+    # Prüfe und führe Alembic-Migrationen aus (automatisch)
+    try:
+        from app.utils.migration_checker import check_and_run_migrations
+        check_and_run_migrations(auto_upgrade=True)
+    except RuntimeError as e:
+        logger.error(f"Migrations-Fehler beim Start: {e}")
+        logger.error("App wird NICHT gestartet - bitte Migrationen manuell prüfen!")
+        raise
+    except Exception as e:
+        logger.warning(f"Migrations-Check fehlgeschlagen: {e}")
+        logger.warning("App wird trotzdem gestartet (Migration manuell prüfen!)")
+
     # Prüfen ob Demo-Daten erstellt werden sollen (nur beim ersten Start)
     from app.database import SessionLocal
     from app.models.event import Event
