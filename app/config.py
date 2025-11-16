@@ -58,8 +58,7 @@ class Settings(BaseSettings):
     # Wird automatisch generiert, falls nicht in .env gesetzt
     # WICHTIG: In Production MUSS SECRET_KEY in .env gesetzt werden!
     secret_key: str = Field(
-        default_factory=lambda: secrets.token_urlsafe(32),
-        min_length=32,
+        default="",
         description="Secret key für Session-Verschlüsselung (min. 32 Zeichen)"
     )
 
@@ -104,9 +103,16 @@ class Settings(BaseSettings):
     @field_validator("secret_key")
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
-        """Validiert den Secret Key"""
-        if len(v) < 32:
-            raise ValueError("SECRET_KEY muss mindestens 32 Zeichen lang sein")
+        """Validiert und generiert Secret Key wenn nötig"""
+        # Wenn leer oder zu kurz: automatisch generieren (für lokalen Single-User-Betrieb)
+        if not v or len(v) < 32:
+            generated_key = secrets.token_urlsafe(32)
+            logger.warning(
+                "⚠️  SECRET_KEY nicht gesetzt oder zu kurz. "
+                "Automatisch generierter Key wird verwendet (Session-Daten gehen bei Neustart verloren). "
+                "Für Produktion bitte SECRET_KEY in .env setzen!"
+            )
+            return generated_key
 
         return v
 
