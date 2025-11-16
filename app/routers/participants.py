@@ -20,6 +20,7 @@ from app.services.qrcode_service import QRCodeService
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
+from app.utils.datetime_utils import utcnow
 from app.schemas import ParticipantCreateSchema, ParticipantUpdateSchema
 from app.templates_config import templates
 
@@ -1331,7 +1332,7 @@ async def delete_participant(
         participant_name = participant.full_name
         # Soft-Delete: Statt db.delete() markieren wir als gelöscht
         participant.is_active = False
-        participant.deleted_at = datetime.utcnow()
+        participant.deleted_at = utcnow()
         db.commit()
         logger.info(f"Participant soft-deleted: {participant_name} (ID: {participant_id})")
         flash(request, f"Teilnehmer {participant_name} wurde erfolgreich gelöscht", "success")

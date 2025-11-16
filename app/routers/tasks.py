@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import Participant, Payment, Expense, Event, Task, Income, Role
 from app.dependencies import get_current_event_id
 from app.utils.flash import flash
+from app.utils.datetime_utils import utcnow
 from app.templates_config import templates
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -369,7 +370,7 @@ async def complete_task(
     if existing_task:
         # Aktualisiere bestehenden Task
         existing_task.is_completed = True
-        existing_task.completed_at = datetime.utcnow()
+        existing_task.completed_at = utcnow()
         if note:
             existing_task.completion_note = note
     else:

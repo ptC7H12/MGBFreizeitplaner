@@ -15,6 +15,7 @@ from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
 from app.utils.file_upload import save_receipt_file, delete_receipt_file
+from app.utils.datetime_utils import utcnow
 from app.schemas import ExpenseCreateSchema, ExpenseUpdateSchema
 from app.templates_config import templates
 
@@ -330,7 +331,7 @@ async def toggle_settled(expense_id: int, db: Session = Depends(get_db), event_i
                 # Ausgabe wurde erstattet → Task als erledigt markieren/erstellen
                 if task:
                     task.is_completed = True
-                    task.completed_at = datetime.utcnow()
+                    task.completed_at = utcnow()
                 else:
                     new_task = Task(
                         task_type="expense_reimbursement",
