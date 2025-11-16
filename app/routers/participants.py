@@ -145,14 +145,46 @@ async def list_participants(
     roles = db.query(Role).filter(Role.is_active == True, Role.event_id == event_id).all()
     families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
 
+    # Für Familien-Tab: Familiendaten mit Statistiken berechnen
+    families_with_participants = db.query(Family)\
+        .filter(Family.event_id == event_id)\
+        .options(
+            joinedload(Family.participants),
+            joinedload(Family.payments)
+        )\
+        .order_by(Family.name)\
+        .all()
+
+    family_data = []
+    for family in families_with_participants:
+        total_price = sum(p.final_price for p in family.participants)
+
+        # Zahlungen: Sowohl direkte Familienzahlungen als auch Zahlungen an einzelne Mitglieder
+        family_payments = sum(payment.amount for payment in family.payments)
+        member_payments = sum(
+            payment.amount
+            for participant in family.participants
+            for payment in participant.payments
+        )
+        total_paid = family_payments + member_payments
+
+        family_data.append({
+            "family": family,
+            "participant_count": len(family.participants),
+            "total_price": total_price,
+            "total_paid": total_paid,
+            "outstanding": total_price - total_paid
+        })
+
     return templates.TemplateResponse(
         "participants/list.html",
         {
             "request": request,
-            "title": "Teilnehmer",
+            "title": "Teilnehmer & Familien",
             "participants": participants,
             "roles": roles,
             "families": families,
+            "family_data": family_data,
             "search": search,
             "selected_role_id": role_id,
             "selected_family_id": family_id
