@@ -282,7 +282,7 @@ echo   Starte Anwendung
 echo ========================================
 echo.
 echo Die Anwendung ist verfuegbar unter:
-echo   http://localhost:8000
+echo   http://localhost:8000/auth
 echo.
 echo Druecke Ctrl+C um die Anwendung zu beenden
 echo.
@@ -290,7 +290,7 @@ echo [INFO] Browser wird automatisch geoeffnet...
 echo.
 
 REM Start browser in background after 3 seconds using PowerShell
-start /b powershell -WindowStyle Hidden -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:8000'"
+start /b powershell -WindowStyle Hidden -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:8000/auth'"
 
 "%PYTHON_EXE%" -m app.main
 
@@ -317,7 +317,7 @@ Diese Version enthält alles, was Sie brauchen - einschließlich Python!
 ## Schnellstart
 
 1. **Doppelklick auf `start.bat`**
-2. Fertig! Browser öffnet automatisch unter http://localhost:8000
+2. Fertig! Browser öffnet automatisch unter http://localhost:8000/auth
 
 ## Das wars!
 
