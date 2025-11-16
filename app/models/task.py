@@ -4,6 +4,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+from app.utils.datetime_utils import get_utc_timestamp, get_local_date
 
 
 class Task(Base):
@@ -31,8 +32,8 @@ class Task(Base):
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
 
     # Timestamps
-    completed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    completed_at = Column(DateTime, default=get_utc_timestamp, nullable=False)
+    created_at = Column(DateTime, default=get_utc_timestamp, nullable=False)
 
     # Beziehungen
     event = relationship("Event", back_populates="tasks")

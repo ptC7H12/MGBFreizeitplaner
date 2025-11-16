@@ -4,6 +4,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Bool
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+from app.utils.datetime_utils import get_utc_timestamp, get_local_date
 
 
 class Family(Base):
@@ -28,8 +29,8 @@ class Family(Base):
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=get_utc_timestamp, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_timestamp, onupdate=get_utc_timestamp, nullable=False)
 
     # Beziehungen
     event = relationship("Event", back_populates="families")
