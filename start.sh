@@ -95,7 +95,7 @@ echo -e "${CYAN}   Starte Anwendung...${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 echo -e "${GREEN}Die Anwendung ist verfügbar unter:${NC}"
-echo -e "${CYAN}  http://localhost:8000${NC}"
+echo -e "${CYAN}  http://localhost:8000/auth${NC}"
 echo ""
 echo -e "${YELLOW}Drücke Ctrl+C um die Anwendung zu beenden${NC}"
 echo -e "${YELLOW}[INFO] Browser wird automatisch geöffnet...${NC}"
@@ -104,9 +104,9 @@ echo ""
 # Open browser in background after 3 seconds
 (sleep 3 && {
     if command -v xdg-open &> /dev/null; then
-        xdg-open http://localhost:8000
+        xdg-open http://localhost:8000/auth
     elif command -v open &> /dev/null; then
-        open http://localhost:8000
+        open http://localhost:8000/auth
     fi
 }) &
 

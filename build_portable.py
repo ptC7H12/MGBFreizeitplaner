@@ -52,7 +52,7 @@ PLATFORM_READMES = {
    - Installiert Abhängigkeiten (beim ersten Start)
    - Startet die Anwendung
 
-3. Öffne im Browser: http://localhost:8000
+3. Browser öffnet automatisch unter: http://localhost:8000/auth
 
 ## Voraussetzungen
 
@@ -109,7 +109,7 @@ Bei Problemen: https://github.com/[YOUR_REPO]/issues
    - Installiert Abhängigkeiten (beim ersten Start)
    - Startet die Anwendung
 
-3. Öffne im Browser: http://localhost:8000
+3. Browser öffnet automatisch unter: http://localhost:8000/auth
 
 ## Voraussetzungen
 
@@ -180,7 +180,7 @@ Bei Problemen: https://github.com/[YOUR_REPO]/issues
    - Installiert Abhängigkeiten (beim ersten Start)
    - Startet die Anwendung
 
-3. Öffne im Browser: http://localhost:8000
+3. Browser öffnet automatisch unter: http://localhost:8000/auth
 
 ## Voraussetzungen
 

@@ -299,7 +299,7 @@ echo   Starte Anwendung...
 echo ========================================
 echo.
 echo Die Anwendung ist verfuegbar unter:
-echo   http://localhost:8000
+echo   http://localhost:8000/auth
 echo.
 echo Druecke Ctrl+C um die Anwendung zu beenden
 echo.
@@ -307,7 +307,7 @@ echo [INFO] Browser wird automatisch geoeffnet...
 echo.
 
 REM Start browser in background after 3 seconds using PowerShell
-start /b powershell -WindowStyle Hidden -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:8000'"
+start /b powershell -WindowStyle Hidden -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:8000/auth'"
 
 "%PYTHON_EXE%" -m app.main
 
@@ -377,7 +377,7 @@ echo -e "${CYAN}   Starte Anwendung...${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 echo -e "${GREEN}Die Anwendung ist verfügbar unter:${NC}"
-echo -e "${CYAN}  http://localhost:8000${NC}"
+echo -e "${CYAN}  http://localhost:8000/auth${NC}"
 echo ""
 echo -e "${YELLOW}Drücke Ctrl+C um die Anwendung zu beenden${NC}"
 echo ""
@@ -472,7 +472,7 @@ Diese Version enthält alles, was Sie brauchen - einschließlich Python!
 ## Schnellstart
 
 {'1. Doppelklick auf `start_embedded.bat`' if platform == 'windows' else '1. Doppelklick auf `start_embedded.sh` (oder im Terminal: `./start_embedded.sh`)'}
-2. Fertig! Browser öffnet sich automatisch unter http://localhost:8000
+2. Fertig! Browser öffnet sich automatisch unter http://localhost:8000/auth
 
 ## Das wars!
 
