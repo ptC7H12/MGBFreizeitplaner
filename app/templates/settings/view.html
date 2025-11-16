@@ -2,17 +2,33 @@
 
 {% block content %}
 <div class="bg-white shadow rounded-lg">
-    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-        <h2 class="text-xl font-semibold text-gray-900">Einstellungen</h2>
-        <a href="/settings/edit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition">
-            <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-            </svg>
-            Bearbeiten
-        </a>
+    <div class="px-6 py-4 border-b border-gray-200">
+        <h2 class="text-2xl font-bold text-gray-900">Einstellungen</h2>
     </div>
 
-    <div class="px-6 py-6 space-y-6">
+    <!-- Tab Navigation -->
+    <div class="border-b border-gray-200">
+        <nav class="flex -mb-px px-6" aria-label="Tabs">
+            <button onclick="switchTab('general')" id="tab-general" class="tab-button active whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm">
+                Allgemein
+            </button>
+            <button onclick="switchTab('ruleset')" id="tab-ruleset" class="tab-button whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm">
+                Regelwerk
+            </button>
+        </nav>
+    </div>
+
+    <!-- Tab Content: Allgemein -->
+    <div id="content-general" class="tab-content px-6 py-6 space-y-6">
+        <div class="flex justify-end mb-4">
+            <a href="/settings/edit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition">
+                <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                </svg>
+                Bearbeiten
+            </a>
+        </div>
+
         <!-- Organisation -->
         <div>
             <h3 class="text-lg font-medium text-gray-900 mb-4">Organisation</h3>
@@ -78,5 +94,84 @@
             </div>
         </div>
     </div>
+
+    <!-- Tab Content: Regelwerk -->
+    <div id="content-ruleset" class="tab-content hidden px-6 py-6 space-y-6">
+        <div class="flex justify-end mb-4">
+            <a href="/settings/edit#ruleset" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition">
+                <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                </svg>
+                Bearbeiten
+            </a>
+        </div>
+
+        <!-- Regelwerk-Einstellungen -->
+        <div>
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Regelwerk-Einstellungen</h3>
+            <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+                <div>
+                    <span class="text-sm font-medium text-gray-500">Standard GitHub-Repository:</span>
+                    <p class="text-sm text-gray-900 mt-1 font-mono break-all">{{ setting.default_github_repo or 'Nicht konfiguriert' }}</p>
+                    {% if not setting.default_github_repo %}
+                    <p class="text-xs text-gray-500 mt-1">Wird beim Regelwerk-Import automatisch vorausgefüllt</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Hinweis -->
+        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-purple-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-purple-700">
+                        Regelwerk-Einstellungen erleichtern den Import von Preis- und Rollenstrukturen. Konfigurieren Sie ein Standard-Repository für schnelleren Zugriff.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+function switchTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+
+    // Remove active class from all tabs
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active', 'border-blue-500', 'text-blue-600');
+        button.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+    });
+
+    // Show selected tab content
+    document.getElementById('content-' + tabName).classList.remove('hidden');
+
+    // Add active class to selected tab
+    const activeTab = document.getElementById('tab-' + tabName);
+    activeTab.classList.add('active', 'border-blue-500', 'text-blue-600');
+    activeTab.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+}
+
+// Initialize tabs on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set initial styling for inactive tabs
+    document.querySelectorAll('.tab-button:not(.active)').forEach(button => {
+        button.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+    });
+
+    // Set initial styling for active tab
+    const activeTab = document.querySelector('.tab-button.active');
+    if (activeTab) {
+        activeTab.classList.add('border-blue-500', 'text-blue-600');
+    }
+});
+</script>
 {% endblock %}

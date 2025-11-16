@@ -27,43 +27,9 @@ async def list_families(
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id)
 ):
-    """Liste aller Familien"""
-    # Eager Loading um N+1 Query Problem zu vermeiden
-    families = db.query(Family)\
-        .filter(Family.event_id == event_id)\
-        .options(
-            joinedload(Family.participants),
-            joinedload(Family.payments)
-        )\
-        .order_by(Family.name)\
-        .all()
-
-    # Für jede Familie: Anzahl Teilnehmer und Gesamtpreis berechnen
-    family_data = []
-    for family in families:
-        total_price = sum(p.final_price for p in family.participants)
-
-        # Zahlungen: Sowohl direkte Familienzahlungen als auch Zahlungen an einzelne Mitglieder
-        family_payments = sum(payment.amount for payment in family.payments)
-        member_payments = sum(
-            payment.amount
-            for participant in family.participants
-            for payment in participant.payments
-        )
-        total_paid = family_payments + member_payments
-
-        family_data.append({
-            "family": family,
-            "participant_count": len(family.participants),
-            "total_price": total_price,
-            "total_paid": total_paid,
-            "outstanding": total_price - total_paid
-        })
-
-    return templates.TemplateResponse(
-        "families/list.html",
-        {"request": request, "title": "Familien", "family_data": family_data}
-    )
+    """Leitet zur kombinierten Teilnehmer & Familien Seite weiter"""
+    # Redirect to participants page which now includes both tabs
+    return RedirectResponse(url="/participants", status_code=303)
 
 
 @router.get("/create", response_class=HTMLResponse)
