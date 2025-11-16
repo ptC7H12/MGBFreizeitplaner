@@ -4,6 +4,7 @@ from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+from app.utils.datetime_utils import get_utc_timestamp, get_local_date
 
 
 class Participant(Base):
@@ -39,7 +40,7 @@ class Participant(Base):
 
     # Status
     is_active = Column(Boolean, default=True, nullable=False, index=True)  # Index für Filter
-    registration_date = Column(Date, default=date.today, nullable=False)
+    registration_date = Column(Date, default=get_local_date, nullable=False)
     deleted_at = Column(DateTime, nullable=True, index=True)  # Index für Soft-Delete Queries
 
     # Foreign Keys
@@ -48,8 +49,8 @@ class Participant(Base):
     family_id = Column(Integer, ForeignKey("families.id"), nullable=True, index=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=get_utc_timestamp, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_timestamp, onupdate=get_utc_timestamp, nullable=False)
 
     # Beziehungen
     event = relationship("Event", back_populates="participants")

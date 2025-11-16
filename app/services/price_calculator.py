@@ -143,12 +143,11 @@ class PriceCalculator:
             age, ruleset_data.get("age_groups", [])
         )
 
-        # Rollenrabatt ermitteln
+        # Rollenrabatt ermitteln (vom Basispreis!)
         breakdown['role_discount_percent'] = PriceCalculator._get_role_discount(
             role_name, ruleset_data.get("role_discounts", {})
         )
         breakdown['role_discount_amount'] = breakdown['base_price'] * (breakdown['role_discount_percent'] / 100)
-        breakdown['price_after_role_discount'] = breakdown['base_price'] - breakdown['role_discount_amount']
 
         if breakdown['role_discount_percent'] > 0:
             breakdown['has_discounts'] = True
@@ -156,15 +155,12 @@ class PriceCalculator:
                 f"Rollenrabatt ({role_display_name}): {breakdown['role_discount_percent']:.0f}%"
             )
 
-        # Familienrabatt ermitteln
+        # Familienrabatt ermitteln (vom Basispreis, NICHT gestapelt!)
         breakdown['family_discount_percent'] = PriceCalculator._get_family_discount(
             family_children_count, ruleset_data.get("family_discount", {})
         )
-        breakdown['family_discount_amount'] = breakdown['price_after_role_discount'] * (
+        breakdown['family_discount_amount'] = breakdown['base_price'] * (
             breakdown['family_discount_percent'] / 100
-        )
-        breakdown['price_after_family_discount'] = (
-            breakdown['price_after_role_discount'] - breakdown['family_discount_amount']
         )
 
         if breakdown['family_discount_percent'] > 0:
@@ -173,7 +169,11 @@ class PriceCalculator:
                 f"Familienrabatt ({family_children_count}. Kind): {breakdown['family_discount_percent']:.0f}%"
             )
 
-        # Manueller Rabatt (zusätzlich)
+        # Preis nach automatischen Rabatten (für Display-Zwecke)
+        breakdown['price_after_role_discount'] = breakdown['base_price'] - breakdown['role_discount_amount']
+        breakdown['price_after_family_discount'] = breakdown['base_price'] - breakdown['role_discount_amount'] - breakdown['family_discount_amount']
+
+        # Manueller Rabatt (zusätzlich, vom bereits reduzierten Preis)
         if discount_percent > 0:
             breakdown['manual_discount_amount'] = breakdown['price_after_family_discount'] * (
                 discount_percent / 100

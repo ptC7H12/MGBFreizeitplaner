@@ -4,6 +4,9 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import logging
 import secrets
 
@@ -16,6 +19,10 @@ from app.routers import dashboard, participants, families, rulesets, payments, e
 # Logging konfigurieren (strukturiert mit Datei-Rotation)
 setup_logging(debug=settings.debug)
 logger = logging.getLogger(__name__)
+
+# Rate Limiter konfigurieren (schützt vor Fehlbedienung)
+# Für lokalen Single-User Betrieb: Großzügige Limits
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 
 @asynccontextmanager
@@ -39,6 +46,18 @@ async def lifespan(app: FastAPI):
     logger.info("Initialisiere Datenbank...")
     init_db()
     logger.info("Datenbank erfolgreich initialisiert!")
+
+    # Prüfe und führe Alembic-Migrationen aus (automatisch)
+    try:
+        from app.utils.migration_checker import check_and_run_migrations
+        check_and_run_migrations(auto_upgrade=True)
+    except RuntimeError as e:
+        logger.error(f"Migrations-Fehler beim Start: {e}")
+        logger.error("App wird NICHT gestartet - bitte Migrationen manuell prüfen!")
+        raise
+    except Exception as e:
+        logger.warning(f"Migrations-Check fehlgeschlagen: {e}")
+        logger.warning("App wird trotzdem gestartet (Migration manuell prüfen!)")
 
     # Prüfen ob Demo-Daten erstellt werden sollen (nur beim ersten Start)
     from app.database import SessionLocal
@@ -70,6 +89,10 @@ app = FastAPI(
     debug=settings.debug,
     lifespan=lifespan
 )
+
+# Rate Limiter zur App hinzufügen
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Session Middleware hinzufügen
 app.add_middleware(

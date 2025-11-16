@@ -4,6 +4,7 @@ from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+from app.utils.datetime_utils import get_utc_timestamp, get_local_date
 
 
 class Payment(Base):
@@ -14,7 +15,7 @@ class Payment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     amount = Column(Float, nullable=False)
-    payment_date = Column(Date, default=date.today, nullable=False)
+    payment_date = Column(Date, default=get_local_date, nullable=False)
     payment_method = Column(String(50), nullable=True)  # z.B. "Bar", "Überweisung", "PayPal"
     reference = Column(String(200), nullable=True)  # Referenznummer, Verwendungszweck
     notes = Column(Text, nullable=True)
@@ -25,8 +26,8 @@ class Payment(Base):
     family_id = Column(Integer, ForeignKey("families.id"), nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=get_utc_timestamp, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_timestamp, onupdate=get_utc_timestamp, nullable=False)
 
     # Beziehungen
     event = relationship("Event", back_populates="payments")

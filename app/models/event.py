@@ -6,6 +6,7 @@ import secrets
 import string
 
 from app.database import Base
+from app.utils.datetime_utils import get_utc_timestamp, get_local_date
 
 
 class Event(Base):
@@ -27,8 +28,8 @@ class Event(Base):
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=get_utc_timestamp, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_timestamp, onupdate=get_utc_timestamp, nullable=False)
 
     # Beziehungen
     participants = relationship("Participant", back_populates="event", cascade="all, delete-orphan")

@@ -12,6 +12,7 @@ from app.models import Family, Participant
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
+from app.utils.datetime_utils import utcnow
 from app.schemas import FamilyCreateSchema, FamilyUpdateSchema
 from app.templates_config import templates
 
@@ -347,7 +348,7 @@ async def delete_family(
         family_name = family.name
         # Soft-Delete: Statt db.delete() markieren wir als gelöscht
         family.is_active = False
-        family.deleted_at = datetime.utcnow()
+        family.deleted_at = utcnow()
         db.commit()
         logger.info(f"Family soft-deleted: {family_name} (ID: {family_id})")
         return RedirectResponse(url="/families", status_code=303)

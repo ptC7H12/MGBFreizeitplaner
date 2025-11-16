@@ -4,6 +4,7 @@ from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+from app.utils.datetime_utils import get_utc_timestamp, get_local_date
 
 
 class Expense(Base):
@@ -16,7 +17,7 @@ class Expense(Base):
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     amount = Column(Float, nullable=False)
-    expense_date = Column(Date, default=date.today, nullable=False)
+    expense_date = Column(Date, default=get_local_date, nullable=False)
     category = Column(String(100), nullable=True)  # z.B. "Verpflegung", "Material", "Transport"
     receipt_number = Column(String(100), nullable=True)
     paid_by = Column(String(200), nullable=True)  # Wer hat die Ausgabe vorgestreckt (falls zutreffend)
@@ -28,8 +29,8 @@ class Expense(Base):
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=get_utc_timestamp, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_timestamp, onupdate=get_utc_timestamp, nullable=False)
 
     # Beziehungen
     event = relationship("Event", back_populates="expenses")

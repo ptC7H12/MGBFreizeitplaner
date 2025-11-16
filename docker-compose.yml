@@ -13,12 +13,17 @@ services:
       - ./data:/app/data
       # Regelwerke (optional für Live-Edits)
       - ./rulesets:/app/rulesets
+      # Uploads (Belege/Quittungen)
+      - ./uploads:/app/uploads
     environment:
       - DATABASE_URL=sqlite:////app/data/freizeit_kassen.db
-      - DEBUG=true
+      - DEBUG=false
+      # SECRET_KEY für Session-Verschlüsselung (generiert mit: python -c "import secrets; print(secrets.token_urlsafe(32))")
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production-use-secrets-token-urlsafe}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # Verwendet Python statt curl (curl ist nicht im Image installiert)
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
