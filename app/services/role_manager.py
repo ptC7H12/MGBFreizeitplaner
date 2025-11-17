@@ -1,8 +1,11 @@
 """Role Management Service"""
+import logging
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.models import Role, Event
+
+logger = logging.getLogger(__name__)
 
 
 class RoleManager:
@@ -127,7 +130,18 @@ class RoleManager:
 
     @staticmethod
     def _get_display_name(role_name: str) -> str:
-        """Ermittelt den Display-Namen für eine Rolle"""
+        """
+        Ermittelt den Display-Namen für eine Rolle.
+
+        Sucht zuerst in den vordefinierten Display-Namen. Wenn die Rolle
+        nicht gefunden wird, wird der Name mit Großbuchstaben am Anfang zurückgegeben.
+
+        Args:
+            role_name: Technischer Name der Rolle (z.B. "kind", "betreuer")
+
+        Returns:
+            Benutzerfreundlicher Display-Name (z.B. "Kind", "Betreuer")
+        """
         role_name_lower = role_name.lower()
 
         # Bekannte Rolle?
@@ -139,6 +153,17 @@ class RoleManager:
 
     @staticmethod
     def _get_role_color(role_name: str) -> str:
-        """Ermittelt die Farbe für eine Rolle"""
+        """
+        Ermittelt die Hex-Farbe für eine Rolle.
+
+        Sucht die Farbe aus den vordefinierten ROLE_COLORS. Wenn keine
+        spezifische Farbe definiert ist, wird die Standard-Farbe (Grau) zurückgegeben.
+
+        Args:
+            role_name: Technischer Name der Rolle (z.B. "kind", "betreuer")
+
+        Returns:
+            Hex-Farbcode (z.B. "#3B82F6" für Blau)
+        """
         role_name_lower = role_name.lower()
         return RoleManager.ROLE_COLORS.get(role_name_lower, RoleManager.ROLE_COLORS["default"])

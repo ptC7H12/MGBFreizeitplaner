@@ -14,7 +14,7 @@ class Setting(Base):
     __tablename__ = "settings"
 
     id = Column(Integer, primary_key=True, index=True)
-    event_id = Column(Integer, ForeignKey("events.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_id = Column(Integer, ForeignKey("events.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
 
     # Organisation
     organization_name = Column(String(200), nullable=False, default="Freizeit-Kassen-System")

@@ -1,8 +1,11 @@
 """Regelwerk-Parser Service"""
+import logging
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class RulesetParser:

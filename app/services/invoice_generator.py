@@ -1,4 +1,5 @@
 """Invoice (Rechnung) Generator Service"""
+import logging
 from io import BytesIO
 from datetime import datetime, date
 from typing import List, Dict, Any
@@ -10,6 +11,8 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.pdfgen import canvas
 from sqlalchemy.orm import Session
 from app.services.qrcode_service import QRCodeService
+
+logger = logging.getLogger(__name__)
 
 
 class InvoiceGenerator:

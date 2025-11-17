@@ -1,6 +1,10 @@
 """Preisberechnungs-Service"""
+import logging
 from typing import Optional, Dict, Any, Tuple
 from datetime import date
+from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 
 class PriceCalculator:
@@ -41,6 +45,9 @@ class PriceCalculator:
         )
 
         # Alle Rabatte vom Basispreis berechnen (nicht gestapelt!)
+        # WICHTIG: Beide Rabatte werden vom Basispreis berechnet, nicht vom bereits
+        # reduzierten Preis. Beispiel: Basispreis 100€, Rollenrabatt 50%, Familienrabatt 20%
+        # → Endpreis = 100€ - 50€ - 20€ = 30€ (NICHT 100€ - 50€ - 10€ = 40€)
         role_discount_amount = base_price * (role_discount_percent / 100)
         family_discount_amount = base_price * (family_discount_percent / 100)
 
@@ -101,17 +108,108 @@ class PriceCalculator:
         - Erstes Kind (first_child_percent, optional, Standard: 0%)
         - Zweites Kind (second_child_percent)
         - Drittes und weitere Kinder (third_plus_child_percent)
+
+        Beispiel: Bei 3 Kindern mit Rabatten [0%, 25%, 50%]:
+        - Kind 1 (ältestes): 0% Rabatt
+        - Kind 2: 25% Rabatt
+        - Kind 3 (jüngstes): 50% Rabatt
         """
         if not family_discount_config.get("enabled", False):
             return 0.0
 
         if child_position == 1:
-            # Erstes Kind: Rabatt optional (Standard: 0%)
+            # Erstes Kind (ältestes): Rabatt optional (Standard: 0%)
             return float(family_discount_config.get("first_child_percent", 0))
         elif child_position == 2:
+            # Zweites Kind
             return float(family_discount_config.get("second_child_percent", 0))
-        else:  # 3. Kind und weitere
+        else:  # 3. Kind und weitere (jüngste Kinder)
             return float(family_discount_config.get("third_plus_child_percent", 0))
+
+    @staticmethod
+    def calculate_price_from_db(
+        db: Session,
+        event_id: int,
+        role_id: Optional[int],
+        birth_date: date,
+        family_id: Optional[int]
+    ) -> float:
+        """
+        Berechnet den Preis für einen Teilnehmer mit Datenbank-Abfragen.
+        Diese Methode lädt alle benötigten Daten aus der DB und ruft dann
+        calculate_participant_price auf.
+
+        Args:
+            db: Datenbank-Session
+            event_id: ID der Veranstaltung
+            role_id: Optional ID der Rolle (kann None sein)
+            birth_date: Geburtsdatum des Teilnehmers
+            family_id: Optional ID der Familie
+
+        Returns:
+            Berechneter Preis in Euro
+        """
+        # Lazy imports to avoid circular dependencies
+        from app.models.event import Event
+        from app.models.ruleset import Ruleset
+        from app.models.role import Role
+        from app.models.participant import Participant
+
+        # Event laden
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            logger.warning(f"Event {event_id} not found")
+            return 0.0
+
+        # Aktives Regelwerk für das Event finden
+        ruleset = db.query(Ruleset).filter(
+            Ruleset.is_active == True,
+            Ruleset.valid_from <= event.start_date,
+            Ruleset.valid_until >= event.start_date,
+            Ruleset.event_id == event_id
+        ).first()
+
+        if not ruleset:
+            logger.warning(f"No active ruleset found for event {event_id}")
+            return 0.0
+
+        # Alter zum Event-Start berechnen
+        age = event.start_date.year - birth_date.year
+        if (event.start_date.month, event.start_date.day) < (birth_date.month, birth_date.day):
+            age -= 1
+
+        # Position in Familie ermitteln (für Familienrabatt)
+        family_children_count = 1
+        if family_id:
+            # Anzahl der Kinder in der Familie zählen (nach Geburtsdatum sortiert)
+            siblings = db.query(Participant).filter(
+                Participant.family_id == family_id,
+                Participant.is_active == True
+            ).order_by(Participant.birth_date).all()
+
+            # Position des neuen Kindes bestimmen
+            family_children_count = len(siblings) + 1
+
+        # Rolle-Name für Preisberechnung
+        role_name = None
+        if role_id:
+            role = db.query(Role).filter(Role.id == role_id).first()
+            if role:
+                role_name = role.name.lower()
+
+        # Preis berechnen (ohne Rolle = nur Basispreis basierend auf Alter)
+        calculated_price = PriceCalculator.calculate_participant_price(
+            age=age,
+            role_name=role_name,  # Kann None sein
+            ruleset_data={
+                "age_groups": ruleset.age_groups,
+                "role_discounts": ruleset.role_discounts,
+                "family_discount": ruleset.family_discount
+            },
+            family_children_count=family_children_count
+        )
+
+        return calculated_price
 
     @staticmethod
     def calculate_participant_price_with_breakdown(

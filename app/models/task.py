@@ -29,7 +29,7 @@ class Task(Base):
     completion_note = Column(String(500), nullable=True)
 
     # Foreign Key
-    event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
 
     # Timestamps
     completed_at = Column(DateTime, default=get_utc_timestamp, nullable=False)

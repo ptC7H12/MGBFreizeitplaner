@@ -463,6 +463,49 @@ Beide Skripte erstellen ZIP-Archive im `releases/` Ordner.
 - Basis-Templates
 - Docker-Setup
 
+## Backup & Restore
+
+**Backup erstellen:**
+Die Datenbank ist in einer einzelnen SQLite-Datei gespeichert:
+```bash
+# Datei kopieren
+cp freizeit_kassen.db freizeit_kassen_backup_$(date +%Y%m%d).db
+```
+
+**Backup wiederherstellen:**
+```bash
+# Alte Datenbank durch Backup ersetzen
+cp freizeit_kassen_backup_YYYYMMDD.db freizeit_kassen.db
+```
+
+**Empfehlung:** Erstelle regelmäßige Backups (z.B. täglich während der Anmeldephase)!
+
+## Troubleshooting
+
+### Problem: Port 8000 bereits belegt
+**Lösung:** Ändere den Port in der `.env` Datei oder starte mit:
+```bash
+uvicorn app.main:app --port 8001
+```
+
+### Problem: Datenbank-Fehler nach Update
+**Lösung:** Führe Datenbankmigrationen aus:
+```bash
+alembic upgrade head
+```
+
+### Problem: Regelwerk wird nicht importiert
+**Lösung:** Überprüfe die YAML-Syntax:
+- Korrekte Einrückung (2 Leerzeichen)
+- Gültige Datumsformate (YYYY-MM-DD)
+- Pflichtfelder vorhanden (name, type, valid_from, valid_until, age_groups)
+
+### Problem: Preise werden nicht korrekt berechnet
+**Lösung:**
+1. Stelle sicher, dass ein aktives Regelwerk für das Event-Datum existiert
+2. Prüfe, ob Altersgruppen den Teilnehmer abdecken
+3. Achte auf Familienrabatt-Reihenfolge (nach Geburtsdatum)
+
 ## Bekannte Einschränkungen
 
 - SQLite ist für einzelne Events ausreichend, bei sehr großen Freizeiten (>1000 Teilnehmer) sollte PostgreSQL in Betracht gezogen werden

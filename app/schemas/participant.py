@@ -21,7 +21,7 @@ class ParticipantBase(BaseModel):
     discount_reason: Optional[str] = Field(None, max_length=200)
     manual_price_override: Optional[float] = Field(None, ge=0)
     event_id: int
-    role_id: int
+    role_id: Optional[int] = None
     family_id: Optional[int] = None
 
 

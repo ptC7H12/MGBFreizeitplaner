@@ -34,7 +34,7 @@ class Ruleset(Base):
     source_file = Column(String(500), nullable=True)  # Pfad zur Original-YAML-Datei
 
     # Foreign Key
-    event_id = Column(Integer, ForeignKey("events.id"), nullable=True)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
 
     # Timestamps
     created_at = Column(DateTime, default=get_utc_timestamp, nullable=False)
