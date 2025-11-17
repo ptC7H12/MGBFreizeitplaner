@@ -133,13 +133,17 @@
     <div class="px-6 py-4 border-t border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900 mb-3">Familienrabatt</h3>
         <div class="bg-gray-50 p-4 rounded-lg">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <p class="text-sm text-gray-600">1. Kind (ältestes)</p>
+                    <p class="text-lg font-bold text-green-600">{{ ruleset.family_discount.first_child_percent|default(0) }}% Rabatt</p>
+                </div>
                 <div>
                     <p class="text-sm text-gray-600">2. Kind</p>
                     <p class="text-lg font-bold text-green-600">{{ ruleset.family_discount.second_child_percent }}% Rabatt</p>
                 </div>
                 <div>
-                    <p class="text-sm text-gray-600">3. Kind und weitere</p>
+                    <p class="text-sm text-gray-600">3. Kind und weitere (jüngste)</p>
                     <p class="text-lg font-bold text-green-600">{{ ruleset.family_discount.third_plus_child_percent }}% Rabatt</p>
                 </div>
             </div>

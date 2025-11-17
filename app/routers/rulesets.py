@@ -533,6 +533,7 @@ async def update_ruleset(
 
 @router.post("/{ruleset_id}/toggle")
 async def toggle_ruleset(
+    request: Request,
     ruleset_id: int,
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id)
@@ -547,11 +548,40 @@ async def toggle_ruleset(
         raise HTTPException(status_code=404, detail="Regelwerk nicht gefunden")
 
     try:
-        ruleset.is_active = not ruleset.is_active
+        # Neuer Status ermitteln
+        new_status = not ruleset.is_active
+
+        # Wenn das Ruleset aktiviert wird, alle anderen desselben Events deaktivieren
+        if new_status is True:
+            # Alle anderen Rulesets desselben Events deaktivieren
+            other_rulesets = db.query(Ruleset).filter(
+                Ruleset.event_id == event_id,
+                Ruleset.id != ruleset_id,
+                Ruleset.is_active == True
+            ).all()
+
+            deactivated_count = len(other_rulesets)
+            for other_ruleset in other_rulesets:
+                other_ruleset.is_active = False
+
+            # Dieses Ruleset aktivieren
+            ruleset.is_active = True
+
+            # Flash-Message mit Info über deaktivierte Rulesets
+            if deactivated_count > 0:
+                flash(request, f"Regelwerk '{ruleset.name}' aktiviert. {deactivated_count} andere(s) Regelwerk(e) wurde(n) deaktiviert.", "success")
+            else:
+                flash(request, f"Regelwerk '{ruleset.name}' aktiviert", "success")
+        else:
+            # Ruleset deaktivieren
+            ruleset.is_active = False
+            flash(request, f"Regelwerk '{ruleset.name}' deaktiviert", "info")
+
         db.commit()
         return RedirectResponse(url=f"/rulesets/{ruleset_id}", status_code=303)
     except Exception as e:
         db.rollback()
+        logger.error(f"Error toggling ruleset {ruleset_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Fehler beim Aktualisieren")
 
 
