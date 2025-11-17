@@ -908,31 +908,68 @@ async def confirm_import(
                 age = event.start_date.year - birth_date.year
                 if (event.start_date.month, event.start_date.day) < (birth_date.month, birth_date.day):
                     age -= 1
-
+                
                 role_id = None
+                
+                # Versuche Rolle aus Regelwerk zu ermitteln
                 if ruleset and ruleset.age_groups:
                     for age_group in ruleset.age_groups:
                         min_age = age_group.get("min_age", 0)
                         max_age = age_group.get("max_age", 999)
                         if min_age <= age <= max_age:
                             role_name = age_group.get("role", "").lower()
-                            role = db.query(Role).filter(
-                                Role.event_id == event_id,
-                                Role.name == role_name,
-                                Role.is_active == True
-                            ).first()
-                            if role:
-                                role_id = role.id
-                                break
-
-                # Fallback: Erste Rolle verwenden
+                            if role_name:  # Nur suchen wenn role_name nicht leer
+                                role = db.query(Role).filter(
+                                    Role.event_id == event_id,
+                                    Role.name == role_name,
+                                    Role.is_active == True
+                                ).first()
+                                if role:
+                                    role_id = role.id
+                                    logger.debug(f"Assigned role '{role.display_name}' to {participant_data['first_name']} {participant_data['last_name']} (age: {age})")
+                                    break
+                                else:
+                                    logger.warning(f"Role '{role_name}' not found for age {age}")
+                
+                # Fallback 1: Standard-Rolle basierend auf Alter
                 if not role_id:
+                    logger.warning(f"No role from ruleset for age {age}, trying fallback...")
+                    
+                    # Versuche Standard-Rollen zu finden
+                    fallback_roles = []
+                    if age < 12:
+                        fallback_roles = ["kind", "child"]
+                    elif age < 18:
+                        fallback_roles = ["jugendlicher", "jugend", "teenager"]
+                    else:
+                        fallback_roles = ["betreuer", "erwachsener", "adult"]
+                    
+                    for fallback_name in fallback_roles:
+                        role = db.query(Role).filter(
+                            Role.event_id == event_id,
+                            Role.name == fallback_name,
+                            Role.is_active == True
+                        ).first()
+                        if role:
+                            role_id = role.id
+                            logger.info(f"Assigned fallback role '{role.display_name}' to {participant_data['first_name']} {participant_data['last_name']}")
+                            break
+                
+                # Fallback 2: Erste verfügbare Rolle verwenden
+                if not role_id:
+                    logger.warning(f"No fallback role found, using first available role...")
                     first_role = db.query(Role).filter(
                         Role.event_id == event_id,
                         Role.is_active == True
                     ).first()
                     if first_role:
                         role_id = first_role.id
+                        logger.info(f"Assigned first available role '{first_role.display_name}' to {participant_data['first_name']} {participant_data['last_name']}")
+                    else:
+                        # Kritischer Fehler: Keine Rollen vorhanden
+                        logger.error(f"CRITICAL: No roles available for event {event_id}!")
+                        skipped_count += 1
+                        continue
 
                 # Familie zuordnen
                 family_id = None
