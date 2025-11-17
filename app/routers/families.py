@@ -68,6 +68,17 @@ async def create_family(
             notes=notes
         )
 
+        # Duplikat-Check: Prüfe ob Familie mit gleichem Namen bereits existiert
+        existing_family = db.query(Family).filter(
+            Family.event_id == event_id,
+            Family.name == family_data.name
+        ).first()
+
+        if existing_family:
+            logger.warning(f"Duplicate family name: {family_data.name} for event {event_id}")
+            flash(request, f"Eine Familie mit dem Namen '{family_data.name}' existiert bereits für dieses Event", "error")
+            return RedirectResponse(url="/families/create?error=duplicate", status_code=303)
+
         family = Family(
             name=family_data.name,
             contact_person=family_data.contact_person,

@@ -45,6 +45,9 @@ class PriceCalculator:
         )
 
         # Alle Rabatte vom Basispreis berechnen (nicht gestapelt!)
+        # WICHTIG: Beide Rabatte werden vom Basispreis berechnet, nicht vom bereits
+        # reduzierten Preis. Beispiel: Basispreis 100€, Rollenrabatt 50%, Familienrabatt 20%
+        # → Endpreis = 100€ - 50€ - 20€ = 30€ (NICHT 100€ - 50€ - 10€ = 40€)
         role_discount_amount = base_price * (role_discount_percent / 100)
         family_discount_amount = base_price * (family_discount_percent / 100)
 
@@ -105,16 +108,22 @@ class PriceCalculator:
         - Erstes Kind (first_child_percent, optional, Standard: 0%)
         - Zweites Kind (second_child_percent)
         - Drittes und weitere Kinder (third_plus_child_percent)
+
+        Beispiel: Bei 3 Kindern mit Rabatten [0%, 25%, 50%]:
+        - Kind 1 (ältestes): 0% Rabatt
+        - Kind 2: 25% Rabatt
+        - Kind 3 (jüngstes): 50% Rabatt
         """
         if not family_discount_config.get("enabled", False):
             return 0.0
 
         if child_position == 1:
-            # Erstes Kind: Rabatt optional (Standard: 0%)
+            # Erstes Kind (ältestes): Rabatt optional (Standard: 0%)
             return float(family_discount_config.get("first_child_percent", 0))
         elif child_position == 2:
+            # Zweites Kind
             return float(family_discount_config.get("second_child_percent", 0))
-        else:  # 3. Kind und weitere
+        else:  # 3. Kind und weitere (jüngste Kinder)
             return float(family_discount_config.get("third_plus_child_percent", 0))
 
     @staticmethod
