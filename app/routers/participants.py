@@ -902,22 +902,47 @@ async def confirm_import(
                 
                 # Versuche erst mit birth_date_obj (wenn bereits geparst)
                 if participant_data.get("birth_date_obj"):
-                    birth_date = participant_data["birth_date_obj"]
-                    logger.debug(f"Using pre-parsed birth_date_obj: {birth_date}")
-                else:
-                    # Ansonsten String parsen
-                    for fmt in ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"]:
+                    birth_date_obj = participant_data["birth_date_obj"]
+                    
+                    # Kann String oder date-Objekt sein (durch JSON-Serialisierung)
+                    if isinstance(birth_date_obj, date):
+                        birth_date = birth_date_obj
+                        logger.debug(f"Using pre-parsed birth_date_obj (date): {birth_date}")
+                    elif isinstance(birth_date_obj, datetime):
+                        birth_date = birth_date_obj.date()
+                        logger.debug(f"Using pre-parsed birth_date_obj (datetime): {birth_date}")
+                    elif isinstance(birth_date_obj, str):
+                        # JSON hat es zu String gemacht - zurück parsen
+                        for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"]:
+                            try:
+                                parsed = datetime.strptime(birth_date_obj, fmt)
+                                birth_date = parsed.date() if isinstance(parsed, datetime) else parsed
+                                logger.debug(f"Parsed birth_date_obj string with format {fmt}: {birth_date}")
+                                break
+                            except ValueError:
+                                continue
+                
+                # Falls birth_date_obj nicht funktioniert hat, versuche birth_date String
+                if not birth_date and birth_date_str:
+                    for fmt in ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S"]:
                         try:
-                            birth_date = datetime.strptime(birth_date_str, fmt).date()
-                            logger.debug(f"Parsed birth_date from string with format {fmt}: {birth_date}")
+                            parsed = datetime.strptime(birth_date_str, fmt)
+                            birth_date = parsed.date() if isinstance(parsed, datetime) else parsed
+                            logger.debug(f"Parsed birth_date string with format {fmt}: {birth_date}")
                             break
                         except ValueError:
                             continue
-        
+                
                 if not birth_date:
                     logger.error(f"Could not parse birth_date for {participant_data.get('first_name')} {participant_data.get('last_name')}: {birth_date_str}")
                     skipped_count += 1
                     continue
+                
+                # Sicherstellen dass birth_date ein date-Objekt ist
+                if isinstance(birth_date, datetime):
+                    birth_date = birth_date.date()
+                
+                logger.debug(f"Final birth_date (type: {type(birth_date).__name__}): {birth_date}")
         
                 # Rolle basierend auf Alter ermitteln
                 age = event.start_date.year - birth_date.year
