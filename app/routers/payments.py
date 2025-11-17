@@ -170,6 +170,118 @@ async def create_payment(
         return handle_db_exception(e, "/payments/create", "Creating payment", db, request)
 
 
+@router.get("/{payment_id}/edit", response_class=HTMLResponse)
+async def edit_payment_form(
+    payment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """Formular zum Bearbeiten einer Zahlung"""
+    payment = db.query(Payment).filter(Payment.id == payment_id, Payment.event_id == event_id).first()
+
+    if not payment:
+        flash(request, "Zahlung nicht gefunden", "error")
+        return RedirectResponse(url="/payments", status_code=303)
+
+    # Teilnehmer und Familien für Dropdown laden
+    participants = db.query(Participant).filter(Participant.event_id == event_id).order_by(Participant.first_name, Participant.last_name).all()
+    families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
+
+    return templates.TemplateResponse(
+        "payments/edit.html",
+        {
+            "request": request,
+            "title": "Zahlung bearbeiten",
+            "payment": payment,
+            "participants": participants,
+            "families": families
+        }
+    )
+
+
+@router.post("/{payment_id}/edit", response_class=HTMLResponse)
+async def update_payment(
+    payment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
+    amount: float = Form(...),
+    payment_date: str = Form(...),
+    payment_method: Optional[str] = Form(None),
+    reference: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
+    participant_id: Optional[str] = Form(None),
+    family_id: Optional[str] = Form(None)
+):
+    """Aktualisiert eine Zahlung"""
+    payment = db.query(Payment).filter(Payment.id == payment_id, Payment.event_id == event_id).first()
+
+    if not payment:
+        flash(request, "Zahlung nicht gefunden", "error")
+        return RedirectResponse(url="/payments", status_code=303)
+
+    try:
+        # Validierung: Nur Teilnehmer ODER Familie, nicht beides
+        if participant_id and family_id:
+            flash(request, "Eine Zahlung kann entweder einem Teilnehmer oder einer Familie zugeordnet werden, nicht beides", "error")
+            return RedirectResponse(url=f"/payments/{payment_id}/edit?error=double_assignment", status_code=303)
+
+        # Pydantic-Validierung
+        payment_data = PaymentUpdateSchema(
+            amount=amount,
+            payment_date=payment_date,
+            payment_method=payment_method,
+            reference=reference,
+            notes=notes,
+            participant_id=participant_id,
+            family_id=family_id
+        )
+
+        # Zahlung aktualisieren
+        payment.amount = payment_data.amount
+        payment.payment_date = payment_data.payment_date
+        payment.payment_method = payment_data.payment_method
+        payment.reference = payment_data.reference
+        payment.notes = payment_data.notes
+        payment.participant_id = payment_data.participant_id
+        payment.family_id = payment_data.family_id
+
+        db.commit()
+        db.refresh(payment)
+
+        logger.info(f"Payment updated: ID {payment_id}, Amount: {payment.amount}€")
+        flash(request, "Zahlung erfolgreich aktualisiert", "success")
+        return RedirectResponse(url="/payments", status_code=303)
+
+    except ValidationError as e:
+        db.rollback()
+        logger.warning(f"Validation error updating payment: {e}", exc_info=True)
+        flash(request, f"Validierungsfehler: {e}", "error")
+        return RedirectResponse(url=f"/payments/{payment_id}/edit?error=validation", status_code=303)
+
+    except ValueError as e:
+        db.rollback()
+        logger.warning(f"Invalid input for payment update: {e}", exc_info=True)
+        flash(request, f"Ungültige Eingabe: {str(e)}", "error")
+        return RedirectResponse(url=f"/payments/{payment_id}/edit?error=invalid_input", status_code=303)
+
+    except IntegrityError as e:
+        db.rollback()
+        logger.error(f"Database integrity error updating payment: {e}", exc_info=True)
+        flash(request, "Zahlung konnte nicht aktualisiert werden (Datenbankfehler)", "error")
+        return RedirectResponse(url=f"/payments/{payment_id}/edit?error=db_integrity", status_code=303)
+
+    except DataError as e:
+        db.rollback()
+        logger.error(f"Invalid data updating payment: {e}", exc_info=True)
+        flash(request, "Ungültige Daten eingegeben", "error")
+        return RedirectResponse(url=f"/payments/{payment_id}/edit?error=invalid_data", status_code=303)
+
+    except Exception as e:
+        return handle_db_exception(e, f"/payments/{payment_id}/edit", "Updating payment", db, request)
+
+
 @router.post("/{payment_id}/delete")
 async def delete_payment(payment_id: int, db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
     """Löscht eine Zahlung"""
