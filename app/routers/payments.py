@@ -291,21 +291,14 @@ async def delete_payment(payment_id: int, db: Session = Depends(get_db), event_i
         raise HTTPException(status_code=404, detail="Zahlung nicht gefunden")
 
     try:
-        participant_id = payment.participant_id
-        family_id = payment.family_id
         payment_amount = payment.amount
 
         db.delete(payment)
         db.commit()
         logger.info(f"Payment deleted: {payment_amount}€ (ID: {payment_id})")
 
-        # Redirect zurück zur Quelle
-        if participant_id:
-            return RedirectResponse(url=f"/participants/{participant_id}", status_code=303)
-        elif family_id:
-            return RedirectResponse(url=f"/families/{family_id}", status_code=303)
-        else:
-            return RedirectResponse(url="/payments", status_code=303)
+        # Redirect zur Zahlungsliste
+        return RedirectResponse(url="/payments", status_code=303)
 
     except IntegrityError as e:
         db.rollback()
