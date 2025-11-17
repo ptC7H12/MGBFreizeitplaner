@@ -648,9 +648,13 @@ def _process_import_row(row, row_num, participants_data, errors, families_dict):
     if not any(row):
         return
 
+    # Werte aus der Zeile extrahieren
     first_name = str(row[0]).strip() if row[0] else ""
     last_name = str(row[1]).strip() if row[1] else ""
-    birth_date_str = str(row[2]).strip() if row[2] else ""
+    
+    # Geburtsdatum: Kann als date/datetime-Objekt oder String kommen
+    birth_date_raw = row[2] if len(row) > 2 and row[2] else None
+    
     gender = str(row[3]).strip() if row[3] and len(row) > 3 else ""
     email = str(row[4]).strip() if row[4] and len(row) > 4 else ""
     phone = str(row[5]).strip() if row[5] and len(row) > 5 else ""
@@ -669,41 +673,46 @@ def _process_import_row(row, row_num, participants_data, errors, families_dict):
         row_errors.append("Nachname fehlt")
         has_error = True
 
-    # Geburtsdatum parsen
+    # Geburtsdatum parsen - unterstützt mehrere Formate
     birth_date = None
-if birth_date_str:
-    try:
-        # Falls Excel ein datetime-Objekt zurückgibt, direkt verwenden
-        if isinstance(birth_date_str, date):
-            birth_date = birth_date_str
-        elif isinstance(birth_date_str, datetime):
-            birth_date = birth_date_str.date()
-        else:
-            # String parsen - versuche verschiedene Formate
-            birth_date_str_clean = str(birth_date_str).strip()
-            
-            # Unterstützte Formate (in Prioritätsreihenfolge)
-            date_formats = [
-                "%Y-%m-%d %H:%M:%S",  # Excel: 1991-07-01 00:00:00
-                "%Y-%m-%d",           # ISO: 1991-07-01
-                "%d.%m.%Y",           # Deutsch: 01.07.1991
-                "%d/%m/%Y",           # Alternative: 01/07/1991
-                "%d-%m-%Y",           # Alternative: 01-07-1991
-            ]
-            
-            for fmt in date_formats:
-                try:
-                    birth_date = datetime.strptime(birth_date_str_clean, fmt).date()
-                    break
-                except ValueError:
-                    continue
+    birth_date_str = ""  # Für Fehlerausgabe
+    
+    if birth_date_raw:
+        try:
+            # Fall 1: Excel gibt bereits ein date/datetime-Objekt zurück
+            if isinstance(birth_date_raw, date):
+                birth_date = birth_date_raw
+                birth_date_str = birth_date.strftime("%d.%m.%Y")
+            elif isinstance(birth_date_raw, datetime):
+                birth_date = birth_date_raw.date()
+                birth_date_str = birth_date.strftime("%d.%m.%Y")
+            else:
+                # Fall 2: String parsen - versuche verschiedene Formate
+                birth_date_str = str(birth_date_raw).strip()
+                
+                # Unterstützte Formate
+                date_formats = [
+                    "%Y-%m-%d %H:%M:%S",  # Excel: 1991-07-01 00:00:00
+                    "%Y-%m-%d",           # ISO: 1991-07-01
+                    "%d.%m.%Y",           # Deutsch: 01.07.1991
+                    "%d/%m/%Y",           # Alternative: 01/07/1991
+                    "%d-%m-%Y",           # Alternative: 01-07-1991
+                ]
+                
+                for fmt in date_formats:
+                    try:
+                        birth_date = datetime.strptime(birth_date_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
 
-            if not birth_date:
-                row_errors.append(f"Ungültiges Datumsformat: {birth_date_str}")
-                has_error = True
-    except Exception as e:
-        row_errors.append(f"Fehler beim Datum: {str(e)}")
-        has_error = True
+                if not birth_date:
+                    row_errors.append(f"Ungültiges Datumsformat: {birth_date_str}")
+                    has_error = True
+                    
+        except Exception as e:
+            row_errors.append(f"Fehler beim Datum: {str(e)}")
+            has_error = True
     else:
         row_errors.append("Geburtsdatum fehlt")
         has_error = True
