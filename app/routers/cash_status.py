@@ -22,6 +22,7 @@ from app.database import get_db
 from app.models import Payment, Expense, Income, Participant, Family, Event
 from app.dependencies import get_current_event_id
 from app.templates_config import templates
+from app.services.excel_service import ExcelService
 
 logger = logging.getLogger(__name__)
 
@@ -523,10 +524,8 @@ async def export_history_excel(
     # Chronologisch sortieren (älteste zuerst für Excel)
     transactions_list.sort(key=lambda x: x['transaction_date'])
 
-    # Excel erstellen
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Transaktionshistorie"
+    # Excel erstellen mit ExcelService
+    wb, ws = ExcelService.create_workbook("Transaktionshistorie")
 
     # Header
     headers = [
@@ -535,21 +534,11 @@ async def export_history_excel(
         "Teilnehmer", "Familie"
     ]
 
-    # Header-Formatierung
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True, size=11)
-    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_num, value=header)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = header_alignment
-
     # Spaltenbreiten
-    column_widths = [12, 18, 12, 12, 12, 12, 15, 25, 30, 20, 20]
-    for col_num, width in enumerate(column_widths, 1):
-        ws.column_dimensions[ws.cell(row=1, column=col_num).column_letter].width = width
+    column_widths = {1: 12, 2: 18, 3: 12, 4: 12, 5: 12, 6: 12, 7: 15, 8: 25, 9: 30, 10: 20, 11: 20}
+
+    # Header-Formatierung mit ExcelService
+    ExcelService.apply_header_row(ws, headers, column_widths)
 
     # Daten schreiben
     running_balance = 0.0
@@ -570,31 +559,22 @@ async def export_history_excel(
         ws.cell(row=row_num, column=10, value=transaction['participant_name'] or '')
         ws.cell(row=row_num, column=11, value=transaction['family_name'] or '')
 
-        # Farbe für Einnahmen/Ausgaben
-        if transaction['amount'] > 0:
-            ws.cell(row=row_num, column=3).font = Font(color="00B050")  # Grün
-        else:
-            ws.cell(row=row_num, column=3).font = Font(color="C00000")  # Rot
+        # Farbe für Einnahmen/Ausgaben mit ExcelService
+        ExcelService.apply_color_by_value(ws, row_num, 3, transaction['amount'])
 
         row_num += 1
 
-    # Summenzeile
+    # Summenzeile mit ExcelService
     row_num += 1
-    summary_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
-    summary_font = Font(bold=True)
-
-    ws.cell(row=row_num, column=1, value="GESAMT").font = summary_font
-    ws.cell(row=row_num, column=1).fill = summary_fill
-
     total_income = sum(t['amount'] for t in transactions_list if t['amount'] > 0)
     total_expenses = sum(abs(t['amount']) for t in transactions_list if t['amount'] < 0)
 
-    ws.cell(row=row_num, column=4, value=total_income).font = summary_font
-    ws.cell(row=row_num, column=4).fill = summary_fill
-    ws.cell(row=row_num, column=5, value=total_expenses).font = summary_font
-    ws.cell(row=row_num, column=5).fill = summary_fill
-    ws.cell(row=row_num, column=6, value=running_balance).font = summary_font
-    ws.cell(row=row_num, column=6).fill = summary_fill
+    summary_values = {
+        4: total_income,
+        5: total_expenses,
+        6: running_balance
+    }
+    ExcelService.apply_summary_row(ws, row_num, summary_values)
 
     # Datei als BytesIO zurückgeben
     output = BytesIO()

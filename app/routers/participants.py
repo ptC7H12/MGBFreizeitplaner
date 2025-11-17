@@ -8,15 +8,17 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from pydantic import ValidationError
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.worksheet.worksheet import Worksheet
 
 from app.database import get_db, transaction
 from app.models import Participant, Role, Event, Family, Ruleset, Setting
 from app.services.price_calculator import PriceCalculator
 from app.services.qrcode_service import QRCodeService
+from app.services.excel_service import ExcelService
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
@@ -32,7 +34,7 @@ router = APIRouter(prefix="/participants", tags=["participants"])
 def _calculate_price_for_participant(
     db: Session,
     event_id: int,
-    role_id: int,
+    role_id: Optional[int],  # Rolle ist optional
     birth_date: date,
     family_id: Optional[int]
 ) -> float:
@@ -42,18 +44,17 @@ def _calculate_price_for_participant(
     Args:
         db: Datenbank-Session
         event_id: ID der Veranstaltung
-        role_id: ID der Rolle
+        role_id: Optional ID der Rolle (kann None sein)
         birth_date: Geburtsdatum des Teilnehmers
         family_id: Optional ID der Familie
 
     Returns:
         Berechneter Preis in Euro
     """
-    # Event und Rolle laden
+    # Event laden
     event = db.query(Event).filter(Event.id == event_id).first()
-    role = db.query(Role).filter(Role.id == role_id).first()
 
-    if not event or not role:
+    if not event:
         return 0.0
 
     # Aktives Regelwerk für das Event finden
@@ -83,10 +84,17 @@ def _calculate_price_for_participant(
         # Position des neuen Kindes bestimmen
         family_children_count = len(siblings) + 1
 
-    # Preis berechnen
+    # Rolle-Name für Preisberechnung
+    role_name = None
+    if role_id:
+        role = db.query(Role).filter(Role.id == role_id).first()
+        if role:
+            role_name = role.name.lower()
+
+    # Preis berechnen (ohne Rolle = nur Basispreis basierend auf Alter)
     calculated_price = PriceCalculator.calculate_participant_price(
         age=age,
-        role_name=role.name.lower(),
+        role_name=role_name,  # Kann None sein
         ruleset_data={
             "age_groups": ruleset.age_groups,
             "role_discounts": ruleset.role_discounts,
@@ -554,24 +562,14 @@ async def download_import_template(
             }
         )
 
-    # Excel-Format (Standard)
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Teilnehmer"
+    # Excel-Format (Standard) mit ExcelService
+    wb, ws = ExcelService.create_workbook("Teilnehmer")
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
+    # Spaltenbreiten
+    column_widths = {1: 15, 2: 15, 3: 25, 4: 12, 5: 25, 6: 15, 7: 30, 8: 12}
 
-    for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_num, value=header)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    # Spaltenbreiten anpassen
-    column_widths = [15, 15, 25, 12, 25, 15, 30, 12]
-    for col_num, width in enumerate(column_widths, 1):
-        ws.column_dimensions[ws.cell(row=1, column=col_num).column_letter].width = width
+    # Header-Formatierung mit ExcelService
+    ExcelService.apply_header_row(ws, headers, column_widths)
 
     # Beispieldaten hinzufügen (bereits definiert oben)
 
@@ -629,8 +627,16 @@ async def download_import_template(
     )
 
 
-def _parse_csv_data(csv_content: str):
-    """Hilfsfunktion zum Parsen von CSV-Inhalten"""
+def _parse_csv_data(csv_content: str) -> List[List[str]]:
+    """
+    Hilfsfunktion zum Parsen von CSV-Inhalten.
+
+    Args:
+        csv_content: CSV-Inhalt als String
+
+    Returns:
+        Liste von Zeilen, jede Zeile ist eine Liste von Werten
+    """
     csv_reader = csv.reader(StringIO(csv_content), delimiter=';')
     rows = list(csv_reader)
 
@@ -642,8 +648,23 @@ def _parse_csv_data(csv_content: str):
     return rows
 
 
-def _process_import_row(row, row_num, participants_data, errors, families_dict):
-    """Hilfsfunktion zum Verarbeiten einer Import-Zeile (Excel oder CSV)"""
+def _process_import_row(
+    row: List[Any],
+    row_num: int,
+    participants_data: List[Dict[str, Any]],
+    errors: List[str],
+    families_dict: Dict[str, Family]
+) -> None:
+    """
+    Hilfsfunktion zum Verarbeiten einer Import-Zeile (Excel oder CSV).
+
+    Args:
+        row: Zeile mit Teilnehmerdaten
+        row_num: Zeilennummer für Fehlermeldungen
+        participants_data: Liste zum Sammeln der verarbeiteten Teilnehmerdaten
+        errors: Liste zum Sammeln von Fehlermeldu ngen
+        families_dict: Dictionary mit Familien-Nummern als Keys
+    """
     # Leere Zeilen überspringen
     if not any(row):
         return
@@ -951,57 +972,53 @@ async def confirm_import(
         
                 logger.debug(f"Calculated age: {age} for {participant_data.get('first_name')} {participant_data.get('last_name')}")
         
+                # KEINE automatische Rollenzuweisung beim Import
+                # Teilnehmer bekommen nur eine Rolle, wenn sie explizit eine benötigen
                 role_id = None
-                if ruleset and ruleset.age_groups:
-                    for age_group in ruleset.age_groups:
-                        min_age = age_group.get("min_age", 0)
-                        max_age = age_group.get("max_age", 999)
-                        if min_age <= age <= max_age:
-                            role_name = age_group.get("role", "").lower()
-                            if role_name:
-                                role = db.query(Role).filter(
-                                    Role.event_id == event_id,
-                                    Role.name == role_name,
-                                    Role.is_active == True
-                                ).first()
-                                if role:
-                                    role_id = role.id
-                                    logger.debug(f"Assigned role from ruleset: {role.display_name}")
-                                    break
-        
-                # Fallback: Erste Rolle verwenden
-                if not role_id:
-                    logger.warning(f"No role from ruleset for age {age}, using fallback")
-                    first_role = db.query(Role).filter(
-                        Role.event_id == event_id,
-                        Role.is_active == True
-                    ).first()
-                    if first_role:
-                        role_id = first_role.id
-                        logger.info(f"Using fallback role: {first_role.display_name}")
-                    else:
-                        logger.error(f"CRITICAL: No roles available for event {event_id}")
-                        skipped_count += 1
-                        continue
-        
+                logger.debug(f"Import: No automatic role assignment for {participant_data.get('first_name')} {participant_data.get('last_name')}")
+
                 # Familie zuordnen
                 family_id = None
                 family_number = participant_data.get("family_number")
                 if family_number and family_number in family_map:
                     family_id = family_map[family_number]
                     logger.debug(f"Assigned to family_id: {family_id}")
-        
-                # Preis berechnen
+
+                # Preis berechnen: Nur Basispreis basierend auf Alter (aus age_groups)
                 final_price = 0.0
-                if role_id:
-                    final_price = _calculate_price_for_participant(
-                        db=db,
-                        event_id=event_id,
-                        role_id=role_id,
-                        birth_date=birth_date,
-                        family_id=family_id
-                    )
-                    logger.debug(f"Calculated price: {final_price}")
+                if ruleset and ruleset.age_groups:
+                    # Finde passende Altersgruppe
+                    for age_group in ruleset.age_groups:
+                        min_age = age_group.get("min_age", 0)
+                        max_age = age_group.get("max_age", 999)
+                        if min_age <= age <= max_age:
+                            base_price = age_group.get("base_price", 0.0)
+                            final_price = base_price
+                            logger.debug(f"Calculated base price from age group: {final_price}€ (age: {age})")
+                            break
+
+                    # Familienrabatt anwenden falls Familie vorhanden
+                    if family_id and final_price > 0:
+                        family_discount = ruleset.family_discount or {}
+                        # Zähle Familienmitglieder
+                        family_members_count = len([p for p in data.get("participants", [])
+                                                   if p.get("family_number") == family_number and not p.get("has_error")])
+
+                        # Familienrabatt nach Anzahl der Mitglieder
+                        discount_percent = 0
+                        for member_count, discount in sorted(family_discount.items(), key=lambda x: int(x[0]), reverse=True):
+                            if family_members_count >= int(member_count):
+                                discount_percent = discount
+                                break
+
+                        if discount_percent > 0:
+                            discount_amount = final_price * (discount_percent / 100)
+                            final_price -= discount_amount
+                            logger.debug(f"Applied family discount: {discount_percent}% = {discount_amount}€, new price: {final_price}€")
+                else:
+                    logger.warning(f"No ruleset or age_groups found, price will be 0.0")
+
+                logger.debug(f"Final calculated price: {final_price}€")
         
                 # Teilnehmer erstellen
                 new_participant = Participant(
@@ -1075,10 +1092,8 @@ async def export_participants_excel(
             Participant.is_active == True
         ).order_by(Participant.last_name, Participant.first_name).all()
 
-        # Workbook erstellen
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Teilnehmerliste"
+        # Workbook erstellen mit ExcelService
+        wb, ws = ExcelService.create_workbook("Teilnehmerliste")
 
         # Header-Zeile
         headers = [
@@ -1087,21 +1102,15 @@ async def export_participants_excel(
             "Bezahlt (€)", "Offen (€)", "Adresse"
         ]
 
-        # Header-Formatierung
-        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-        header_font = Font(color="FFFFFF", bold=True, size=11)
-        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-        for col_num, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col_num, value=header)
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = header_alignment
-
         # Spaltenbreiten
-        column_widths = [15, 15, 12, 6, 10, 15, 20, 25, 15, 10, 10, 10, 30]
-        for col_num, width in enumerate(column_widths, 1):
-            ws.column_dimensions[ws.cell(row=1, column=col_num).column_letter].width = width
+        column_widths = {
+            1: 15, 2: 15, 3: 15, 4: 8, 5: 12,
+            6: 15, 7: 20, 8: 25, 9: 15, 10: 12,
+            11: 12, 12: 12, 13: 30
+        }
+
+        # Header-Formatierung mit ExcelService
+        ExcelService.apply_header_row(ws, headers, column_widths)
 
         # Familien gruppieren
         families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
@@ -1194,8 +1203,16 @@ async def export_participants_excel(
         raise HTTPException(status_code=500, detail=f"Fehler beim Export: {str(e)}")
 
 
-def _write_participant_row(ws, row_num: int, participant: Participant, event: Event):
-    """Hilfsfunktion zum Schreiben einer Teilnehmer-Zeile"""
+def _write_participant_row(ws: Worksheet, row_num: int, participant: Participant, event: Event) -> None:
+    """
+    Hilfsfunktion zum Schreiben einer Teilnehmer-Zeile in ein Excel-Worksheet.
+
+    Args:
+        ws: Worksheet-Objekt
+        row_num: Zeilennummer
+        participant: Teilnehmer-Objekt
+        event: Event-Objekt
+    """
     # Alter berechnen
     age = event.start_date.year - participant.birth_date.year
     if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
@@ -1328,7 +1345,7 @@ async def update_participant(
     discount_percent: float = Form(0.0),
     discount_reason: Optional[str] = Form(None),
     manual_price_override: Optional[float] = Form(None),
-    role_id: int = Form(...),
+    role_id: Optional[int] = Form(None),  # Rolle ist optional
     family_id: Optional[int] = Form(None)
 ):
     """Aktualisiert einen Teilnehmer"""

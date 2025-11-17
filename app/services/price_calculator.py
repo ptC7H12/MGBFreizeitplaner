@@ -9,7 +9,7 @@ class PriceCalculator:
     @staticmethod
     def calculate_participant_price(
         age: int,
-        role_name: str,
+        role_name: Optional[str],  # Rolle ist optional
         ruleset_data: Dict[str, Any],
         family_children_count: int = 1
     ) -> float:
@@ -18,7 +18,7 @@ class PriceCalculator:
 
         Args:
             age: Alter des Teilnehmers
-            role_name: Name der Rolle (z.B. "betreuer", "kind")
+            role_name: Optional Name der Rolle (z.B. "betreuer", "kind"). None = keine Rolle
             ruleset_data: Regelwerk-Daten (age_groups, role_discounts, etc.)
             family_children_count: Position in der Familie (1=erstes Kind, 2=zweites, etc.)
 
@@ -28,10 +28,12 @@ class PriceCalculator:
         # Basispreis aus Altersgruppen ermitteln
         base_price = PriceCalculator._get_base_price_by_age(age, ruleset_data.get("age_groups", []))
 
-        # Rollenrabatt ermitteln
-        role_discount_percent = PriceCalculator._get_role_discount(
-            role_name, ruleset_data.get("role_discounts", {})
-        )
+        # Rollenrabatt ermitteln (nur wenn Rolle vorhanden)
+        role_discount_percent = 0.0
+        if role_name:
+            role_discount_percent = PriceCalculator._get_role_discount(
+                role_name, ruleset_data.get("role_discounts", {})
+            )
 
         # Familienrabatt ermitteln
         family_discount_percent = PriceCalculator._get_family_discount(
@@ -49,17 +51,42 @@ class PriceCalculator:
 
     @staticmethod
     def _get_base_price_by_age(age: int, age_groups: list) -> float:
-        """Ermittelt den Basispreis basierend auf dem Alter"""
+        """
+        Ermittelt den Basispreis basierend auf dem Alter.
+
+        Args:
+            age: Alter des Teilnehmers
+            age_groups: Liste der Altersgruppen mit base_price
+
+        Returns:
+            Basispreis für die Altersgruppe
+        """
         for group in age_groups:
             min_age = group.get("min_age", 0)
             max_age = group.get("max_age", 999)
             if min_age <= age <= max_age:
+                # Neues Format: base_price direkt aus age_group
+                if "base_price" in group:
+                    return float(group.get("base_price", 0))
+                # Legacy Format: price als Fallback
                 return float(group.get("price", 0))
         return 0.0
 
     @staticmethod
-    def _get_role_discount(role_name: str, role_discounts: dict) -> float:
-        """Ermittelt den Rollenrabatt in Prozent"""
+    def _get_role_discount(role_name: Optional[str], role_discounts: dict) -> float:
+        """
+        Ermittelt den Rollenrabatt in Prozent.
+
+        Args:
+            role_name: Optional Name der Rolle
+            role_discounts: Dictionary mit Rollenrabatten
+
+        Returns:
+            Rabatt in Prozent (0.0 wenn keine Rolle oder kein Rabatt)
+        """
+        if not role_name:
+            return 0.0
+
         role_name_lower = role_name.lower()
         if role_name_lower in role_discounts:
             return float(role_discounts[role_name_lower].get("discount_percent", 0))

@@ -3,7 +3,7 @@ from typing import List, Dict
 from fastapi import Request
 
 
-def flash(request: Request, message: str, category: str = "info"):
+def flash(request: Request, message: str, category: str = "info") -> None:
     """
     Fügt eine Flash-Message zur Session hinzu.
 
