@@ -73,7 +73,8 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
         "income_subsidy_mismatch": [],
         "role_count_exceeded": [],
         "birthday_gifts": [],
-        "kitchen_team_gift": []
+        "kitchen_team_gift": [],
+        "familienfreizeit_non_member_check": []
     }
 
     # 1. Bildung & Teilhabe IDs vorhanden (müssen beantragt werden)
@@ -355,6 +356,17 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
             "task_type": "kitchen_team_gift",
             "count": len(kitchen_participants)
         })
+
+    # 14. Familienfreizeit: Prüfung ob Kinder von Nicht-Gemeindemitgliedern mitfahren
+    if event and event.event_type and event.event_type.lower() == "familienfreizeit":
+        if not is_task_completed(completed_tasks, "familienfreizeit_non_member_check", event_id):
+            tasks["familienfreizeit_non_member_check"].append({
+                "id": event_id,
+                "title": "Kinder von Nicht-Gemeindemitgliedern prüfen",
+                "description": "Prüfen ob Kinder von nicht-Gemeindemitgliedern mitfahren. Zuschüsse werden nur für Gemeindemitglieder gewährt.",
+                "link": f"/participants",
+                "task_type": "familienfreizeit_non_member_check"
+            })
 
     # Zähle Gesamtaufgaben
     total_tasks = sum(len(task_list) for task_list in tasks.values())
