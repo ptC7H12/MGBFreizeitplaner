@@ -112,6 +112,15 @@ async def _try_import_ruleset_from_github(
             flash(request, f"Gefundenes Regelwerk ist ungültig: {error_msg}", "warning")
             return False
 
+        # Alle bestehenden Rulesets für dieses Event deaktivieren
+        # (sollte normalerweise keine geben, aber sicherheitshalber)
+        existing_rulesets = db.query(Ruleset).filter(
+            Ruleset.event_id == event_id,
+            Ruleset.is_active == True
+        ).all()
+        for existing_ruleset in existing_rulesets:
+            existing_ruleset.is_active = False
+
         # Regelwerk in Datenbank speichern
         ruleset = Ruleset(
             name=data["name"],
