@@ -1,4 +1,5 @@
 """Auth Router - Freizeit-Auswahl und -Erstellung"""
+import logging
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -7,15 +8,20 @@ from datetime import date, datetime
 from app.database import get_db
 from app.models.event import Event
 from app.templates_config import templates
+from app.utils.flash import flash
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request, db: Session = Depends(get_db), error: str = None):
     """Landing Page für Freizeit-Auswahl oder -Erstellung"""
+    logger.info("Loading landing page")
+
     # Alle aktiven Freizeiten laden (neueste zuerst)
     events = db.query(Event).filter(Event.is_active == True).order_by(Event.created_at.desc()).all()
+    logger.debug(f"Found {len(events)} active events")
 
     return templates.TemplateResponse(
         "auth/landing.html",
@@ -35,6 +41,8 @@ async def select_event(
     event_id: int = Form(...)
 ):
     """Wählt eine Freizeit aus"""
+    logger.info(f"Attempting to select event {event_id}")
+
     # Event suchen
     event = db.query(Event).filter(
         Event.id == event_id,
@@ -42,14 +50,15 @@ async def select_event(
     ).first()
 
     if not event:
-        return RedirectResponse(
-            url="/auth/?error=invalid_event",
-            status_code=303
-        )
+        logger.warning(f"Event {event_id} not found or inactive")
+        flash(request, "Event nicht gefunden oder inaktiv", "error")
+        return RedirectResponse(url="/auth/", status_code=303)
 
     # Event-ID in Session speichern
     request.session["event_id"] = event.id
     request.session["event_name"] = event.name
+    logger.info(f"Successfully selected event {event_id} ('{event.name}')")
+    flash(request, f"Event '{event.name}' erfolgreich ausgewählt", "success")
 
     return RedirectResponse(url="/dashboard", status_code=303)
 
@@ -66,6 +75,8 @@ async def create_event(
     description: str = Form(None)
 ):
     """Erstellt eine neue Freizeit"""
+    logger.info(f"Attempting to create new event: name='{name}', type={event_type}")
+
     try:
         # Datum parsen
         start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
@@ -91,20 +102,26 @@ async def create_event(
         request.session["event_id"] = event.id
         request.session["event_name"] = event.name
 
+        logger.info(f"Successfully created event {event.id} ('{event.name}') from {start_date} to {end_date}")
+        flash(request, f"Event '{event.name}' erfolgreich erstellt!", "success")
         return RedirectResponse(url="/dashboard", status_code=303)
 
     except Exception as e:
+        logger.error(f"Failed to create event '{name}': {e}", exc_info=True)
         db.rollback()
-        return RedirectResponse(
-            url="/auth/?error=create_failed",
-            status_code=303
-        )
+        flash(request, f"Event konnte nicht erstellt werden: {str(e)}", "error")
+        return RedirectResponse(url="/auth/", status_code=303)
 
 
 @router.get("/logout")
 async def logout(request: Request):
     """Logout - Entfernt Event aus Session"""
+    event_id = request.session.get("event_id")
+    event_name = request.session.get("event_name")
+
     request.session.clear()
+    logger.info(f"User logged out from event {event_id} ('{event_name}')")
+
     return RedirectResponse(url="/auth/", status_code=303)
 
 
@@ -121,23 +138,29 @@ async def delete_event(
     event_id: int = Form(...)
 ):
     """Löscht eine Freizeit"""
+    logger.info(f"Attempting to delete event {event_id}")
+
     # Event suchen
     event = db.query(Event).filter(Event.id == event_id).first()
 
     if not event:
-        return RedirectResponse(
-            url="/auth/?error=invalid_event",
-            status_code=303
-        )
+        logger.warning(f"Event {event_id} not found for deletion")
+        flash(request, "Event nicht gefunden", "error")
+        return RedirectResponse(url="/auth/", status_code=303)
+
+    event_name = event.name
 
     # Prüfen ob das Event aktuell in der Session ist
     current_event_id = request.session.get("event_id")
     if current_event_id == event_id:
         # Session löschen wenn das aktuelle Event gelöscht wird
         request.session.clear()
+        logger.debug(f"Cleared session as deleted event was currently active")
 
     # Event löschen (Cascade löscht alle zugehörigen Daten)
     db.delete(event)
     db.commit()
 
+    logger.info(f"Successfully deleted event {event_id} ('{event_name}')")
+    flash(request, f"Event '{event_name}' wurde gelöscht", "info")
     return RedirectResponse(url="/auth/", status_code=303)

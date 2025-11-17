@@ -1,4 +1,5 @@
 """Tasks Router - Offene Aufgaben"""
+import logging
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -12,6 +13,7 @@ from app.utils.flash import flash
 from app.utils.datetime_utils import utcnow
 from app.templates_config import templates
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
@@ -35,6 +37,7 @@ def is_task_completed(completed_tasks: set, task_type: str, reference_id: int) -
 @router.get("/", response_class=HTMLResponse)
 async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
     """Liste aller offenen Aufgaben"""
+    logger.info(f"Loading tasks list for event {event_id}")
 
     # Hole Event-Details für Fälligkeitsdatum
     event = db.query(Event).filter(Event.id == event_id).first()
@@ -336,6 +339,7 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
 
     # Zähle Gesamtaufgaben
     total_tasks = sum(len(task_list) for task_list in tasks.values())
+    logger.info(f"Found {total_tasks} open tasks for event {event_id}")
 
     return templates.TemplateResponse(
         "tasks/list.html",
@@ -359,6 +363,7 @@ async def complete_task(
     event_id: int = Depends(get_current_event_id)
 ):
     """Markiert eine Aufgabe als erledigt"""
+    logger.info(f"Marking task as completed: type={task_type}, reference_id={reference_id}, event_id={event_id}")
 
     # Prüfe, ob Task bereits existiert
     existing_task = db.query(Task).filter(
@@ -373,6 +378,7 @@ async def complete_task(
         existing_task.completed_at = utcnow()
         if note:
             existing_task.completion_note = note
+        logger.debug(f"Updated existing task {existing_task.id}")
     else:
         # Erstelle neuen Task
         new_task = Task(
@@ -383,15 +389,18 @@ async def complete_task(
             event_id=event_id
         )
         db.add(new_task)
+        logger.debug(f"Created new task for type={task_type}, reference_id={reference_id}")
 
     # Spezielle Behandlung für expense_reimbursement
     if task_type == "expense_reimbursement":
         expense = db.query(Expense).filter(Expense.id == reference_id).first()
         if expense:
             expense.is_settled = True
+            logger.info(f"Marked expense {expense.id} as settled")
 
     db.commit()
     flash(request, "Aufgabe wurde als erledigt markiert", "success")
+    logger.info(f"Task completed successfully: type={task_type}, reference_id={reference_id}")
 
     return RedirectResponse(url="/tasks", status_code=303)
 
@@ -405,6 +414,7 @@ async def uncomplete_task(
     event_id: int = Depends(get_current_event_id)
 ):
     """Markiert eine Aufgabe als nicht erledigt (macht Completion rückgängig)"""
+    logger.info(f"Uncompleting task: type={task_type}, reference_id={reference_id}, event_id={event_id}")
 
     # Finde und lösche den Task
     task = db.query(Task).filter(
@@ -415,14 +425,19 @@ async def uncomplete_task(
 
     if task:
         db.delete(task)
+        logger.debug(f"Deleted task {task.id}")
 
         # Spezielle Behandlung für expense_reimbursement
         if task_type == "expense_reimbursement":
             expense = db.query(Expense).filter(Expense.id == reference_id).first()
             if expense:
                 expense.is_settled = False
+                logger.info(f"Marked expense {expense.id} as not settled")
 
         db.commit()
         flash(request, "Aufgabe wurde wieder als offen markiert", "info")
+        logger.info(f"Task uncompleted successfully: type={task_type}, reference_id={reference_id}")
+    else:
+        logger.warning(f"Task not found for uncomplete: type={task_type}, reference_id={reference_id}")
 
     return RedirectResponse(url="/tasks", status_code=303)

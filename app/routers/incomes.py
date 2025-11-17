@@ -61,7 +61,7 @@ async def list_incomes(
     )
 
 
-@router.get("/new", response_class=HTMLResponse)
+@router.get("/create", response_class=HTMLResponse)
 async def new_income_form(
     request: Request,
     db: Session = Depends(get_db),
@@ -80,7 +80,7 @@ async def new_income_form(
     )
 
 
-@router.post("/new")
+@router.post("/create")
 async def create_income(
     request: Request,
     name: str = Form(...),
@@ -101,7 +101,7 @@ async def create_income(
         role = db.query(Role).filter(Role.id == role_id_int, Role.event_id == event_id).first()
         if not role:
             flash(request, "Ungültige Rolle ausgewählt", "error")
-            return RedirectResponse(url="/incomes/new", status_code=303)
+            return RedirectResponse(url="/incomes/create", status_code=303)
 
     income = Income(
         event_id=event_id,
