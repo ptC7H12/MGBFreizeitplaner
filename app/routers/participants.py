@@ -671,12 +671,29 @@ def _process_import_row(row, row_num, participants_data, errors, families_dict):
 
     # Geburtsdatum parsen
     birth_date = None
-    if birth_date_str:
-        try:
-            # Versuche verschiedene Formate
-            for fmt in ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"]:
+if birth_date_str:
+    try:
+        # Falls Excel ein datetime-Objekt zurückgibt, direkt verwenden
+        if isinstance(birth_date_str, date):
+            birth_date = birth_date_str
+        elif isinstance(birth_date_str, datetime):
+            birth_date = birth_date_str.date()
+        else:
+            # String parsen - versuche verschiedene Formate
+            birth_date_str_clean = str(birth_date_str).strip()
+            
+            # Unterstützte Formate (in Prioritätsreihenfolge)
+            date_formats = [
+                "%Y-%m-%d %H:%M:%S",  # Excel: 1991-07-01 00:00:00
+                "%Y-%m-%d",           # ISO: 1991-07-01
+                "%d.%m.%Y",           # Deutsch: 01.07.1991
+                "%d/%m/%Y",           # Alternative: 01/07/1991
+                "%d-%m-%Y",           # Alternative: 01-07-1991
+            ]
+            
+            for fmt in date_formats:
                 try:
-                    birth_date = datetime.strptime(birth_date_str, fmt).date()
+                    birth_date = datetime.strptime(birth_date_str_clean, fmt).date()
                     break
                 except ValueError:
                     continue
@@ -684,9 +701,9 @@ def _process_import_row(row, row_num, participants_data, errors, families_dict):
             if not birth_date:
                 row_errors.append(f"Ungültiges Datumsformat: {birth_date_str}")
                 has_error = True
-        except Exception as e:
-            row_errors.append(f"Fehler beim Datum: {str(e)}")
-            has_error = True
+    except Exception as e:
+        row_errors.append(f"Fehler beim Datum: {str(e)}")
+        has_error = True
     else:
         row_errors.append("Geburtsdatum fehlt")
         has_error = True
