@@ -3,6 +3,7 @@ from app.schemas.participant import ParticipantCreate, ParticipantUpdate, Partic
 from app.schemas.family import FamilyCreate, FamilyUpdate, FamilyResponse
 from app.schemas.payment import PaymentCreate, PaymentUpdate, PaymentResponse
 from app.schemas.expense import ExpenseCreate, ExpenseUpdate, ExpenseResponse
+from app.schemas.income import IncomeCreate, IncomeUpdate, IncomeResponse
 from app.schemas.setting import SettingUpdate, SettingResponse
 
 # Aliase für Kompatibilität mit älterem Code
@@ -14,6 +15,8 @@ PaymentCreateSchema = PaymentCreate
 PaymentUpdateSchema = PaymentUpdate
 ExpenseCreateSchema = ExpenseCreate
 ExpenseUpdateSchema = ExpenseUpdate
+IncomeCreateSchema = IncomeCreate
+IncomeUpdateSchema = IncomeUpdate
 SettingUpdateSchema = SettingUpdate
 
 __all__ = [
@@ -37,6 +40,11 @@ __all__ = [
     "ExpenseResponse",
     "ExpenseCreateSchema",
     "ExpenseUpdateSchema",
+    "IncomeCreate",
+    "IncomeUpdate",
+    "IncomeResponse",
+    "IncomeCreateSchema",
+    "IncomeUpdateSchema",
     "SettingUpdate",
     "SettingResponse",
     "SettingUpdateSchema",
