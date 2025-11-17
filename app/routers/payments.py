@@ -283,7 +283,12 @@ async def update_payment(
 
 
 @router.post("/{payment_id}/delete")
-async def delete_payment(payment_id: int, db: Session = Depends(get_db), event_id: int = Depends(get_current_event_id)):
+async def delete_payment(
+    request: Request,
+    payment_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Löscht eine Zahlung"""
     payment = db.query(Payment).filter(Payment.id == payment_id, Payment.event_id == event_id).first()
 

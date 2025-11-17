@@ -1,8 +1,11 @@
 """Role Management Service"""
+import logging
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.models import Role, Event
+
+logger = logging.getLogger(__name__)
 
 
 class RoleManager:

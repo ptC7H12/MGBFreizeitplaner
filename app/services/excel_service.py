@@ -1,8 +1,11 @@
 """Service für Excel-Exporte mit wiederverwendbaren Formatierungen"""
+import logging
 from typing import Dict, List, Optional, Any
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.worksheet.worksheet import Worksheet
+
+logger = logging.getLogger(__name__)
 
 
 class ExcelService:

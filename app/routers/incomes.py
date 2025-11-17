@@ -80,7 +80,7 @@ async def new_income_form(
     )
 
 
-@router.post("/create")
+@router.post("/create", response_class=HTMLResponse)
 async def create_income(
     request: Request,
     name: str = Form(...),
@@ -139,8 +139,8 @@ async def create_income(
 
 @router.get("/{income_id}/edit", response_class=HTMLResponse)
 async def edit_income_form(
-    income_id: int,
     request: Request,
+    income_id: int,
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id)
 ):
@@ -161,10 +161,10 @@ async def edit_income_form(
     )
 
 
-@router.post("/{income_id}/edit")
+@router.post("/{income_id}/edit", response_class=HTMLResponse)
 async def update_income(
-    income_id: int,
     request: Request,
+    income_id: int,
     name: str = Form(...),
     amount: float = Form(...),
     date: date_type = Form(...),
@@ -264,10 +264,10 @@ async def download_income_receipt(income_id: int, db: Session = Depends(get_db),
     )
 
 
-@router.post("/{income_id}/delete")
+@router.post("/{income_id}/delete", response_class=HTMLResponse)
 async def delete_income(
-    income_id: int,
     request: Request,
+    income_id: int,
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id)
 ):

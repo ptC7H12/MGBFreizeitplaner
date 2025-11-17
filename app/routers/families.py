@@ -287,6 +287,7 @@ async def update_family(
 
 @router.post("/{family_id}/delete")
 async def delete_family(
+    request: Request,
     family_id: int,
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id)

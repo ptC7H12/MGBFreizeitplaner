@@ -1,7 +1,10 @@
 """QR-Code Service für SEPA-Überweisungen (EPC QR-Code)"""
+import logging
 import qrcode
 from io import BytesIO
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class QRCodeService:

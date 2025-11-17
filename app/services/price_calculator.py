@@ -1,6 +1,9 @@
 """Preisberechnungs-Service"""
+import logging
 from typing import Optional, Dict, Any, Tuple
 from datetime import date
+
+logger = logging.getLogger(__name__)
 
 
 class PriceCalculator:
