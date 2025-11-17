@@ -1,5 +1,5 @@
 """Income Model für zusätzliche Einnahmen (z.B. Zuschüsse)"""
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, DateTime, Text
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Date, DateTime, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
 from app.utils.datetime_helper import get_utc_timestamp
@@ -12,7 +12,7 @@ class Income(Base):
     id = Column(Integer, primary_key=True, index=True)
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
     name = Column(String(200), nullable=False)
-    amount = Column(Float, nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)
     date = Column(Date, nullable=False)
     description = Column(Text, nullable=True)
     receipt_file_path = Column(String(500), nullable=True)  # Pfad zum hochgeladenen Beleg (PDF/Bild)

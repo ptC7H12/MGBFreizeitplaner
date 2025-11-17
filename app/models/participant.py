@@ -1,6 +1,6 @@
 """Participant (Teilnehmer) Model"""
 from datetime import datetime, date
-from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Boolean, Float
+from sqlalchemy import Column, Integer, String, Date, DateTime, Text, ForeignKey, Boolean, Numeric
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -33,9 +33,9 @@ class Participant(Base):
     notes = Column(Text, nullable=True)
 
     # Preis und Rabatte
-    calculated_price = Column(Float, default=0.0, nullable=False)  # Berechneter Preis
-    manual_price_override = Column(Float, nullable=True)  # Manuell überschriebener Preis
-    discount_percent = Column(Float, default=0.0, nullable=False)  # Zusätzlicher Rabatt in %
+    calculated_price = Column(Numeric(10, 2), default=0.0, nullable=False)  # Berechneter Preis
+    manual_price_override = Column(Numeric(10, 2), nullable=True)  # Manuell überschriebener Preis
+    discount_percent = Column(Numeric(5, 2), default=0.0, nullable=False)  # Zusätzlicher Rabatt in %
     discount_reason = Column(String(200), nullable=True)
 
     # Status
