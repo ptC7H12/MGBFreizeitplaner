@@ -39,7 +39,10 @@ def _calculate_price_for_participant(
     family_id: Optional[int]
 ) -> float:
     """
-    Hilfsfunktion zur Berechnung des Teilnehmerpreises
+    Wrapper-Funktion für Preisberechnung (ruft PriceCalculator.calculate_price_from_db auf)
+
+    Diese Funktion ist für Abwärtskompatibilität erhalten, delegiert aber an den
+    PriceCalculator-Service, um Code-Duplikation zu vermeiden.
 
     Args:
         db: Datenbank-Session
@@ -51,59 +54,13 @@ def _calculate_price_for_participant(
     Returns:
         Berechneter Preis in Euro
     """
-    # Event laden
-    event = db.query(Event).filter(Event.id == event_id).first()
-
-    if not event:
-        return 0.0
-
-    # Aktives Regelwerk für das Event finden
-    ruleset = db.query(Ruleset).filter(
-        Ruleset.is_active == True,
-        Ruleset.valid_from <= event.start_date,
-        Ruleset.valid_until >= event.start_date
-    ).first()
-
-    if not ruleset:
-        return 0.0
-
-    # Alter zum Event-Start berechnen
-    age = event.start_date.year - birth_date.year
-    if (event.start_date.month, event.start_date.day) < (birth_date.month, birth_date.day):
-        age -= 1
-
-    # Position in Familie ermitteln (für Familienrabatt)
-    family_children_count = 1
-    if family_id:
-        # Anzahl der Kinder in der Familie zählen (nach Geburtsdatum sortiert)
-        siblings = db.query(Participant).filter(
-            Participant.family_id == family_id,
-            Participant.is_active == True
-        ).order_by(Participant.birth_date).all()
-
-        # Position des neuen Kindes bestimmen
-        family_children_count = len(siblings) + 1
-
-    # Rolle-Name für Preisberechnung
-    role_name = None
-    if role_id:
-        role = db.query(Role).filter(Role.id == role_id).first()
-        if role:
-            role_name = role.name.lower()
-
-    # Preis berechnen (ohne Rolle = nur Basispreis basierend auf Alter)
-    calculated_price = PriceCalculator.calculate_participant_price(
-        age=age,
-        role_name=role_name,  # Kann None sein
-        ruleset_data={
-            "age_groups": ruleset.age_groups,
-            "role_discounts": ruleset.role_discounts,
-            "family_discount": ruleset.family_discount
-        },
-        family_children_count=family_children_count
+    return PriceCalculator.calculate_price_from_db(
+        db=db,
+        event_id=event_id,
+        role_id=role_id,
+        birth_date=birth_date,
+        family_id=family_id
     )
-
-    return calculated_price
 
 
 @router.get("/", response_class=HTMLResponse)
