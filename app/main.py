@@ -34,6 +34,15 @@ async def lifespan(app: FastAPI):
     # ===== STARTUP =====
     logger.info(f"Starte {settings.app_name} v{settings.app_version}")
 
+    # Validiere Konfiguration (Pfade, etc.)
+    try:
+        settings.validate_paths()
+        logger.info("Konfiguration erfolgreich validiert!")
+    except FileNotFoundError as e:
+        logger.error(f"Konfigurationsfehler: {e}")
+        logger.error("App wird NICHT gestartet - bitte Konfiguration prüfen!")
+        raise
+
     # Warnung wenn SECRET_KEY nicht gesetzt ist
     if not settings.is_secret_key_from_env():
         logger.warning("=" * 80)

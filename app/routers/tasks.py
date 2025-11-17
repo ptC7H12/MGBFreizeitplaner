@@ -17,8 +17,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
-def get_completed_tasks(db: Session, event_id: int) -> dict:
-    """Holt alle erledigten Tasks für ein Event als Set"""
+def get_completed_tasks(db: Session, event_id: int) -> set:
+    """
+    Holt alle erledigten Tasks für ein Event als Set.
+
+    Args:
+        db: Datenbank-Session
+        event_id: Event-ID für die Tasks
+
+    Returns:
+        Set von (task_type, reference_id) Tupeln für schnelle Lookups
+    """
     completed = db.query(Task).filter(
         Task.event_id == event_id,
         Task.is_completed == True
@@ -30,7 +39,17 @@ def get_completed_tasks(db: Session, event_id: int) -> dict:
 
 
 def is_task_completed(completed_tasks: set, task_type: str, reference_id: int) -> bool:
-    """Prüft, ob eine Aufgabe bereits erledigt wurde"""
+    """
+    Prüft, ob eine Aufgabe bereits erledigt wurde.
+
+    Args:
+        completed_tasks: Set von (task_type, reference_id) Tupeln
+        task_type: Typ der Aufgabe (z.B. "bildung_teilhabe")
+        reference_id: ID der referenzierten Entität
+
+    Returns:
+        True wenn die Aufgabe erledigt ist, sonst False
+    """
     return (task_type, reference_id) in completed_tasks
 
 

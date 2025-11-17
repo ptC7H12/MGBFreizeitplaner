@@ -5,7 +5,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
-def setup_logging(debug: bool = False, log_file: str = "freizeit_kassen.log"):
+def setup_logging(debug: bool = False, log_file: str = "freizeit_kassen.log") -> None:
     """
     Konfiguriert das Logging-System mit Console und File Handler.
 

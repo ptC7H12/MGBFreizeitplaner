@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Participant, Role, Event, Family, Ruleset
 from app.services.price_calculator import PriceCalculator
+from app.services.excel_service import ExcelService
 
 logger = logging.getLogger(__name__)
 
@@ -102,17 +103,6 @@ class ParticipantService:
             "Bezahlt (€)", "Offen (€)", "Adresse"
         ]
 
-        # Header-Formatierung
-        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-        header_font = Font(color="FFFFFF", bold=True, size=11)
-        header_alignment = Alignment(horizontal="center", vertical="center")
-
-        for col_num, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col_num, value=header)
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = header_alignment
-
         # Spaltenbreiten setzen
         column_widths = {
             1: 20,  # Nachname
@@ -130,8 +120,8 @@ class ParticipantService:
             13: 40  # Adresse
         }
 
-        for col_num, width in column_widths.items():
-            ws.column_dimensions[ws.cell(row=1, column=col_num).column_letter].width = width
+        # Header-Formatierung mit ExcelService
+        ExcelService.apply_header_row(ws, headers, column_widths)
 
         # Daten schreiben
         for row_num, participant in enumerate(participants, 2):

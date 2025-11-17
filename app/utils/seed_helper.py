@@ -7,7 +7,7 @@ from app.models import Event, Family, Participant, Role, Ruleset, Payment, Expen
 from app.services.ruleset_parser import RulesetParser
 
 
-def create_demo_data(db: Session):
+def create_demo_data(db: Session) -> None:
     """
     Erstellt Demo-Daten beim ersten Start der Anwendung.
 

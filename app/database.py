@@ -1,5 +1,6 @@
 """Datenbank-Setup und Session-Management"""
 from contextlib import contextmanager
+from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -39,7 +40,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     """
     Dependency für FastAPI-Routen.
     Stellt eine Datenbank-Session bereit und schließt sie nach der Anfrage.
@@ -52,7 +53,7 @@ def get_db():
 
 
 @contextmanager
-def transaction(db: Session):
+def transaction(db: Session) -> Generator[Session, None, None]:
     """
     Context Manager für sichere Datenbank-Transaktionen.
 
@@ -77,7 +78,7 @@ def transaction(db: Session):
         raise
 
 
-def init_db():
+def init_db() -> None:
     """
     Initialisiert die Datenbank und erstellt alle Tabellen
 

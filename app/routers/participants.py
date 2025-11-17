@@ -8,15 +8,17 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError, DataError
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from pydantic import ValidationError
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.worksheet.worksheet import Worksheet
 
 from app.database import get_db, transaction
 from app.models import Participant, Role, Event, Family, Ruleset, Setting
 from app.services.price_calculator import PriceCalculator
 from app.services.qrcode_service import QRCodeService
+from app.services.excel_service import ExcelService
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
@@ -554,24 +556,14 @@ async def download_import_template(
             }
         )
 
-    # Excel-Format (Standard)
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Teilnehmer"
+    # Excel-Format (Standard) mit ExcelService
+    wb, ws = ExcelService.create_workbook("Teilnehmer")
 
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
+    # Spaltenbreiten
+    column_widths = {1: 15, 2: 15, 3: 25, 4: 12, 5: 25, 6: 15, 7: 30, 8: 12}
 
-    for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_num, value=header)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    # Spaltenbreiten anpassen
-    column_widths = [15, 15, 25, 12, 25, 15, 30, 12]
-    for col_num, width in enumerate(column_widths, 1):
-        ws.column_dimensions[ws.cell(row=1, column=col_num).column_letter].width = width
+    # Header-Formatierung mit ExcelService
+    ExcelService.apply_header_row(ws, headers, column_widths)
 
     # Beispieldaten hinzufügen (bereits definiert oben)
 
@@ -629,8 +621,16 @@ async def download_import_template(
     )
 
 
-def _parse_csv_data(csv_content: str):
-    """Hilfsfunktion zum Parsen von CSV-Inhalten"""
+def _parse_csv_data(csv_content: str) -> List[List[str]]:
+    """
+    Hilfsfunktion zum Parsen von CSV-Inhalten.
+
+    Args:
+        csv_content: CSV-Inhalt als String
+
+    Returns:
+        Liste von Zeilen, jede Zeile ist eine Liste von Werten
+    """
     csv_reader = csv.reader(StringIO(csv_content), delimiter=';')
     rows = list(csv_reader)
 
@@ -642,8 +642,23 @@ def _parse_csv_data(csv_content: str):
     return rows
 
 
-def _process_import_row(row, row_num, participants_data, errors, families_dict):
-    """Hilfsfunktion zum Verarbeiten einer Import-Zeile (Excel oder CSV)"""
+def _process_import_row(
+    row: List[Any],
+    row_num: int,
+    participants_data: List[Dict[str, Any]],
+    errors: List[str],
+    families_dict: Dict[str, Family]
+) -> None:
+    """
+    Hilfsfunktion zum Verarbeiten einer Import-Zeile (Excel oder CSV).
+
+    Args:
+        row: Zeile mit Teilnehmerdaten
+        row_num: Zeilennummer für Fehlermeldungen
+        participants_data: Liste zum Sammeln der verarbeiteten Teilnehmerdaten
+        errors: Liste zum Sammeln von Fehlermeldu ngen
+        families_dict: Dictionary mit Familien-Nummern als Keys
+    """
     # Leere Zeilen überspringen
     if not any(row):
         return
@@ -1075,10 +1090,8 @@ async def export_participants_excel(
             Participant.is_active == True
         ).order_by(Participant.last_name, Participant.first_name).all()
 
-        # Workbook erstellen
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Teilnehmerliste"
+        # Workbook erstellen mit ExcelService
+        wb, ws = ExcelService.create_workbook("Teilnehmerliste")
 
         # Header-Zeile
         headers = [
@@ -1087,21 +1100,15 @@ async def export_participants_excel(
             "Bezahlt (€)", "Offen (€)", "Adresse"
         ]
 
-        # Header-Formatierung
-        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-        header_font = Font(color="FFFFFF", bold=True, size=11)
-        header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-        for col_num, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col_num, value=header)
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = header_alignment
-
         # Spaltenbreiten
-        column_widths = [15, 15, 12, 6, 10, 15, 20, 25, 15, 10, 10, 10, 30]
-        for col_num, width in enumerate(column_widths, 1):
-            ws.column_dimensions[ws.cell(row=1, column=col_num).column_letter].width = width
+        column_widths = {
+            1: 15, 2: 15, 3: 15, 4: 8, 5: 12,
+            6: 15, 7: 20, 8: 25, 9: 15, 10: 12,
+            11: 12, 12: 12, 13: 30
+        }
+
+        # Header-Formatierung mit ExcelService
+        ExcelService.apply_header_row(ws, headers, column_widths)
 
         # Familien gruppieren
         families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
@@ -1194,8 +1201,16 @@ async def export_participants_excel(
         raise HTTPException(status_code=500, detail=f"Fehler beim Export: {str(e)}")
 
 
-def _write_participant_row(ws, row_num: int, participant: Participant, event: Event):
-    """Hilfsfunktion zum Schreiben einer Teilnehmer-Zeile"""
+def _write_participant_row(ws: Worksheet, row_num: int, participant: Participant, event: Event) -> None:
+    """
+    Hilfsfunktion zum Schreiben einer Teilnehmer-Zeile in ein Excel-Worksheet.
+
+    Args:
+        ws: Worksheet-Objekt
+        row_num: Zeilennummer
+        participant: Teilnehmer-Objekt
+        event: Event-Objekt
+    """
     # Alter berechnen
     age = event.start_date.year - participant.birth_date.year
     if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
