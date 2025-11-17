@@ -12,6 +12,7 @@ class SettingBase(BaseModel):
     bank_bic: Optional[str] = Field(None, max_length=11)
     invoice_subject_prefix: Optional[str] = Field(None, max_length=100)
     invoice_footer_text: Optional[str] = None
+    default_github_repo: Optional[str] = Field(None, max_length=500)
 
 
 class SettingUpdate(SettingBase):
