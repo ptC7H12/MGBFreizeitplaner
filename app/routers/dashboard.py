@@ -6,7 +6,7 @@ from sqlalchemy import func, extract
 from datetime import date, timedelta
 
 from app.database import get_db
-from app.models import Participant, Payment, Expense, Event, Family, Role
+from app.models import Participant, Payment, Expense, Event, Family, Role, Income
 from app.dependencies import get_current_event_id
 from app.templates_config import templates
 
@@ -22,21 +22,59 @@ async def dashboard(request: Request, db: Session = Depends(get_db), event_id: i
     total_families = db.query(func.count(Family.id)).filter(Family.event_id == event_id).scalar() or 0
 
     # Finanzielle Übersicht (gefiltert nach event_id)
-    total_revenue_target = db.query(func.sum(Participant.calculated_price)).filter(Participant.event_id == event_id).scalar() or 0.0
-    total_payments = db.query(func.sum(Payment.amount)).filter(Payment.event_id == event_id).scalar() or 0.0
-    total_expenses = db.query(func.sum(Expense.amount)).filter(Expense.event_id == event_id).scalar() or 0.0
+    # Einnahmen
+    soll_zahlungseingaenge = db.query(func.sum(Participant.calculated_price)).filter(Participant.event_id == event_id).scalar() or 0.0
+    soll_sonstige_einnahmen = db.query(func.sum(Income.amount)).filter(Income.event_id == event_id).scalar() or 0.0
+    soll_einnahmen_gesamt = soll_zahlungseingaenge + soll_sonstige_einnahmen
 
-    outstanding = total_revenue_target - total_payments
-    balance = total_payments - total_expenses
+    ist_zahlungseingaenge = db.query(func.sum(Payment.amount)).filter(Payment.event_id == event_id).scalar() or 0.0
+    ist_sonstige_einnahmen = soll_sonstige_einnahmen  # Sonstige Einnahmen werden direkt erfasst
+    ist_einnahmen_gesamt = ist_zahlungseingaenge + ist_sonstige_einnahmen
+
+    # Ausgaben
+    soll_ausgaben_gesamt = db.query(func.sum(Expense.amount)).filter(Expense.event_id == event_id).scalar() or 0.0
+    ausgaben_beglichen = db.query(func.sum(Expense.amount)).filter(
+        Expense.event_id == event_id,
+        Expense.is_settled == True
+    ).scalar() or 0.0
+
+    # Saldo
+    saldo_gesamt = ist_einnahmen_gesamt - soll_ausgaben_gesamt
+
+    # Offene Beträge
+    offene_zahlungseingaenge = soll_zahlungseingaenge - ist_zahlungseingaenge
+    offene_ausgaben = soll_ausgaben_gesamt - ausgaben_beglichen
+
+    # Zahlungsquoten
+    zahlungsquote_eingaenge = (ist_zahlungseingaenge / soll_zahlungseingaenge * 100) if soll_zahlungseingaenge > 0 else 0.0
+    zahlungsquote_ausgaben = (ausgaben_beglichen / soll_ausgaben_gesamt * 100) if soll_ausgaben_gesamt > 0 else 0.0
 
     stats = {
         "total_participants": total_participants,
         "total_families": total_families,
-        "total_revenue_target": total_revenue_target,
-        "total_payments": total_payments,
-        "total_expenses": total_expenses,
-        "outstanding": outstanding,
-        "balance": balance
+        # Einnahmen
+        "soll_zahlungseingaenge": soll_zahlungseingaenge,
+        "soll_sonstige_einnahmen": soll_sonstige_einnahmen,
+        "soll_einnahmen_gesamt": soll_einnahmen_gesamt,
+        "ist_zahlungseingaenge": ist_zahlungseingaenge,
+        "ist_sonstige_einnahmen": ist_sonstige_einnahmen,
+        "ist_einnahmen_gesamt": ist_einnahmen_gesamt,
+        # Ausgaben
+        "soll_ausgaben_gesamt": soll_ausgaben_gesamt,
+        "ausgaben_beglichen": ausgaben_beglichen,
+        "offene_ausgaben": offene_ausgaben,
+        # Saldo & Offene Beträge
+        "saldo_gesamt": saldo_gesamt,
+        "offene_zahlungseingaenge": offene_zahlungseingaenge,
+        # Zahlungsquoten
+        "zahlungsquote_eingaenge": zahlungsquote_eingaenge,
+        "zahlungsquote_ausgaben": zahlungsquote_ausgaben,
+        # Legacy (für Kompatibilität)
+        "total_revenue_target": soll_zahlungseingaenge,
+        "total_payments": ist_zahlungseingaenge,
+        "total_expenses": soll_ausgaben_gesamt,
+        "outstanding": offene_zahlungseingaenge,
+        "balance": saldo_gesamt
     }
 
     return templates.TemplateResponse(
