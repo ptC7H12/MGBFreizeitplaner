@@ -11,7 +11,7 @@
     </div>
 
     <div class="bg-white rounded-lg shadow-md p-6">
-        <form method="POST" action="{{ '/incomes/' ~ income.id ~ '/edit' if income else '/incomes/new' }}" enctype="multipart/form-data">
+        <form method="POST" action="{{ '/incomes/' ~ income.id ~ '/edit' if income else '/incomes/create' }}" enctype="multipart/form-data">
             <!-- Name -->
             <div class="mb-4">
                 <label for="name" class="block text-sm font-medium text-gray-700 mb-1">
