@@ -2,20 +2,14 @@
 
 {% block content %}
 <!-- Header mit Gesamt-Anzahl -->
-<div class="mb-6">
-    <div class="bg-white shadow rounded-lg p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900">Offene Aufgaben</h1>
-                <p class="mt-1 text-sm text-gray-600">Übersicht aller zu erledigenden Aufgaben für diese Freizeit</p>
-            </div>
-            <div class="text-center">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full {% if total_tasks > 0 %}bg-orange-100{% else %}bg-green-100{% endif %}">
-                    <span class="text-2xl font-bold {% if total_tasks > 0 %}text-orange-600{% else %}text-green-600{% endif %}">
-                        {{ total_tasks }}
-                    </span>
-                </div>
-                <p class="mt-2 text-xs text-gray-600">Aufgaben</p>
+<div class="mb-6 bg-white shadow rounded-lg">
+    <div class="px-6 py-4 flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Aufgaben</h1>
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full {% if total_tasks > 0 %}bg-orange-100{% else %}bg-green-100{% endif %}">
+                <span class="text-xl font-bold {% if total_tasks > 0 %}text-orange-600{% else %}text-green-600{% endif %}">
+                    {{ total_tasks }}
+                </span>
             </div>
         </div>
     </div>
