@@ -1,7 +1,7 @@
 """Pydantic Schemas für Payment"""
 from datetime import date
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class PaymentBase(BaseModel):
@@ -13,6 +13,14 @@ class PaymentBase(BaseModel):
     notes: Optional[str] = None
     participant_id: Optional[int] = None
     family_id: Optional[int] = None
+
+    @field_validator('participant_id', 'family_id', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        """Konvertiert leere Strings zu None"""
+        if v == '' or (isinstance(v, str) and v.strip() == ''):
+            return None
+        return v
 
 
 class PaymentCreate(PaymentBase):
@@ -29,6 +37,14 @@ class PaymentUpdate(BaseModel):
     notes: Optional[str] = None
     participant_id: Optional[int] = None
     family_id: Optional[int] = None
+
+    @field_validator('participant_id', 'family_id', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        """Konvertiert leere Strings zu None"""
+        if v == '' or (isinstance(v, str) and v.strip() == ''):
+            return None
+        return v
 
 
 class PaymentResponse(PaymentBase):
