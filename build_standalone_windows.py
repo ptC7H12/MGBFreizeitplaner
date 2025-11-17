@@ -42,6 +42,7 @@ INCLUDE_ITEMS = [
     "rulesets/",
     "seed_data.py",
     "requirements.txt",
+    "version.txt",
     ".env.example",
     "README.md",
 ]

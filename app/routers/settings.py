@@ -123,7 +123,8 @@ async def update_settings(
     bank_bic: Optional[str] = Form(None),
     invoice_subject_prefix: Optional[str] = Form(None),
     invoice_footer_text: Optional[str] = Form(None),
-    default_github_repo: Optional[str] = Form(None)
+    default_github_repo: Optional[str] = Form(None),
+    current_tab: Optional[str] = Form("general")
 ):
     """Aktualisiert die Einstellungen"""
     setting = db.query(Setting).filter(Setting.event_id == event_id).first()
@@ -159,7 +160,9 @@ async def update_settings(
         db.commit()
 
         flash(request, "Einstellungen wurden erfolgreich aktualisiert", "success")
-        return RedirectResponse(url="/settings", status_code=303)
+        # Redirect zurück zum selben Tab
+        redirect_url = f"/settings#{current_tab}" if current_tab and current_tab != "general" else "/settings"
+        return RedirectResponse(url=redirect_url, status_code=303)
 
     except ValidationError as e:
         # Pydantic-Validierungsfehler
@@ -168,27 +171,31 @@ async def update_settings(
         field_name = first_error['loc'][0] if first_error['loc'] else 'Unbekannt'
         error_msg = first_error['msg']
         flash(request, f"Validierungsfehler ({field_name}): {error_msg}", "error")
-        return RedirectResponse(url="/settings/edit?error=validation", status_code=303)
+        redirect_url = f"/settings/edit#{current_tab}" if current_tab and current_tab != "general" else "/settings/edit"
+        return RedirectResponse(url=redirect_url, status_code=303)
 
     except ValueError as e:
         logger.warning(f"Invalid input for settings update: {e}", exc_info=True)
         flash(request, f"Ungültige Eingabe: {str(e)}", "error")
-        return RedirectResponse(url="/settings/edit?error=invalid_input", status_code=303)
+        redirect_url = f"/settings/edit#{current_tab}" if current_tab and current_tab != "general" else "/settings/edit"
+        return RedirectResponse(url=redirect_url, status_code=303)
 
     except IntegrityError as e:
         db.rollback()
         logger.error(f"Database integrity error updating settings: {e}", exc_info=True)
         flash(request, "Einstellungen konnten nicht aktualisiert werden (Datenbankfehler)", "error")
-        return RedirectResponse(url="/settings/edit?error=db_integrity", status_code=303)
+        redirect_url = f"/settings/edit#{current_tab}" if current_tab and current_tab != "general" else "/settings/edit"
+        return RedirectResponse(url=redirect_url, status_code=303)
 
     except DataError as e:
         db.rollback()
         logger.error(f"Invalid data updating settings: {e}", exc_info=True)
         flash(request, "Ungültige Daten eingegeben", "error")
-        return RedirectResponse(url="/settings/edit?error=invalid_data", status_code=303)
+        redirect_url = f"/settings/edit#{current_tab}" if current_tab and current_tab != "general" else "/settings/edit"
+        return RedirectResponse(url=redirect_url, status_code=303)
 
     except Exception as e:
-        return handle_db_exception(e, "/settings/edit", "Updating settings", db, request)
+        return handle_db_exception(e, f"/settings/edit#{current_tab}" if current_tab else "/settings/edit", "Updating settings", db, request)
 
 
 @router.post("/categories/rename")
@@ -268,3 +275,52 @@ async def delete_category(
         db.rollback()
         logger.error(f"Error deleting category: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Fehler beim Löschen: {str(e)}")
+
+
+@router.post("/categories/add")
+async def add_category(
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
+    name: str = Form(...)
+):
+    """Fügt eine neue Kategorie hinzu (erstellt eine Dummy-Ausgabe mit dieser Kategorie)"""
+    try:
+        # Validierung
+        if not name or not name.strip():
+            raise HTTPException(status_code=400, detail="Kategorienamen darf nicht leer sein")
+
+        name = name.strip()
+
+        # Prüfen ob Kategorie bereits existiert
+        existing = db.query(Expense).filter(
+            Expense.event_id == event_id,
+            Expense.category == name
+        ).first()
+
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Kategorie '{name}' existiert bereits")
+
+        # Erstelle eine Dummy-Ausgabe mit 0 EUR, um die Kategorie zu registrieren
+        # Diese kann später gelöscht oder bearbeitet werden
+        dummy_expense = Expense(
+            event_id=event_id,
+            title=f"Kategorie: {name}",
+            amount=0.00,
+            category=name,
+            description="Automatisch erstellt zum Anlegen der Kategorie. Kann gelöscht werden.",
+            is_settled=False
+        )
+        db.add(dummy_expense)
+        db.commit()
+
+        logger.info(f"Added new category '{name}' for event {event_id}")
+        flash(request, f"Kategorie '{name}' wurde hinzugefügt", "success")
+        return RedirectResponse(url="/settings#categories", status_code=303)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error adding category: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fehler beim Hinzufügen: {str(e)}")

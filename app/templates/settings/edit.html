@@ -18,7 +18,8 @@
         </nav>
     </div>
 
-    <form method="POST" action="/settings/edit">
+    <form method="POST" action="/settings/edit" id="settings-form">
+        <input type="hidden" name="current_tab" id="current-tab" value="general">
         <!-- Tab Content: Allgemein -->
         <div id="content-general" class="tab-content px-6 py-6 space-y-6">
             <!-- Organisation -->
@@ -243,6 +244,12 @@ function switchTab(tabName) {
     const activeTab = document.getElementById('tab-' + tabName);
     activeTab.classList.add('active', 'border-blue-500', 'text-blue-600');
     activeTab.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+
+    // Update hidden field mit aktuellem Tab
+    const currentTabField = document.getElementById('current-tab');
+    if (currentTabField) {
+        currentTabField.value = tabName;
+    }
 }
 
 // Initialize tabs on page load
