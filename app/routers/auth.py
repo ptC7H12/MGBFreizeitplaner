@@ -8,6 +8,7 @@ from datetime import date, datetime
 from app.database import get_db
 from app.models.event import Event
 from app.templates_config import templates
+from app.utils.flash import flash
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -50,15 +51,14 @@ async def select_event(
 
     if not event:
         logger.warning(f"Event {event_id} not found or inactive")
-        return RedirectResponse(
-            url="/auth/?error=invalid_event",
-            status_code=303
-        )
+        flash(request, "Event nicht gefunden oder inaktiv", "error")
+        return RedirectResponse(url="/auth/", status_code=303)
 
     # Event-ID in Session speichern
     request.session["event_id"] = event.id
     request.session["event_name"] = event.name
     logger.info(f"Successfully selected event {event_id} ('{event.name}')")
+    flash(request, f"Event '{event.name}' erfolgreich ausgewählt", "success")
 
     return RedirectResponse(url="/dashboard", status_code=303)
 
@@ -103,15 +103,14 @@ async def create_event(
         request.session["event_name"] = event.name
 
         logger.info(f"Successfully created event {event.id} ('{event.name}') from {start_date} to {end_date}")
+        flash(request, f"Event '{event.name}' erfolgreich erstellt!", "success")
         return RedirectResponse(url="/dashboard", status_code=303)
 
     except Exception as e:
         logger.error(f"Failed to create event '{name}': {e}", exc_info=True)
         db.rollback()
-        return RedirectResponse(
-            url="/auth/?error=create_failed",
-            status_code=303
-        )
+        flash(request, f"Event konnte nicht erstellt werden: {str(e)}", "error")
+        return RedirectResponse(url="/auth/", status_code=303)
 
 
 @router.get("/logout")
@@ -146,10 +145,8 @@ async def delete_event(
 
     if not event:
         logger.warning(f"Event {event_id} not found for deletion")
-        return RedirectResponse(
-            url="/auth/?error=invalid_event",
-            status_code=303
-        )
+        flash(request, "Event nicht gefunden", "error")
+        return RedirectResponse(url="/auth/", status_code=303)
 
     event_name = event.name
 
@@ -165,4 +162,5 @@ async def delete_event(
     db.commit()
 
     logger.info(f"Successfully deleted event {event_id} ('{event_name}')")
+    flash(request, f"Event '{event_name}' wurde gelöscht", "info")
     return RedirectResponse(url="/auth/", status_code=303)
