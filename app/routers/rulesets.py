@@ -43,7 +43,8 @@ async def import_ruleset_form(
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id),
     error: Optional[str] = None,
-    success: Optional[str] = None
+    success: Optional[str] = None,
+    source: Optional[str] = None
 ):
     """Formular zum Importieren eines Regelwerks"""
     from app.models import Setting
@@ -62,7 +63,8 @@ async def import_ruleset_form(
             "event": event,
             "error": error,
             "success": success,
-            "default_github_repo": default_github_repo
+            "default_github_repo": default_github_repo,
+            "source": source
         }
     )
 
@@ -166,6 +168,11 @@ async def import_ruleset_upload(
     file: UploadFile = File(...)
 ):
     """Importiert ein Regelwerk aus einer hochgeladenen YAML-Datei"""
+    # Get source parameter from query string
+    source = request.query_params.get("source")
+    source_param = f"?source={source}" if source else ""
+    error_separator = "&" if source else "?"
+
     try:
         # Datei-Inhalt lesen
         content = await file.read()
@@ -179,7 +186,7 @@ async def import_ruleset_upload(
         is_valid, error_msg = parser.validate_ruleset(data)
         if not is_valid:
             return RedirectResponse(
-                url=f"/rulesets/import?error={error_msg}",
+                url=f"/rulesets/import{source_param}{error_separator}error={error_msg}",
                 status_code=303
             )
 
@@ -208,12 +215,12 @@ async def import_ruleset_upload(
         else:
             flash(request, "Regelwerk erfolgreich importiert", "success")
 
-        return RedirectResponse(url=f"/rulesets/{ruleset.id}", status_code=303)
+        return RedirectResponse(url=f"/rulesets/{ruleset.id}{source_param}", status_code=303)
 
     except Exception as e:
         db.rollback()
         return RedirectResponse(
-            url=f"/rulesets/import?error=Fehler beim Import: {str(e)}",
+            url=f"/rulesets/import{source_param}{error_separator}error=Fehler beim Import: {str(e)}",
             status_code=303
         )
 
@@ -226,11 +233,16 @@ async def import_ruleset_github(
     github_url: str = Form(...)
 ):
     """Importiert ein Regelwerk von einer GitHub-URL"""
+    # Get source parameter from query string
+    source = request.query_params.get("source")
+    source_param = f"?source={source}" if source else ""
+    error_separator = "&" if source else "?"
+
     try:
         # URL validieren
         if not github_url.startswith("https://"):
             return RedirectResponse(
-                url="/rulesets/import?error=Ungültige URL. Bitte HTTPS verwenden.",
+                url=f"/rulesets/import{source_param}{error_separator}error=Ungültige URL. Bitte HTTPS verwenden.",
                 status_code=303
             )
 
@@ -254,7 +266,7 @@ async def import_ruleset_github(
         is_valid, error_msg = parser.validate_ruleset(data)
         if not is_valid:
             return RedirectResponse(
-                url=f"/rulesets/import?error={error_msg}",
+                url=f"/rulesets/import{source_param}{error_separator}error={error_msg}",
                 status_code=303
             )
 
@@ -283,17 +295,17 @@ async def import_ruleset_github(
         else:
             flash(request, "Regelwerk erfolgreich von GitHub importiert", "success")
 
-        return RedirectResponse(url=f"/rulesets/{ruleset.id}", status_code=303)
+        return RedirectResponse(url=f"/rulesets/{ruleset.id}{source_param}", status_code=303)
 
     except httpx.HTTPError as e:
         return RedirectResponse(
-            url=f"/rulesets/import?error=Fehler beim Herunterladen: {str(e)}",
+            url=f"/rulesets/import{source_param}{error_separator}error=Fehler beim Herunterladen: {str(e)}",
             status_code=303
         )
     except Exception as e:
         db.rollback()
         return RedirectResponse(
-            url=f"/rulesets/import?error=Fehler beim Import: {str(e)}",
+            url=f"/rulesets/import{source_param}{error_separator}error=Fehler beim Import: {str(e)}",
             status_code=303
         )
 
@@ -306,6 +318,11 @@ async def import_ruleset_manual(
     yaml_content: str = Form(...)
 ):
     """Importiert ein Regelwerk aus manuell eingegebenem YAML"""
+    # Get source parameter from query string
+    source = request.query_params.get("source")
+    source_param = f"?source={source}" if source else ""
+    error_separator = "&" if source else "?"
+
     try:
         # YAML parsen
         parser = RulesetParser()
@@ -315,7 +332,7 @@ async def import_ruleset_manual(
         is_valid, error_msg = parser.validate_ruleset(data)
         if not is_valid:
             return RedirectResponse(
-                url=f"/rulesets/import?error={error_msg}",
+                url=f"/rulesets/import{source_param}{error_separator}error={error_msg}",
                 status_code=303
             )
 
@@ -344,12 +361,12 @@ async def import_ruleset_manual(
         else:
             flash(request, "Regelwerk erfolgreich manuell importiert", "success")
 
-        return RedirectResponse(url=f"/rulesets/{ruleset.id}", status_code=303)
+        return RedirectResponse(url=f"/rulesets/{ruleset.id}{source_param}", status_code=303)
 
     except Exception as e:
         db.rollback()
         return RedirectResponse(
-            url=f"/rulesets/import?error=Fehler beim Import: {str(e)}",
+            url=f"/rulesets/import{source_param}{error_separator}error=Fehler beim Import: {str(e)}",
             status_code=303
         )
 
@@ -359,7 +376,8 @@ async def view_ruleset(
     request: Request,
     ruleset_id: int,
     db: Session = Depends(get_db),
-    event_id: int = Depends(get_current_event_id)
+    event_id: int = Depends(get_current_event_id),
+    source: Optional[str] = None
 ):
     """Detailansicht eines Regelwerks"""
     ruleset = db.query(Ruleset).filter(
@@ -375,7 +393,8 @@ async def view_ruleset(
         {
             "request": request,
             "title": f"Regelwerk: {ruleset.name}",
-            "ruleset": ruleset
+            "ruleset": ruleset,
+            "source": source
         }
     )
 

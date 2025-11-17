@@ -28,8 +28,8 @@ async def list_families(
     event_id: int = Depends(get_current_event_id)
 ):
     """Leitet zur kombinierten Teilnehmer & Familien Seite weiter"""
-    # Redirect to participants page which now includes both tabs
-    return RedirectResponse(url="/participants", status_code=303)
+    # Redirect to participants page with families tab active
+    return RedirectResponse(url="/participants#families", status_code=303)
 
 
 @router.get("/create", response_class=HTMLResponse)
@@ -132,7 +132,7 @@ async def view_family(
     ).first()
 
     if not family:
-        return RedirectResponse(url="/families", status_code=303)
+        return RedirectResponse(url="/participants#families", status_code=303)
 
     # Finanzielle Übersicht
     total_price = sum(p.final_price for p in family.participants)
@@ -196,7 +196,7 @@ async def edit_family_form(
     ).first()
 
     if not family:
-        return RedirectResponse(url="/families", status_code=303)
+        return RedirectResponse(url="/participants#families", status_code=303)
 
     return templates.TemplateResponse(
         "families/edit.html",
@@ -230,7 +230,7 @@ async def update_family(
     ).first()
 
     if not family:
-        return RedirectResponse(url="/families", status_code=303)
+        return RedirectResponse(url="/participants#families", status_code=303)
 
     try:
         # Pydantic-Validierung
@@ -317,7 +317,7 @@ async def delete_family(
         family.deleted_at = utcnow()
         db.commit()
         logger.info(f"Family soft-deleted: {family_name} (ID: {family_id})")
-        return RedirectResponse(url="/families", status_code=303)
+        return RedirectResponse(url="/participants#families", status_code=303)
 
     except Exception as e:
         db.rollback()

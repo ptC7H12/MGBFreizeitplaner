@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="mb-4">
-    <a href="/rulesets" class="text-blue-600 hover:text-blue-800 text-sm">← Zurück zur Übersicht</a>
+    <a href="{% if source == 'settings' %}/settings#ruleset{% else %}/rulesets{% endif %}" class="text-blue-600 hover:text-blue-800 text-sm">← Zurück zur Übersicht</a>
 </div>
 
 <div class="bg-white shadow rounded-lg overflow-hidden">
