@@ -324,6 +324,11 @@ document.addEventListener('DOMContentLoaded', function() {
         activeTab.classList.add('border-blue-500', 'text-blue-600');
     }
 
+    // Check URL hash and switch tab if needed
+    if (window.location.hash === '#families') {
+        switchTab('families');
+    }
+
     // Live-Filter aktivieren
     const searchInput = document.getElementById('search-input');
     if (searchInput) {
