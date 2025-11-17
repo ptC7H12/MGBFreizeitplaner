@@ -60,6 +60,7 @@
             <div class="flex-1 min-w-[200px]">
                 <input
                     type="text"
+                    id="search-input"
                     name="search"
                     placeholder="Titel, Beschreibung, Bezahlt von... suchen"
                     value="{{ search if search else '' }}"
@@ -87,7 +88,7 @@
 
     {% if expenses %}
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
+        <table id="expenses-table" class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datum</th>
@@ -198,4 +199,100 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+// Live-Filter für Ausgaben-Suche
+function filterExpenses() {
+    const searchInput = document.getElementById('search-input');
+    const table = document.getElementById('expenses-table');
+
+    if (!searchInput || !table) return;
+
+    const searchTerm = searchInput.value.toLowerCase();
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+    let visibleCount = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+
+        // Prüfe ob die Zeile eine Notiz-Zeile ist (colspan="7")
+        const firstCell = row.getElementsByTagName('td')[0];
+        if (firstCell && firstCell.getAttribute('colspan')) {
+            // Notiz-Zeile - zeige sie wenn die vorherige Ausgaben-Zeile sichtbar ist
+            continue;
+        }
+
+        // Suche in Titel (Spalte 2), Beschreibung und Bezahlt von (Spalte 5)
+        const titleCell = row.getElementsByTagName('td')[1];
+        const paidByCell = row.getElementsByTagName('td')[4];
+
+        if (!titleCell) continue;
+
+        const titleText = titleCell.textContent || titleCell.innerText;
+        const paidByText = paidByCell ? (paidByCell.textContent || paidByCell.innerText) : '';
+        const combinedText = (titleText + ' ' + paidByText).toLowerCase();
+
+        if (combinedText.indexOf(searchTerm) > -1) {
+            row.style.display = '';
+            visibleCount++;
+
+            // Zeige auch die Notiz-Zeile wenn vorhanden
+            const nextRow = rows[i + 1];
+            if (nextRow) {
+                const nextFirstCell = nextRow.getElementsByTagName('td')[0];
+                if (nextFirstCell && nextFirstCell.getAttribute('colspan')) {
+                    nextRow.style.display = '';
+                }
+            }
+        } else {
+            row.style.display = 'none';
+
+            // Verstecke auch die Notiz-Zeile wenn vorhanden
+            const nextRow = rows[i + 1];
+            if (nextRow) {
+                const nextFirstCell = nextRow.getElementsByTagName('td')[0];
+                if (nextFirstCell && nextFirstCell.getAttribute('colspan')) {
+                    nextRow.style.display = 'none';
+                }
+            }
+        }
+    }
+
+    // Zeige Nachricht wenn keine Ergebnisse
+    updateNoResultsMessage(visibleCount);
+}
+
+function updateNoResultsMessage(visibleCount) {
+    const table = document.getElementById('expenses-table');
+    if (!table) return;
+
+    const tableContainer = table.parentElement;
+    let noResultsMsg = document.getElementById('no-search-results');
+
+    if (visibleCount === 0) {
+        if (!noResultsMsg) {
+            noResultsMsg = document.createElement('div');
+            noResultsMsg.id = 'no-search-results';
+            noResultsMsg.className = 'px-6 py-8 text-center text-gray-500';
+            noResultsMsg.innerHTML = '<p>Keine Ausgaben gefunden, die der Suche entsprechen.</p>';
+            tableContainer.appendChild(noResultsMsg);
+        }
+        table.style.display = 'none';
+    } else {
+        if (noResultsMsg) {
+            noResultsMsg.remove();
+        }
+        table.style.display = '';
+    }
+}
+
+// Live-Filter aktivieren
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', filterExpenses);
+    }
+});
+</script>
 {% endblock %}
