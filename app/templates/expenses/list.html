@@ -36,22 +36,36 @@
     </div>
 </div>
 
-<!-- Filter -->
-{% if categories %}
-<div class="bg-white shadow rounded-lg p-4 mb-6">
-    <h3 class="text-sm font-medium text-gray-700 mb-3">Filter</h3>
-    <div class="flex flex-wrap gap-2">
-        <a href="/expenses" class="px-3 py-1 text-sm rounded-full bg-gray-200 text-gray-700 hover:bg-gray-300 transition">
-            Alle
+<!-- Such- und Filterbereich -->
+<div class="bg-gray-50 border-b border-gray-200 p-4 mb-6">
+    <form method="get" action="/expenses" class="flex flex-wrap gap-4">
+        <div class="flex-1 min-w-[200px]">
+            <input
+                type="text"
+                name="search"
+                placeholder="Titel, Beschreibung, Bezahlt von... suchen"
+                value="{{ search if search else '' }}"
+                class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-red-500 focus:border-red-500"
+            >
+        </div>
+        {% if categories %}
+        <div class="min-w-[150px]">
+            <select name="category" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-red-500 focus:border-red-500">
+                <option value="">Alle Kategorien</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">
+            Filtern
+        </button>
+        <a href="/expenses" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">
+            Zurücksetzen
         </a>
-        {% for cat in categories %}
-        <a href="/expenses?category={{ cat }}" class="px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-800 hover:bg-blue-200 transition">
-            {{ cat }}
-        </a>
-        {% endfor %}
-    </div>
+    </form>
 </div>
-{% endif %}
 
 <!-- Ausgabentabelle -->
 <div class="bg-white shadow rounded-lg overflow-hidden">
