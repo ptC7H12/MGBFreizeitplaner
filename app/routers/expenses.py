@@ -64,7 +64,8 @@ async def list_expenses(
             "title": "Ausgaben",
             "expenses": expenses,
             "categories": categories,
-            "search": search
+            "search": search,
+            "selected_category": category
         }
     )
 
