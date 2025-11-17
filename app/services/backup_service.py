@@ -3,7 +3,7 @@ import shutil
 import os
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import List, Dict
+from typing import List, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class BackupService:
         self.backup_dir = Path(backup_dir)
         self.backup_dir.mkdir(exist_ok=True, parents=True)
 
-    def create_backup(self, description: str = "") -> Dict[str, any]:
+    def create_backup(self, description: str = "") -> Dict[str, Any]:
         """
         Erstellt ein Backup der Datenbank
 
@@ -62,7 +62,7 @@ class BackupService:
             "description": description
         }
 
-    def list_backups(self) -> List[Dict[str, any]]:
+    def list_backups(self) -> List[Dict[str, Any]]:
         """
         Listet alle vorhandenen Backups auf
 
@@ -183,7 +183,7 @@ class BackupService:
             logger.error(f"Fehler beim Wiederherstellen: {e}")
             raise
 
-    def get_backup_stats(self) -> Dict[str, any]:
+    def get_backup_stats(self) -> Dict[str, Any]:
         """
         Liefert Statistiken über Backups
 

@@ -201,9 +201,17 @@ async def create_expense(
 
 
 @router.get("/{expense_id}/edit", response_class=HTMLResponse)
-async def edit_expense_form(request: Request, expense_id: int, db: Session = Depends(get_db)):
+async def edit_expense_form(
+    request: Request,
+    expense_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Formular zum Bearbeiten einer Ausgabe"""
-    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    expense = db.query(Expense).filter(
+        Expense.id == expense_id,
+        Expense.event_id == event_id
+    ).first()
 
     if not expense:
         return RedirectResponse(url="/expenses", status_code=303)
@@ -241,6 +249,7 @@ async def update_expense(
     request: Request,
     expense_id: int,
     db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
     title: str = Form(...),
     description: Optional[str] = Form(None),
     amount: float = Form(...),
@@ -253,7 +262,10 @@ async def update_expense(
     remove_receipt: Optional[str] = Form(None),
 ):
     """Aktualisiert eine Ausgabe"""
-    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    expense = db.query(Expense).filter(
+        Expense.id == expense_id,
+        Expense.event_id == event_id
+    ).first()
 
     if not expense:
         return RedirectResponse(url="/expenses", status_code=303)
@@ -396,9 +408,16 @@ async def toggle_settled(expense_id: int, db: Session = Depends(get_db), event_i
 
 
 @router.get("/{expense_id}/receipt/download")
-async def download_expense_receipt(expense_id: int, db: Session = Depends(get_db)):
+async def download_expense_receipt(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Lädt den Beleg einer Ausgabe herunter"""
-    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    expense = db.query(Expense).filter(
+        Expense.id == expense_id,
+        Expense.event_id == event_id
+    ).first()
 
     if not expense:
         raise HTTPException(status_code=404, detail="Ausgabe nicht gefunden")
@@ -431,9 +450,16 @@ async def download_expense_receipt(expense_id: int, db: Session = Depends(get_db
 
 
 @router.post("/{expense_id}/delete")
-async def delete_expense(expense_id: int, db: Session = Depends(get_db)):
+async def delete_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
     """Löscht eine Ausgabe"""
-    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    expense = db.query(Expense).filter(
+        Expense.id == expense_id,
+        Expense.event_id == event_id
+    ).first()
 
     if not expense:
         raise HTTPException(status_code=404, detail="Ausgabe nicht gefunden")

@@ -1,7 +1,8 @@
 """Income Model für zusätzliche Einnahmen (z.B. Zuschüsse)"""
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, Text
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, DateTime, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
+from app.utils.datetime_helper import get_utc_timestamp
 
 
 class Income(Base):
@@ -18,6 +19,10 @@ class Income(Base):
 
     # Optional: Verknüpfung mit Rolle (z.B. "50% Zuschuss für alle Kinder")
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=True, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=get_utc_timestamp, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_timestamp, onupdate=get_utc_timestamp, nullable=False)
 
     # Relationships
     event = relationship("Event", back_populates="incomes")
