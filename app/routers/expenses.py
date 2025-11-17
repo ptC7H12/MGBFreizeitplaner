@@ -10,7 +10,7 @@ from typing import Optional
 from pydantic import ValidationError
 
 from app.database import get_db
-from app.models import Expense, Event
+from app.models import Expense, Event, Participant
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
@@ -75,13 +75,18 @@ async def create_expense_form(
     all_categories = list(set(existing_categories + default_categories))
     all_categories.sort()
 
+    # Teilnehmer für "Bezahlt von" Dropdown laden
+    participants = db.query(Participant).filter(Participant.event_id == event_id).order_by(Participant.last_name, Participant.first_name).all()
+    participant_names = [f"{p.first_name} {p.last_name}" for p in participants]
+
     return templates.TemplateResponse(
         "expenses/create.html",
         {
             "request": request,
             "title": "Neue Ausgabe",
             "event": event,
-            "categories": all_categories
+            "categories": all_categories,
+            "participants": participant_names
         }
     )
 
@@ -201,6 +206,10 @@ async def edit_expense_form(request: Request, expense_id: int, db: Session = Dep
     all_categories = list(set(existing_categories + default_categories))
     all_categories.sort()
 
+    # Teilnehmer für "Bezahlt von" Dropdown laden
+    participants = db.query(Participant).filter(Participant.event_id == expense.event_id).order_by(Participant.last_name, Participant.first_name).all()
+    participant_names = [f"{p.first_name} {p.last_name}" for p in participants]
+
     return templates.TemplateResponse(
         "expenses/edit.html",
         {
@@ -208,7 +217,8 @@ async def edit_expense_form(request: Request, expense_id: int, db: Session = Dep
             "title": f"Ausgabe bearbeiten: {expense.title}",
             "expense": expense,
             "event": event,
-            "categories": all_categories
+            "categories": all_categories,
+            "participants": participant_names
         }
     )
 

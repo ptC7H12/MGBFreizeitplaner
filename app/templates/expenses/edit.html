@@ -87,10 +87,17 @@
                     type="text"
                     id="paid_by"
                     name="paid_by"
+                    list="participant-suggestions"
                     value="{{ expense.paid_by if expense.paid_by else '' }}"
-                    placeholder="z.B. Name der Person"
+                    placeholder="Teilnehmer wählen oder Namen eingeben"
                     class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-red-500 focus:border-red-500"
                 >
+                <datalist id="participant-suggestions">
+                    {% for participant in participants %}
+                    <option value="{{ participant }}">
+                    {% endfor %}
+                </datalist>
+                <p class="mt-1 text-xs text-gray-500">Wählen Sie einen Teilnehmer oder geben Sie einen anderen Namen ein</p>
             </div>
         </div>
 
