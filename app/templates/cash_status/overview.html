@@ -426,8 +426,8 @@
 
                 <!-- Suche -->
                 <div>
-                    <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Suche</label>
-                    <input type="text" id="search" name="search" value="{{ filter_search or '' }}"
+                    <label for="search-input" class="block text-sm font-medium text-gray-700 mb-1">Suche</label>
+                    <input type="text" id="search-input" name="search" value="{{ filter_search or '' }}"
                            placeholder="Referenz, Beschreibung, Name..."
                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
@@ -491,7 +491,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     {% if transactions %}
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
+        <table id="transactions-table" class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datum</th>
@@ -578,6 +578,79 @@ document.addEventListener('DOMContentLoaded', function() {
         <li>Exportieren Sie die gefilterten Daten als Excel oder CSV für weitere Analysen</li>
     </ul>
 </div>
+
+<script>
+// Live-Filter für Transaktionssuche
+function filterTransactions() {
+    const searchInput = document.getElementById('search-input');
+    const table = document.getElementById('transactions-table');
+
+    if (!searchInput || !table) return;
+
+    const searchTerm = searchInput.value.toLowerCase();
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+    let visibleCount = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+
+        // Suche in Referenz (Spalte 3), Beschreibung (Spalte 4) und Teilnehmer/Familie (Spalte 5)
+        const referenceCell = row.getElementsByTagName('td')[2];
+        const descriptionCell = row.getElementsByTagName('td')[3];
+        const participantCell = row.getElementsByTagName('td')[4];
+
+        if (!referenceCell) continue;
+
+        const referenceText = referenceCell.textContent || referenceCell.innerText;
+        const descriptionText = descriptionCell ? (descriptionCell.textContent || descriptionCell.innerText) : '';
+        const participantText = participantCell ? (participantCell.textContent || participantCell.innerText) : '';
+        const combinedText = (referenceText + ' ' + descriptionText + ' ' + participantText).toLowerCase();
+
+        if (combinedText.indexOf(searchTerm) > -1) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    }
+
+    // Zeige Nachricht wenn keine Ergebnisse
+    updateNoResultsMessage(visibleCount);
+}
+
+function updateNoResultsMessage(visibleCount) {
+    const table = document.getElementById('transactions-table');
+    if (!table) return;
+
+    const tableContainer = table.parentElement;
+    let noResultsMsg = document.getElementById('no-search-results');
+
+    if (visibleCount === 0) {
+        if (!noResultsMsg) {
+            noResultsMsg = document.createElement('div');
+            noResultsMsg.id = 'no-search-results';
+            noResultsMsg.className = 'px-6 py-8 text-center text-gray-500';
+            noResultsMsg.innerHTML = '<p>Keine Transaktionen gefunden, die der Suche entsprechen.</p>';
+            tableContainer.appendChild(noResultsMsg);
+        }
+        table.style.display = 'none';
+    } else {
+        if (noResultsMsg) {
+            noResultsMsg.remove();
+        }
+        table.style.display = '';
+    }
+}
+
+// Live-Filter aktivieren
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', filterTransactions);
+    }
+});
+</script>
 
 {% endif %}
 {% endblock %}
