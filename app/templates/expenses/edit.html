@@ -121,17 +121,17 @@
             {% if expense.receipt_file_path %}
                 <!-- Aktueller Beleg -->
                 <div class="mb-4 p-3 bg-white border border-gray-200 rounded-md">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-3">
-                            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex items-center space-x-3 min-w-0 flex-1">
+                            <svg class="w-8 h-8 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                             </svg>
-                            <div>
+                            <div class="min-w-0 flex-1">
                                 <p class="text-sm font-medium text-gray-900">Beleg vorhanden</p>
-                                <p class="text-xs text-gray-500">{{ expense.receipt_file_path.split('/')[-1] }}</p>
+                                <p class="text-xs text-gray-500 truncate" title="{{ expense.receipt_file_path.split('/')[-1] }}">{{ expense.receipt_file_path.split('/')[-1] }}</p>
                             </div>
                         </div>
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-2 flex-shrink-0">
                             <a href="/expenses/{{ expense.id }}/receipt/download"
                                class="px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
                                 Herunterladen
