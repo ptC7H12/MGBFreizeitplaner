@@ -30,15 +30,26 @@ async def list_expenses(
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id),
     event_id_param: Optional[int] = None,
-    category: Optional[str] = None
+    category: Optional[str] = None,
+    search: Optional[str] = ""
 ):
-    """Liste aller Ausgaben mit Filter"""
+    """Liste aller Ausgaben mit Filter und Suche"""
     query = db.query(Expense).filter(Expense.event_id == event_id)
 
     if event_id_param:
         query = query.filter(Expense.event_id == event_id_param)
     if category:
         query = query.filter(Expense.category == category)
+
+    # Volltextsuche
+    if search and search.strip():
+        search_filter = f"%{search}%"
+        query = query.filter(
+            (Expense.title.ilike(search_filter)) |
+            (Expense.description.ilike(search_filter)) |
+            (Expense.paid_by.ilike(search_filter)) |
+            (Expense.receipt_number.ilike(search_filter))
+        )
 
     expenses = query.order_by(Expense.expense_date.desc()).all()
 
@@ -52,7 +63,9 @@ async def list_expenses(
             "request": request,
             "title": "Ausgaben",
             "expenses": expenses,
-            "categories": categories
+            "categories": categories,
+            "search": search,
+            "selected_category": category
         }
     )
 

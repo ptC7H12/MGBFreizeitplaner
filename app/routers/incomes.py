@@ -87,15 +87,18 @@ async def create_income(
     amount: float = Form(...),
     date: date_type = Form(...),
     description: str = Form(None),
-    role_id: int = Form(None),
+    role_id: Optional[str] = Form(None),
     receipt_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     event_id: int = Depends(get_current_event_id)
 ):
     """Erstellt eine neue Einnahme"""
+    # Konvertiere leere Strings zu None
+    role_id_int = int(role_id) if role_id and role_id.strip() else None
+
     # Validiere Rolle falls angegeben
-    if role_id:
-        role = db.query(Role).filter(Role.id == role_id, Role.event_id == event_id).first()
+    if role_id_int:
+        role = db.query(Role).filter(Role.id == role_id_int, Role.event_id == event_id).first()
         if not role:
             flash(request, "Ungültige Rolle ausgewählt", "error")
             return RedirectResponse(url="/incomes/new", status_code=303)
@@ -106,7 +109,7 @@ async def create_income(
         amount=amount,
         date=date,
         description=description,
-        role_id=role_id if role_id else None
+        role_id=role_id_int
     )
 
     db.add(income)
@@ -166,7 +169,7 @@ async def update_income(
     amount: float = Form(...),
     date: date_type = Form(...),
     description: str = Form(None),
-    role_id: int = Form(None),
+    role_id: Optional[str] = Form(None),
     receipt_file: Optional[UploadFile] = File(None),
     remove_receipt: Optional[str] = Form(None),
     db: Session = Depends(get_db),
@@ -177,9 +180,12 @@ async def update_income(
     if not income:
         raise HTTPException(status_code=404, detail="Einnahme nicht gefunden")
 
+    # Konvertiere leere Strings zu None
+    role_id_int = int(role_id) if role_id and role_id.strip() else None
+
     # Validiere Rolle falls angegeben
-    if role_id:
-        role = db.query(Role).filter(Role.id == role_id, Role.event_id == event_id).first()
+    if role_id_int:
+        role = db.query(Role).filter(Role.id == role_id_int, Role.event_id == event_id).first()
         if not role:
             flash(request, "Ungültige Rolle ausgewählt", "error")
             return RedirectResponse(url=f"/incomes/{income_id}/edit", status_code=303)
@@ -188,7 +194,7 @@ async def update_income(
     income.amount = amount
     income.date = date
     income.description = description
-    income.role_id = role_id if role_id else None
+    income.role_id = role_id_int
 
     # Beleg entfernen, falls gewünscht
     if remove_receipt == "true" and income.receipt_file_path:

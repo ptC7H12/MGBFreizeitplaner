@@ -1,6 +1,16 @@
 {% extends "base.html" %}
 
 {% block content %}
+<!-- Hauptüberschrift mit Counter -->
+<div class="mb-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Aufgaben</h1>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+            {{ total_tasks }} offene Aufgabe{{ 'n' if total_tasks != 1 else '' }}
+        </span>
+    </div>
+</div>
+
 <!-- Bildung & Teilhabe -->
 {% if tasks.bildung_teilhabe|length > 0 %}
 <div class="p-6 mb-6">
