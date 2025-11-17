@@ -883,42 +883,57 @@ async def confirm_import(
             family_map[family_number] = new_family.id
 
         # Dann: Teilnehmer importieren
+        logger.info(f"Starting participant import: {len(data.get('participants', []))} participants to process")
+        
         for participant_data in data.get("participants", []):
+            # Debug-Logging
+            logger.debug(f"Processing: {participant_data.get('first_name')} {participant_data.get('last_name')} - has_error: {participant_data.get('has_error')}")
+            
             # Fehlerhafte überspringen
             if participant_data.get("has_error"):
+                logger.warning(f"Skipping {participant_data.get('first_name')} {participant_data.get('last_name')} due to validation errors")
                 skipped_count += 1
                 continue
-
+        
             try:
                 # Geburtsdatum parsen
                 birth_date_str = participant_data["birth_date"]
                 birth_date = None
-                for fmt in ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"]:
-                    try:
-                        birth_date = datetime.strptime(birth_date_str, fmt).date()
-                        break
-                    except ValueError:
-                        continue
-
+                
+                # Versuche erst mit birth_date_obj (wenn bereits geparst)
+                if participant_data.get("birth_date_obj"):
+                    birth_date = participant_data["birth_date_obj"]
+                    logger.debug(f"Using pre-parsed birth_date_obj: {birth_date}")
+                else:
+                    # Ansonsten String parsen
+                    for fmt in ["%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"]:
+                        try:
+                            birth_date = datetime.strptime(birth_date_str, fmt).date()
+                            logger.debug(f"Parsed birth_date from string with format {fmt}: {birth_date}")
+                            break
+                        except ValueError:
+                            continue
+        
                 if not birth_date:
+                    logger.error(f"Could not parse birth_date for {participant_data.get('first_name')} {participant_data.get('last_name')}: {birth_date_str}")
                     skipped_count += 1
                     continue
-
+        
                 # Rolle basierend auf Alter ermitteln
                 age = event.start_date.year - birth_date.year
                 if (event.start_date.month, event.start_date.day) < (birth_date.month, birth_date.day):
                     age -= 1
-                
+        
+                logger.debug(f"Calculated age: {age} for {participant_data.get('first_name')} {participant_data.get('last_name')}")
+        
                 role_id = None
-                
-                # Versuche Rolle aus Regelwerk zu ermitteln
                 if ruleset and ruleset.age_groups:
                     for age_group in ruleset.age_groups:
                         min_age = age_group.get("min_age", 0)
                         max_age = age_group.get("max_age", 999)
                         if min_age <= age <= max_age:
                             role_name = age_group.get("role", "").lower()
-                            if role_name:  # Nur suchen wenn role_name nicht leer
+                            if role_name:
                                 role = db.query(Role).filter(
                                     Role.event_id == event_id,
                                     Role.name == role_name,
@@ -926,57 +941,31 @@ async def confirm_import(
                                 ).first()
                                 if role:
                                     role_id = role.id
-                                    logger.debug(f"Assigned role '{role.display_name}' to {participant_data['first_name']} {participant_data['last_name']} (age: {age})")
+                                    logger.debug(f"Assigned role from ruleset: {role.display_name}")
                                     break
-                                else:
-                                    logger.warning(f"Role '{role_name}' not found for age {age}")
-                
-                # Fallback 1: Standard-Rolle basierend auf Alter
+        
+                # Fallback: Erste Rolle verwenden
                 if not role_id:
-                    logger.warning(f"No role from ruleset for age {age}, trying fallback...")
-                    
-                    # Versuche Standard-Rollen zu finden
-                    fallback_roles = []
-                    if age < 12:
-                        fallback_roles = ["kind", "child"]
-                    elif age < 18:
-                        fallback_roles = ["jugendlicher", "jugend", "teenager"]
-                    else:
-                        fallback_roles = ["betreuer", "erwachsener", "adult"]
-                    
-                    for fallback_name in fallback_roles:
-                        role = db.query(Role).filter(
-                            Role.event_id == event_id,
-                            Role.name == fallback_name,
-                            Role.is_active == True
-                        ).first()
-                        if role:
-                            role_id = role.id
-                            logger.info(f"Assigned fallback role '{role.display_name}' to {participant_data['first_name']} {participant_data['last_name']}")
-                            break
-                
-                # Fallback 2: Erste verfügbare Rolle verwenden
-                if not role_id:
-                    logger.warning(f"No fallback role found, using first available role...")
+                    logger.warning(f"No role from ruleset for age {age}, using fallback")
                     first_role = db.query(Role).filter(
                         Role.event_id == event_id,
                         Role.is_active == True
                     ).first()
                     if first_role:
                         role_id = first_role.id
-                        logger.info(f"Assigned first available role '{first_role.display_name}' to {participant_data['first_name']} {participant_data['last_name']}")
+                        logger.info(f"Using fallback role: {first_role.display_name}")
                     else:
-                        # Kritischer Fehler: Keine Rollen vorhanden
-                        logger.error(f"CRITICAL: No roles available for event {event_id}!")
+                        logger.error(f"CRITICAL: No roles available for event {event_id}")
                         skipped_count += 1
                         continue
-
+        
                 # Familie zuordnen
                 family_id = None
                 family_number = participant_data.get("family_number")
                 if family_number and family_number in family_map:
                     family_id = family_map[family_number]
-
+                    logger.debug(f"Assigned to family_id: {family_id}")
+        
                 # Preis berechnen
                 final_price = 0.0
                 if role_id:
@@ -987,7 +976,8 @@ async def confirm_import(
                         birth_date=birth_date,
                         family_id=family_id
                     )
-
+                    logger.debug(f"Calculated price: {final_price}")
+        
                 # Teilnehmer erstellen
                 new_participant = Participant(
                     event_id=event_id,
@@ -1000,20 +990,23 @@ async def confirm_import(
                     address=participant_data.get("address"),
                     role_id=role_id,
                     family_id=family_id,
-                    calculated_price=final_price,  # final_price ist eine Property, nicht ein DB-Feld
+                    calculated_price=final_price,
                     is_active=True
                 )
-
+        
                 db.add(new_participant)
                 imported_count += 1
-
+                logger.info(f"✓ Added participant: {new_participant.first_name} {new_participant.last_name}")
+        
             except Exception as e:
-                logger.exception(f"Error importing participant {participant_data.get('first_name')} {participant_data.get('last_name')}: {e}")
+                logger.exception(f"✗ Error importing participant {participant_data.get('first_name')} {participant_data.get('last_name')}: {e}")
                 skipped_count += 1
                 continue
-
+        
         # Commit aller Änderungen
+        logger.info(f"Committing changes: {imported_count} participants to import")
         db.commit()
+        logger.info(f"✓ Import completed: {imported_count} imported, {skipped_count} skipped")
 
         # Erfolgs-Nachricht
         message = f"{imported_count} Teilnehmer erfolgreich importiert"
