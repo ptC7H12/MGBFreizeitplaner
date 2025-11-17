@@ -45,7 +45,7 @@ class Participant(Base):
 
     # Foreign Keys
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False, index=True)
-    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=True, index=True)  # Rolle ist optional
     family_id = Column(Integer, ForeignKey("families.id"), nullable=True, index=True)
 
     # Timestamps
