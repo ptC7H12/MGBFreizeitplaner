@@ -92,8 +92,8 @@ async def create_payment(
     payment_method: Optional[str] = Form(None),
     reference: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
-    participant_id: Optional[int] = Form(None),
-    family_id: Optional[int] = Form(None)
+    participant_id: Optional[str] = Form(None),
+    family_id: Optional[str] = Form(None)
 ):
     """Erstellt eine neue Zahlung"""
     try:
