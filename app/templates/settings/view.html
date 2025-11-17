@@ -383,29 +383,30 @@ function switchTab(tabName) {
 
 // Initialize tabs on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Set initial styling for inactive tabs
-    document.querySelectorAll('.tab-button:not(.active)').forEach(button => {
-        button.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
-    });
+    // Prüfe zuerst ob URL einen Hash hat und öffne entsprechenden Tab
+    const hash = window.location.hash;
+    if (hash === '#categories') {
+        switchTab('categories');
+    } else if (hash === '#ruleset') {
+        switchTab('ruleset');
+    } else {
+        // Nur wenn kein Hash vorhanden, setze Standard-Tab-Styling
+        // Set initial styling for inactive tabs
+        document.querySelectorAll('.tab-button:not(.active)').forEach(button => {
+            button.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+        });
 
-    // Set initial styling for active tab
-    const activeTab = document.querySelector('.tab-button.active');
-    if (activeTab) {
-        activeTab.classList.add('border-blue-500', 'text-blue-600');
+        // Set initial styling for active tab
+        const activeTab = document.querySelector('.tab-button.active');
+        if (activeTab) {
+            activeTab.classList.add('border-blue-500', 'text-blue-600');
+        }
     }
 
     // Event Listener für "Neue Kategorie hinzufügen" Formular
     const addCategoryForm = document.getElementById('add-category-form');
     if (addCategoryForm) {
         addCategoryForm.addEventListener('submit', addCategory);
-    }
-
-    // Prüfe ob URL einen Hash hat und öffne entsprechenden Tab
-    const hash = window.location.hash;
-    if (hash === '#categories') {
-        switchTab('categories');
-    } else if (hash === '#ruleset') {
-        switchTab('ruleset');
     }
 });
 </script>
