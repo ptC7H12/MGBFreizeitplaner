@@ -1,6 +1,6 @@
 """Pydantic Schemas für Family"""
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class FamilyBase(BaseModel):
@@ -11,6 +11,14 @@ class FamilyBase(BaseModel):
     phone: Optional[str] = Field(None, max_length=50)
     address: Optional[str] = None
     notes: Optional[str] = None
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        """Konvertiert leere Strings zu None"""
+        if v == '' or (isinstance(v, str) and v.strip() == ''):
+            return None
+        return v
 
 
 class FamilyCreate(FamilyBase):
@@ -26,6 +34,14 @@ class FamilyUpdate(BaseModel):
     phone: Optional[str] = Field(None, max_length=50)
     address: Optional[str] = None
     notes: Optional[str] = None
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v):
+        """Konvertiert leere Strings zu None"""
+        if v == '' or (isinstance(v, str) and v.strip() == ''):
+            return None
+        return v
 
 
 class FamilyResponse(FamilyBase):
