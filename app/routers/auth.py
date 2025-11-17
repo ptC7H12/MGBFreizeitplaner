@@ -1,17 +1,151 @@
 """Auth Router - Freizeit-Auswahl und -Erstellung"""
 import logging
+import httpx
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from datetime import date, datetime
+from typing import Optional
 
 from app.database import get_db
 from app.models.event import Event
+from app.models.ruleset import Ruleset
+from app.models.setting import Setting
+from app.services.ruleset_parser import RulesetParser
+from app.services.role_manager import RoleManager
 from app.templates_config import templates
 from app.utils.flash import flash
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _get_ruleset_filename_for_event_type(event_type: str, year: int) -> Optional[str]:
+    """
+    Generiert den erwarteten Dateinamen für ein Ruleset basierend auf Event-Typ und Jahr.
+
+    Args:
+        event_type: Event-Typ (z.B. "familienfreizeit", "kinderfreizeit")
+        year: Jahr des Events (z.B. 2024)
+
+    Returns:
+        Dateiname (z.B. "Familienfreizeiten_2024.yaml") oder None bei unbekanntem Typ
+    """
+    # Mapping: event_type → Dateinamen-Präfix
+    type_mapping = {
+        "familienfreizeit": "Familienfreizeiten",
+        "kinderfreizeit": "Kinderfreizeiten",
+        "jugendfreizeit": "Jugendfreizeiten",
+        "teeniefreizeit": "Teeniefreizeiten"
+    }
+
+    prefix = type_mapping.get(event_type.lower())
+    if not prefix:
+        return None
+
+    return f"{prefix}_{year}.yaml"
+
+
+async def _try_import_ruleset_from_github(
+    db: Session,
+    event_id: int,
+    event_type: str,
+    start_date: date,
+    request: Request
+) -> bool:
+    """
+    Versucht ein passendes Ruleset aus dem GitHub-Repository zu importieren.
+
+    Args:
+        db: Datenbank-Session
+        event_id: ID des erstellten Events
+        event_type: Event-Typ
+        start_date: Startdatum des Events
+        request: Request-Objekt für Flash-Messages
+
+    Returns:
+        True wenn erfolgreich importiert, sonst False
+    """
+    try:
+        # Jahr aus Startdatum extrahieren
+        year = start_date.year
+
+        # Erwarteten Dateinamen generieren
+        filename = _get_ruleset_filename_for_event_type(event_type, year)
+        if not filename:
+            logger.debug(f"No ruleset filename mapping for event type '{event_type}'")
+            return False
+
+        # Standard-GitHub-Repo aus Settings laden
+        setting = db.query(Setting).filter(Setting.event_id == event_id).first()
+        if not setting or not setting.default_github_repo:
+            logger.debug("No default GitHub repo configured")
+            return False
+
+        base_url = setting.default_github_repo
+
+        # GitHub Raw URL konstruieren
+        # Von: https://github.com/ptC7H12/MGBFreizeitplaner/tree/main/rulesets/valid/
+        # Zu: https://raw.githubusercontent.com/ptC7H12/MGBFreizeitplaner/main/rulesets/valid/Familienfreizeiten_2024.yaml
+        raw_url = base_url.replace("github.com", "raw.githubusercontent.com").replace("/tree/", "/") + filename
+
+        logger.info(f"Attempting to import ruleset from: {raw_url}")
+
+        # Datei von GitHub herunterladen
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(raw_url)
+
+            if response.status_code != 200:
+                logger.info(f"Ruleset file not found on GitHub (HTTP {response.status_code})")
+                return False
+
+            yaml_content = response.text
+
+        # YAML parsen
+        parser = RulesetParser()
+        data = parser.parse_yaml_content(yaml_content)
+
+        # Validieren
+        is_valid, error_msg = parser.validate_ruleset(data)
+        if not is_valid:
+            logger.warning(f"Invalid ruleset from GitHub: {error_msg}")
+            flash(request, f"Gefundenes Regelwerk ist ungültig: {error_msg}", "warning")
+            return False
+
+        # Regelwerk in Datenbank speichern
+        ruleset = Ruleset(
+            name=data["name"],
+            ruleset_type=data["type"],
+            description=data.get("description"),
+            valid_from=datetime.strptime(data["valid_from"], "%Y-%m-%d").date(),
+            valid_until=datetime.strptime(data["valid_until"], "%Y-%m-%d").date(),
+            age_groups=data["age_groups"],
+            role_discounts=data.get("role_discounts"),
+            family_discount=data.get("family_discount"),
+            source_file=raw_url,
+            event_id=event_id,
+            is_active=True  # Automatisch aktivieren
+        )
+
+        db.add(ruleset)
+        db.commit()
+        db.refresh(ruleset)
+
+        # Rollen aus Ruleset erstellen
+        if data.get("role_discounts"):
+            RoleManager.create_roles_from_ruleset(db, event_id, data.get("role_discounts"))
+            logger.info(f"Created {len(data.get('role_discounts'))} roles from ruleset")
+
+        logger.info(f"Successfully imported and activated ruleset '{data['name']}' for event {event_id}")
+        flash(request, f"Regelwerk '{data['name']}' automatisch importiert und aktiviert!", "success")
+        return True
+
+    except httpx.HTTPError as e:
+        logger.error(f"HTTP error while fetching ruleset from GitHub: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Error importing ruleset from GitHub: {e}", exc_info=True)
+        return False
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -97,6 +231,18 @@ async def create_event(
         db.add(event)
         db.commit()
         db.refresh(event)
+
+        # Setting-Eintrag für das Event erstellen (falls noch nicht vorhanden)
+        setting = db.query(Setting).filter(Setting.event_id == event.id).first()
+        if not setting:
+            setting = Setting(event_id=event.id)
+            db.add(setting)
+            db.commit()
+            db.refresh(setting)
+            logger.info(f"Created default settings for event {event.id}")
+
+        # Versuche passendes Ruleset von GitHub zu importieren
+        await _try_import_ruleset_from_github(db, event.id, event_type, start_date_obj, request)
 
         # Event-ID in Session speichern
         request.session["event_id"] = event.id
