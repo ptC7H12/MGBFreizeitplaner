@@ -139,7 +139,30 @@
     <!-- Tab Content: Ausgabenkategorien -->
     <div id="content-categories" class="tab-content hidden px-6 py-6 space-y-6">
         <div class="mb-4">
-            <p class="text-sm text-gray-600">Verwalten Sie hier Ihre Ausgabenkategorien. Sie können Kategorien umbenennen oder löschen.</p>
+            <p class="text-sm text-gray-600">Verwalten Sie hier Ihre Ausgabenkategorien. Sie können Kategorien hinzufügen, umbenennen oder löschen.</p>
+        </div>
+
+        <!-- Neue Kategorie hinzufügen -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 class="text-sm font-medium text-blue-900 mb-3">Neue Kategorie hinzufügen</h3>
+            <form id="add-category-form" class="flex gap-2">
+                <input
+                    type="text"
+                    id="new-category-name"
+                    placeholder="Kategoriename eingeben..."
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    required
+                >
+                <button
+                    type="submit"
+                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition"
+                >
+                    <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                    </svg>
+                    Hinzufügen
+                </button>
+            </form>
         </div>
 
         {% if categories %}
@@ -298,6 +321,39 @@ async function deleteCategory(name, count) {
     }
 }
 
+async function addCategory(event) {
+    event.preventDefault();
+
+    const nameInput = document.getElementById('new-category-name');
+    const name = nameInput.value.trim();
+
+    if (!name) {
+        alert('Bitte geben Sie einen Kategorienamen ein.');
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('name', name);
+
+        const response = await fetch('/settings/categories/add', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            // Erfolgreich - Seite neu laden und im Kategorien-Tab bleiben
+            window.location.href = '/settings#categories';
+            window.location.reload();
+        } else {
+            const data = await response.json();
+            alert('Fehler beim Hinzufügen: ' + (data.detail || 'Unbekannter Fehler'));
+        }
+    } catch (error) {
+        alert('Fehler beim Hinzufügen der Kategorie: ' + error.message);
+    }
+}
+
 function switchTab(tabName) {
     // Hide all tab contents
     document.querySelectorAll('.tab-content').forEach(content => {
@@ -330,6 +386,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const activeTab = document.querySelector('.tab-button.active');
     if (activeTab) {
         activeTab.classList.add('border-blue-500', 'text-blue-600');
+    }
+
+    // Event Listener für "Neue Kategorie hinzufügen" Formular
+    const addCategoryForm = document.getElementById('add-category-form');
+    if (addCategoryForm) {
+        addCategoryForm.addEventListener('submit', addCategory);
+    }
+
+    // Prüfe ob URL einen Hash hat und öffne entsprechenden Tab
+    const hash = window.location.hash;
+    if (hash === '#categories') {
+        switchTab('categories');
+    } else if (hash === '#ruleset') {
+        switchTab('ruleset');
     }
 });
 </script>
