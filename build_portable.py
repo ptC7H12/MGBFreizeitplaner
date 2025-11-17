@@ -17,8 +17,12 @@ PROJECT_ROOT = Path(__file__).parent
 BUILD_DIR = PROJECT_ROOT / "build"
 RELEASE_DIR = PROJECT_ROOT / "releases"
 
-# Version aus einer zukünftigen version.txt oder hardcoded
-VERSION = "1.0.0"
+# Version aus version.txt lesen
+VERSION_FILE = PROJECT_ROOT / "version.txt"
+try:
+    VERSION = VERSION_FILE.read_text().strip()
+except Exception:
+    VERSION = "0.0.0"  # Fallback
 
 # Dateien und Ordner, die inkludiert werden sollen
 INCLUDE_ITEMS = [

@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator, ValidationError
 from pathlib import Path
 import logging
+from app.version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class Settings(BaseSettings):
         description="Name der Anwendung"
     )
     app_version: str = Field(
-        default="0.1.0",
+        default=__version__,
         description="Version der Anwendung"
     )
     debug: bool = Field(
