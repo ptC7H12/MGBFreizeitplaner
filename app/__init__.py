@@ -1,2 +1,4 @@
 """Freizeit-Kassen-System - Hauptpaket"""
-__version__ = "0.1.0"
+from app.version import __version__
+
+__all__ = ["__version__"]

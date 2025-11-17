@@ -10,7 +10,7 @@ from typing import Optional
 from pydantic import ValidationError
 
 from app.database import get_db
-from app.models import Expense, Event
+from app.models import Expense, Event, Participant
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
@@ -66,12 +66,27 @@ async def create_expense_form(
     """Formular zum Erstellen einer neuen Ausgabe"""
     event = db.query(Event).filter(Event.id == event_id).first()
 
+    # Vorhandene Kategorien aus der Datenbank laden (distinct)
+    categories_query = db.query(Expense.category).filter(Expense.category.isnot(None)).distinct().all()
+    existing_categories = [c[0] for c in categories_query if c[0]]
+
+    # Standard-Kategorien hinzufügen, falls noch nicht vorhanden
+    default_categories = ["Unterkunft", "Verpflegung", "Transport", "Aktivitäten", "Material", "Sonstiges"]
+    all_categories = list(set(existing_categories + default_categories))
+    all_categories.sort()
+
+    # Teilnehmer für "Bezahlt von" Dropdown laden
+    participants = db.query(Participant).filter(Participant.event_id == event_id).order_by(Participant.last_name, Participant.first_name).all()
+    participant_names = [f"{p.first_name} {p.last_name}" for p in participants]
+
     return templates.TemplateResponse(
         "expenses/create.html",
         {
             "request": request,
             "title": "Neue Ausgabe",
-            "event": event
+            "event": event,
+            "categories": all_categories,
+            "participants": participant_names
         }
     )
 
@@ -182,13 +197,28 @@ async def edit_expense_form(request: Request, expense_id: int, db: Session = Dep
 
     event = db.query(Event).filter(Event.id == expense.event_id).first()
 
+    # Vorhandene Kategorien aus der Datenbank laden (distinct)
+    categories_query = db.query(Expense.category).filter(Expense.category.isnot(None)).distinct().all()
+    existing_categories = [c[0] for c in categories_query if c[0]]
+
+    # Standard-Kategorien hinzufügen, falls noch nicht vorhanden
+    default_categories = ["Unterkunft", "Verpflegung", "Transport", "Aktivitäten", "Material", "Sonstiges"]
+    all_categories = list(set(existing_categories + default_categories))
+    all_categories.sort()
+
+    # Teilnehmer für "Bezahlt von" Dropdown laden
+    participants = db.query(Participant).filter(Participant.event_id == expense.event_id).order_by(Participant.last_name, Participant.first_name).all()
+    participant_names = [f"{p.first_name} {p.last_name}" for p in participants]
+
     return templates.TemplateResponse(
         "expenses/edit.html",
         {
             "request": request,
             "title": f"Ausgabe bearbeiten: {expense.title}",
             "expense": expense,
-            "event": event
+            "event": event,
+            "categories": all_categories,
+            "participants": participant_names
         }
     )
 

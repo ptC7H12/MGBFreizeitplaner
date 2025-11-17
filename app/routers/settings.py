@@ -9,8 +9,9 @@ from pydantic import ValidationError
 
 from app.config import settings
 from app.database import get_db
-from app.models import Setting, Event, Ruleset
+from app.models import Setting, Event, Ruleset, Expense
 from app.dependencies import get_current_event_id
+from sqlalchemy import func
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
 from app.schemas import SettingUpdateSchema
@@ -59,6 +60,18 @@ async def view_settings(
     # Alle Rulesets für Dropdown
     rulesets = db.query(Ruleset).filter(Ruleset.event_id == event_id).order_by(Ruleset.valid_from.desc()).all()
 
+    # Kategorien mit Anzahl der Ausgaben laden
+    categories_query = db.query(
+        Expense.category,
+        func.count(Expense.id).label('count')
+    ).filter(
+        Expense.event_id == event_id,
+        Expense.category.isnot(None),
+        Expense.category != ''
+    ).group_by(Expense.category).order_by(Expense.category).all()
+
+    categories = [{'name': cat.category, 'count': cat.count} for cat in categories_query]
+
     return templates.TemplateResponse(
         "settings/view.html",
         {
@@ -66,7 +79,8 @@ async def view_settings(
             "title": "Einstellungen",
             "setting": setting,
             "event": event,
-            "rulesets": rulesets
+            "rulesets": rulesets,
+            "categories": categories
         }
     )
 
@@ -175,3 +189,82 @@ async def update_settings(
 
     except Exception as e:
         return handle_db_exception(e, "/settings/edit", "Updating settings", db, request)
+
+
+@router.post("/categories/rename")
+async def rename_category(
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
+    old_name: str = Form(...),
+    new_name: str = Form(...)
+):
+    """Benennt eine Kategorie um und aktualisiert alle zugehörigen Ausgaben"""
+    try:
+        # Validierung
+        if not old_name or not new_name:
+            raise HTTPException(status_code=400, detail="Kategorienamen dürfen nicht leer sein")
+
+        if old_name == new_name:
+            raise HTTPException(status_code=400, detail="Alter und neuer Name sind identisch")
+
+        # Prüfen ob neue Kategorie bereits existiert
+        existing = db.query(Expense).filter(
+            Expense.event_id == event_id,
+            Expense.category == new_name
+        ).first()
+
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Kategorie '{new_name}' existiert bereits")
+
+        # Alle Ausgaben mit der alten Kategorie aktualisieren
+        updated_count = db.query(Expense).filter(
+            Expense.event_id == event_id,
+            Expense.category == old_name
+        ).update({'category': new_name})
+
+        db.commit()
+
+        logger.info(f"Renamed category '{old_name}' to '{new_name}' for event {event_id}, updated {updated_count} expenses")
+        flash(request, f"Kategorie '{old_name}' wurde zu '{new_name}' umbenannt ({updated_count} Ausgaben aktualisiert)", "success")
+        return RedirectResponse(url="/settings#categories", status_code=303)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error renaming category: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fehler beim Umbenennen: {str(e)}")
+
+
+@router.post("/categories/delete")
+async def delete_category(
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
+    name: str = Form(...)
+):
+    """Löscht eine Kategorie (setzt category auf NULL bei allen zugehörigen Ausgaben)"""
+    try:
+        # Validierung
+        if not name:
+            raise HTTPException(status_code=400, detail="Kategorienamen darf nicht leer sein")
+
+        # Alle Ausgaben mit dieser Kategorie auf NULL setzen
+        updated_count = db.query(Expense).filter(
+            Expense.event_id == event_id,
+            Expense.category == name
+        ).update({'category': None})
+
+        db.commit()
+
+        logger.info(f"Deleted category '{name}' for event {event_id}, updated {updated_count} expenses")
+        flash(request, f"Kategorie '{name}' wurde gelöscht ({updated_count} Ausgaben aktualisiert)", "success")
+        return RedirectResponse(url="/settings#categories", status_code=303)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting category: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Fehler beim Löschen: {str(e)}")

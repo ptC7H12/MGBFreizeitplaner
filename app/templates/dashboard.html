@@ -91,47 +91,85 @@
 <!-- Finanzübersicht -->
 <div class="bg-white shadow rounded-lg p-6 mb-8">
     <h2 class="text-xl font-semibold text-gray-900 mb-4">Finanzübersicht</h2>
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div>
-            <p class="text-sm text-gray-600">Soll-Einnahmen</p>
-            <p class="text-2xl font-bold text-blue-600">{{ "%.2f"|format(stats.total_revenue_target if stats else 0) }} €</p>
+
+    <!-- Einnahmen -->
+    <div class="mb-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-3">Einnahmen</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">Soll Zahlungseingänge</p>
+                <p class="text-xl font-bold text-blue-600">{{ "%.2f"|format(stats.soll_zahlungseingaenge if stats else 0) }} €</p>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">Soll Sonstige Einnahmen</p>
+                <p class="text-xl font-bold text-green-600">{{ "%.2f"|format(stats.soll_sonstige_einnahmen if stats else 0) }} €</p>
+            </div>
+            <div class="bg-indigo-50 p-4 rounded-lg">
+                <p class="text-sm font-medium text-gray-700">Soll Einnahmen (Gesamt)</p>
+                <p class="text-2xl font-bold text-indigo-600">{{ "%.2f"|format(stats.soll_einnahmen_gesamt if stats else 0) }} €</p>
+            </div>
         </div>
-        <div>
-            <p class="text-sm text-gray-600">Ist-Einnahmen</p>
-            <p class="text-2xl font-bold text-green-600">{{ "%.2f"|format(stats.total_payments if stats else 0) }} €</p>
+    </div>
+
+    <!-- Ausgaben -->
+    <div class="mb-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-3">Ausgaben</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-red-50 p-4 rounded-lg">
+                <p class="text-sm font-medium text-gray-700">Soll Ausgaben (Gesamt)</p>
+                <p class="text-2xl font-bold text-red-600">{{ "%.2f"|format(stats.soll_ausgaben_gesamt if stats else 0) }} €</p>
+            </div>
+            <div class="bg-pink-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">Beglichene Ausgaben</p>
+                <p class="text-xl font-bold text-pink-600">{{ "%.2f"|format(stats.ausgaben_beglichen if stats else 0) }} €</p>
+            </div>
         </div>
-        <div>
-            <p class="text-sm text-gray-600">Ausgaben</p>
-            <p class="text-2xl font-bold text-red-600">{{ "%.2f"|format(stats.total_expenses if stats else 0) }} €</p>
-        </div>
-        <div>
-            <p class="text-sm text-gray-600">Offene Beträge</p>
-            <p class="text-2xl font-bold {% if stats and stats.outstanding > 0 %}text-orange-600{% else %}text-gray-600{% endif %}">
-                {{ "%.2f"|format(stats.outstanding if stats else 0) }} €
+    </div>
+
+    <!-- Saldo -->
+    <div>
+        <h3 class="text-lg font-medium text-gray-900 mb-3">Saldo</h3>
+        <div class="bg-purple-50 p-4 rounded-lg">
+            <p class="text-sm font-medium text-gray-700">Saldo (Gesamt)</p>
+            <p class="text-3xl font-bold {% if stats and stats.saldo_gesamt >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                {{ "%.2f"|format(stats.saldo_gesamt if stats else 0) }} €
             </p>
+            <p class="text-xs text-gray-500 mt-1">Einnahmen - Ausgaben</p>
         </div>
     </div>
 </div>
 
-<!-- Saldo-Übersicht -->
+<!-- Zahlungsquoten -->
 <div class="bg-white shadow rounded-lg p-6 mb-8">
-    <h2 class="text-xl font-semibold text-gray-900 mb-4">Saldo</h2>
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">Zahlungsquoten</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-            <p class="text-sm text-gray-600">Aktueller Saldo (Einnahmen - Ausgaben)</p>
-            <p class="text-3xl font-bold {% if stats and stats.balance >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
-                {{ "%.2f"|format(stats.balance if stats else 0) }} €
-            </p>
+            <p class="text-sm text-gray-600 mb-2">Zahlungsquote Zahlungseingänge</p>
+            <div class="flex items-end gap-3">
+                <p class="text-3xl font-bold text-blue-600">
+                    {{ "%.1f"|format(stats.zahlungsquote_eingaenge if stats else 0) }}%
+                </p>
+                <p class="text-sm text-gray-500 mb-1">
+                    {{ "%.2f"|format(stats.ist_zahlungseingaenge if stats else 0) }} € / {{ "%.2f"|format(stats.soll_zahlungseingaenge if stats else 0) }} €
+                </p>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                <div class="bg-blue-600 h-2.5 rounded-full" style="width: {{ stats.zahlungsquote_eingaenge if stats else 0 }}%"></div>
+            </div>
         </div>
         <div>
-            <p class="text-sm text-gray-600">Zahlungsquote</p>
-            <p class="text-3xl font-bold text-blue-600">
-                {% if stats and stats.total_revenue_target > 0 %}
-                    {{ "%.1f"|format((stats.total_payments / stats.total_revenue_target) * 100) }}%
-                {% else %}
-                    0.0%
-                {% endif %}
-            </p>
+            <p class="text-sm text-gray-600 mb-2">Zahlungsquote beglichene Ausgaben</p>
+            <div class="flex items-end gap-3">
+                <p class="text-3xl font-bold text-green-600">
+                    {{ "%.1f"|format(stats.zahlungsquote_ausgaben if stats else 0) }}%
+                </p>
+                <p class="text-sm text-gray-500 mb-1">
+                    {{ "%.2f"|format(stats.ausgaben_beglichen if stats else 0) }} € / {{ "%.2f"|format(stats.soll_ausgaben_gesamt if stats else 0) }} €
+                </p>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                <div class="bg-green-600 h-2.5 rounded-full" style="width: {{ stats.zahlungsquote_ausgaben if stats else 0 }}%"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -139,24 +177,30 @@
 <!-- Quick Actions -->
 <div class="bg-white shadow rounded-lg p-6 mb-8">
     <h2 class="text-xl font-semibold text-gray-900 mb-4">Schnellzugriff</h2>
-    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <a href="/participants/create" class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition">
             <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
             </svg>
             Neuer Teilnehmer
         </a>
-        <a href="/families/create" class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition">
+        <a href="/families/create" class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition">
             <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
             </svg>
             Neue Familie
         </a>
-        <a href="/payments/create" class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 transition">
+        <a href="/payments/create" class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition">
             <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
             </svg>
             Zahlung erfassen
+        </a>
+        <a href="/incomes/new" class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition">
+            <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+            </svg>
+            Sonstige Einnahme
         </a>
         <a href="/expenses/create" class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition">
             <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -164,11 +208,11 @@
             </svg>
             Ausgabe erfassen
         </a>
-        <a href="/rulesets/import" class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 transition">
+        <a href="/payments/invoice/bulk" class="flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 transition">
             <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
             </svg>
-            Regelwerk importieren
+            Rechnungen
         </a>
     </div>
 </div>

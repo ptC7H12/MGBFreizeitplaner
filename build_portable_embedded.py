@@ -21,8 +21,12 @@ BUILD_DIR = PROJECT_ROOT / "build"
 RELEASE_DIR = PROJECT_ROOT / "releases"
 DOWNLOAD_CACHE = PROJECT_ROOT / ".download_cache"
 
-# Version
-VERSION = "1.0.0"
+# Version aus version.txt lesen
+VERSION_FILE = PROJECT_ROOT / "version.txt"
+try:
+    VERSION = VERSION_FILE.read_text().strip()
+except Exception:
+    VERSION = "0.0.0"  # Fallback
 
 # Python Versionen für embedded/standalone builds
 PYTHON_VERSIONS = {
