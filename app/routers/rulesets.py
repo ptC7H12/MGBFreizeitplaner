@@ -282,6 +282,49 @@ async def import_ruleset_github(
                 status_code=303
             )
 
+        # Event laden für automatische Dateierkennung
+        event = db.query(Event).filter(Event.id == event_id).first()
+        if not event:
+            return RedirectResponse(
+                url=f"/rulesets/import{source_param}{error_separator}error=Event nicht gefunden.",
+                status_code=303
+            )
+
+        # Prüfe ob es eine Verzeichnis-URL ist
+        is_directory = False
+        if "github.com" in github_url and "/tree/" in github_url:
+            is_directory = True
+        elif not (github_url.endswith('.yaml') or github_url.endswith('.yml')):
+            # Wenn URL nicht mit .yaml/.yml endet und auch nicht /tree/ enthält,
+            # behandle sie als Verzeichnis wenn sie mit / endet
+            is_directory = github_url.endswith('/')
+
+        # Bei Verzeichnis-URL: Automatisch passenden Dateinamen konstruieren
+        if is_directory:
+            # Jahr aus Event-Startdatum extrahieren
+            year = event.start_date.year
+
+            # Event-Typ zu Dateinamen-Prefix mappen
+            event_type_mapping = {
+                "Familie": "Familienfreizeiten",
+                "Kinder": "Kinderfreizeiten",
+                "Jugend": "Jugendfreizeiten",
+                "Erwachsene": "Erwachsenenfreizeiten",
+            }
+
+            filename_prefix = event_type_mapping.get(event.event_type, event.event_type.capitalize() + "freizeiten")
+            filename = f"{filename_prefix}_{year}.yaml"
+
+            # URL zum Dateinamen konstruieren
+            # Entferne trailing slash falls vorhanden
+            base_url = github_url.rstrip('/')
+            # Füge Dateinamen hinzu
+            github_url = f"{base_url}/{filename}"
+
+            # Konvertiere /tree/ zu /blob/ für Dateien
+            if "/tree/" in github_url:
+                github_url = github_url.replace("/tree/", "/blob/")
+
         # GitHub-URLs automatisch zu Raw-URLs konvertieren
         # Von: https://github.com/user/repo/blob/branch/path/file.yaml
         # Zu: https://raw.githubusercontent.com/user/repo/branch/path/file.yaml
