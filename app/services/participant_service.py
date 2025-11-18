@@ -125,8 +125,9 @@ class ParticipantService:
 
         # Daten schreiben
         for row_num, participant in enumerate(participants, 2):
-            total_paid = sum(payment.amount for payment in participant.payments)
-            outstanding = participant.final_price - total_paid
+            # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+            total_paid = float(sum((payment.amount for payment in participant.payments), 0))
+            outstanding = float(participant.final_price) - total_paid
 
             ws.cell(row=row_num, column=1, value=participant.last_name)
             ws.cell(row=row_num, column=2, value=participant.first_name)

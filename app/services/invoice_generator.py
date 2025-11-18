@@ -155,8 +155,9 @@ class InvoiceGenerator:
         invoice_date = datetime.now().strftime("%d.%m.%Y")
 
         # QR-Code für SEPA-Zahlung vorbereiten (falls offen)
-        total_paid = sum(payment.amount for payment in participant.payments)
-        outstanding = participant.final_price - total_paid
+        # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+        total_paid = float(sum((payment.amount for payment in participant.payments), 0))
+        outstanding = float(participant.final_price) - total_paid
         qr_image = None
 
         # Verwendungszweck: Präfix + Teilnehmername
@@ -375,15 +376,16 @@ class InvoiceGenerator:
         invoice_date = datetime.now().strftime("%d.%m.%Y")
 
         # Gesamtbetrag und ausstehenden Betrag berechnen
-        total_amount = sum(p.final_price for p in family.participants if p.is_active)
+        # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+        total_amount = float(sum((p.final_price for p in family.participants if p.is_active), 0))
 
         # Zahlungen: Sowohl direkte Familienzahlungen als auch Zahlungen an einzelne Mitglieder
-        family_payments = sum(payment.amount for payment in family.payments)
-        member_payments = sum(
-            payment.amount
+        family_payments = float(sum((payment.amount for payment in family.payments), 0))
+        member_payments = float(sum(
+            (payment.amount
             for participant in family.participants
-            for payment in participant.payments
-        )
+            for payment in participant.payments), 0
+        ))
         total_paid = family_payments + member_payments
         outstanding = total_amount - total_paid
 
