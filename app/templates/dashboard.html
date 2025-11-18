@@ -63,7 +63,7 @@
         <div class="p-5">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <svg class="h-6 w-6 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                    <svg class="h-6 w-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
                     </svg>
@@ -71,10 +71,10 @@
                 <div class="ml-5 w-0 flex-1">
                     <dl>
                         <dt class="text-sm font-medium text-gray-500 truncate">
-                            Einnahmen
+                            Ist Einnahmen
                         </dt>
                         <dd class="text-2xl font-semibold text-gray-900">
-                            {{ "%.2f"|format(stats.total_payments if stats else 0) }} €
+                            {{ "%.2f"|format(stats.ist_einnahmen_gesamt if stats else 0) }} €
                         </dd>
                     </dl>
                 </div>
@@ -82,7 +82,35 @@
         </div>
         <div class="bg-gray-50 px-5 py-3">
             <span class="text-sm text-gray-500">
-                Ziel: {{ "%.2f"|format(stats.total_revenue_target if stats else 0) }} €
+                Ziel: {{ "%.2f"|format(stats.soll_einnahmen_gesamt if stats else 0) }} €
+            </span>
+        </div>
+    </div>
+
+    <!-- Statistik-Karte: Ausgaben -->
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <svg class="h-6 w-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">
+                            Ist Ausgaben
+                        </dt>
+                        <dd class="text-2xl font-semibold text-gray-900">
+                            {{ "%.2f"|format(stats.ausgaben_beglichen if stats else 0) }} €
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+        <div class="bg-gray-50 px-5 py-3">
+            <span class="text-sm text-gray-500">
+                Gesamt: {{ "%.2f"|format(stats.soll_ausgaben_gesamt if stats else 0) }} €
             </span>
         </div>
     </div>
@@ -95,7 +123,7 @@
     <!-- Einnahmen -->
     <div class="mb-6">
         <h3 class="text-lg font-medium text-gray-900 mb-3">Einnahmen</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="bg-emerald-50 p-4 rounded-lg">
                 <p class="text-sm font-medium text-gray-700">Soll Einnahmen (Gesamt)</p>
                 <p class="text-2xl font-bold text-emerald-600">{{ "%.2f"|format(stats.soll_einnahmen_gesamt if stats else 0) }} €</p>
@@ -108,13 +136,18 @@
                 <p class="text-sm text-gray-600">Soll Sonstige Einnahmen</p>
                 <p class="text-xl font-bold text-teal-600">{{ "%.2f"|format(stats.soll_sonstige_einnahmen if stats else 0) }} €</p>
             </div>
+            <div class="bg-green-50 p-4 rounded-lg border-2 border-green-400">
+                <p class="text-sm font-medium text-gray-700">Ist Einnahmen (Gesamt)</p>
+                <p class="text-2xl font-bold text-green-600">{{ "%.2f"|format(stats.ist_einnahmen_gesamt if stats else 0) }} €</p>
+                <p class="text-xs text-gray-500 mt-1">Zahlungen + Sonstige</p>
+            </div>
         </div>
     </div>
 
     <!-- Ausgaben -->
     <div class="mb-6">
         <h3 class="text-lg font-medium text-gray-900 mb-3">Ausgaben</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="bg-red-50 p-4 rounded-lg">
                 <p class="text-sm font-medium text-gray-700">Soll Ausgaben (Gesamt)</p>
                 <p class="text-2xl font-bold text-red-600">{{ "%.2f"|format(stats.soll_ausgaben_gesamt if stats else 0) }} €</p>
@@ -122,6 +155,11 @@
             <div class="bg-pink-50 p-4 rounded-lg">
                 <p class="text-sm text-gray-600">Beglichene Ausgaben</p>
                 <p class="text-xl font-bold text-pink-600">{{ "%.2f"|format(stats.ausgaben_beglichen if stats else 0) }} €</p>
+            </div>
+            <div class="bg-orange-50 p-4 rounded-lg border-2 border-orange-400">
+                <p class="text-sm font-medium text-gray-700">Ist Ausgaben (Aktuell)</p>
+                <p class="text-2xl font-bold text-orange-600">{{ "%.2f"|format(stats.ausgaben_beglichen if stats else 0) }} €</p>
+                <p class="text-xs text-gray-500 mt-1">Tatsächlich gezahlt</p>
             </div>
         </div>
     </div>
