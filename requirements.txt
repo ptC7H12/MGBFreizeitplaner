@@ -35,3 +35,7 @@ openpyxl==3.1.5
 
 # Development
 python-dotenv==1.0.1
+
+# Desktop Application
+pywebview==5.3.1
+pyinstaller==6.11.1
