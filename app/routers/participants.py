@@ -197,15 +197,21 @@ async def create_participant(
     allergies: Optional[str] = Form(None),
     medical_notes: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
-    discount_percent: float = Form(0.0),
+    discount_percent: str = Form("0.0"),  # Als String empfangen
     discount_reason: Optional[str] = Form(None),
-    manual_price_override: Optional[float] = Form(None),
-    role_id: int = Form(...),
-    family_id: Optional[int] = Form(None),
+    manual_price_override: str = Form(""),  # Als String empfangen
+    role_id: str = Form(...),  # Als String empfangen
+    family_id: Optional[str] = Form(None),  # Als String empfangen
     create_as_family: Optional[str] = Form(None)
 ):
     """Erstellt einen neuen Teilnehmer"""
     try:
+        # Konvertiere leere Strings zu None oder passenden Werten
+        manual_price_override_val = None if not manual_price_override or manual_price_override.strip() == "" else float(manual_price_override)
+        discount_percent_val = 0.0 if not discount_percent or discount_percent.strip() == "" else float(discount_percent)
+        role_id_val = int(role_id)  # Pflichtfeld, muss immer eine Zahl sein
+        family_id_val = None if not family_id or family_id.strip() == "" else int(family_id)
+
         # Pydantic-Validierung
         participant_data = ParticipantCreateSchema(
             first_name=first_name,
@@ -219,12 +225,12 @@ async def create_participant(
             allergies=allergies,
             medical_notes=medical_notes,
             notes=notes,
-            discount_percent=discount_percent,
+            discount_percent=discount_percent_val,
             discount_reason=discount_reason,
-            manual_price_override=manual_price_override,
+            manual_price_override=manual_price_override_val,
             event_id=event_id,  # From session dependency
-            role_id=role_id,
-            family_id=family_id
+            role_id=role_id_val,
+            family_id=family_id_val
         )
 
         # Wenn "Als Familie erstellen" aktiviert ist, neue Familie erstellen
@@ -240,7 +246,7 @@ async def create_participant(
 
             if existing_family:
                 # Familie existiert bereits, diese verwenden
-                family_id = existing_family.id
+                family_id_val = existing_family.id
             else:
                 # Neue Familie erstellen
                 new_family = Family(
@@ -253,16 +259,16 @@ async def create_participant(
                 )
                 db.add(new_family)
                 db.flush()  # Familie speichern, um ID zu erhalten
-                family_id = new_family.id
+                family_id_val = new_family.id
 
         # Automatische Preisberechnung (birth_date ist bereits ein date-Objekt)
-        # Verwende die lokale family_id Variable (kann durch "Als Familie erstellen" gesetzt sein)
+        # Verwende family_id_val (kann durch "Als Familie erstellen" gesetzt sein)
         calculated_price = _calculate_price_for_participant(
             db=db,
             event_id=event_id,
             role_id=participant_data.role_id,
             birth_date=participant_data.birth_date,
-            family_id=family_id
+            family_id=family_id_val
         )
 
         # Neuen Teilnehmer erstellen (birth_date ist bereits ein date-Objekt)
@@ -283,7 +289,7 @@ async def create_participant(
             manual_price_override=participant_data.manual_price_override,
             event_id=event_id,  # Aus Session, nicht aus Formular!
             role_id=participant_data.role_id,
-            family_id=family_id,  # Verwende lokale Variable statt participant_data.family_id
+            family_id=family_id_val,  # Verwende konvertierte Variable
             calculated_price=calculated_price
         )
 
@@ -1321,11 +1327,11 @@ async def update_participant(
     allergies: Optional[str] = Form(None),
     medical_notes: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
-    discount_percent: float = Form(0.0),
+    discount_percent: str = Form("0.0"),  # Als String empfangen
     discount_reason: Optional[str] = Form(None),
-    manual_price_override: Optional[float] = Form(None),
-    role_id: Optional[int] = Form(None),  # Rolle ist optional
-    family_id: Optional[int] = Form(None)
+    manual_price_override: str = Form(""),  # Als String empfangen
+    role_id: Optional[str] = Form(None),  # Als String empfangen
+    family_id: Optional[str] = Form(None)  # Als String empfangen
 ):
     """Aktualisiert einen Teilnehmer"""
     participant = db.query(Participant).options(
@@ -1340,6 +1346,12 @@ async def update_participant(
         return RedirectResponse(url="/participants", status_code=303)
 
     try:
+        # Konvertiere leere Strings zu None oder passenden Werten
+        manual_price_override_val = None if not manual_price_override or manual_price_override.strip() == "" else float(manual_price_override)
+        discount_percent_val = 0.0 if not discount_percent or discount_percent.strip() == "" else float(discount_percent)
+        role_id_val = None if not role_id or role_id.strip() == "" else int(role_id)
+        family_id_val = None if not family_id or family_id.strip() == "" else int(family_id)
+
         # Pydantic-Validierung
         participant_data = ParticipantUpdateSchema(
             first_name=first_name,
@@ -1353,11 +1365,11 @@ async def update_participant(
             allergies=allergies,
             medical_notes=medical_notes,
             notes=notes,
-            discount_percent=discount_percent,
+            discount_percent=discount_percent_val,
             discount_reason=discount_reason,
-            manual_price_override=manual_price_override,
-            role_id=role_id,
-            family_id=family_id
+            manual_price_override=manual_price_override_val,
+            role_id=role_id_val,
+            family_id=family_id_val
         )
 
         # Preis neu berechnen (wenn sich relevante Daten geändert haben)
