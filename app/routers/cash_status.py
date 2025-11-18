@@ -19,14 +19,67 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.pdfgen import canvas as pdf_canvas
 
 from app.database import get_db
-from app.models import Payment, Expense, Income, Participant, Family, Event
+from app.models import Payment, Expense, Income, Participant, Family, Event, Ruleset
 from app.dependencies import get_current_event_id
 from app.templates_config import templates
 from app.services.excel_service import ExcelService
+from app.services.price_calculator import PriceCalculator
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/cash-status", tags=["cash_status"])
+
+
+def calculate_base_prices_sum(db: Session, event_id: int) -> float:
+    """
+    Berechnet die Summe der Basispreise (ohne Rabatte) für alle Teilnehmer eines Events.
+
+    Args:
+        db: Datenbank-Session
+        event_id: ID des Events
+
+    Returns:
+        Summe der Basispreise in Euro
+    """
+    # Event laden
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        return 0.0
+
+    # Aktives Ruleset für das Event finden
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.event_id == event_id,
+        Ruleset.is_active == True,
+        Ruleset.valid_from <= event.start_date,
+        Ruleset.valid_until >= event.start_date
+    ).first()
+
+    if not ruleset:
+        return 0.0
+
+    # Alle aktiven Teilnehmer laden
+    participants = db.query(Participant).filter(
+        Participant.event_id == event_id,
+        Participant.is_active == True
+    ).all()
+
+    total_base_price = 0.0
+
+    for participant in participants:
+        # Alter berechnen
+        age = event.start_date.year - participant.birth_date.year
+        if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+            age -= 1
+
+        # Basispreis aus Altersgruppen ermitteln (ohne Rabatte)
+        base_price = PriceCalculator._get_base_price_by_age(
+            age,
+            ruleset.age_groups or []
+        )
+
+        total_base_price += base_price
+
+    return round(total_base_price, 2)
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -39,7 +92,10 @@ async def cash_status(
 
     # === SOLL-Werte (Zu erwartende Werte) ===
 
-    # Erwartete Einnahmen durch Teilnehmer
+    # Basispreise ohne Rabatte berechnen
+    base_prices_sum = calculate_base_prices_sum(db, event_id)
+
+    # Erwartete Einnahmen durch Teilnehmer (mit Rabatten/manuellen Preisen)
     # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
     participants = db.query(Participant).filter(
         Participant.event_id == event_id,
@@ -47,19 +103,16 @@ async def cash_status(
     ).all()
     expected_income_participants = float(sum((p.final_price for p in participants), 0))
 
-    # Sonstige Einnahmen (Zuschüsse/Förderungen)
-    # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
-    other_income = float(db.query(func.sum(Income.amount)).filter(
-        Income.event_id == event_id
-    ).scalar() or 0)
+    # Sonstige Einnahmen = Differenz zwischen Basispreis und rabattiertem Preis (Rabattbetrag)
+    other_income = base_prices_sum - expected_income_participants
 
     # Alle Ausgaben (gesamt)
     total_expenses = float(db.query(func.sum(Expense.amount)).filter(
         Expense.event_id == event_id
     ).scalar() or 0)
 
-    # Erwarteter Saldo
-    expected_balance = expected_income_participants + other_income - total_expenses
+    # Erwarteter Saldo (jetzt basierend auf Basispreisen)
+    expected_balance = base_prices_sum - total_expenses
 
     # === IST-Werte (Getätigte Zahlungen) ===
 
