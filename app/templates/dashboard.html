@@ -95,9 +95,10 @@
                 <p class="text-sm font-medium text-gray-700">Soll Ausgaben (Gesamt)</p>
                 <p class="text-2xl font-bold text-red-600">{{ "%.2f"|format(stats.soll_ausgaben_gesamt if stats else 0) }} €</p>
             </div>
-            <div class="bg-pink-50 p-4 rounded-lg">
+            <div class="bg-pink-50 p-4 rounded-lg border-2 border-pink-400">
                 <p class="text-sm font-medium text-gray-700">Beglichene Ausgaben</p>
                 <p class="text-2xl font-bold text-pink-600">{{ "%.2f"|format(stats.ausgaben_beglichen if stats else 0) }} €</p>
+                <p class="text-xs text-gray-500 mt-1">Tatsächlich gezahlt</p>
             </div>
         </div>
     </div>
