@@ -60,12 +60,15 @@ datas += [(os.path.join(project_root, 'app/templates'), 'app/templates')]
 # Static Files hinzufügen
 datas += [(os.path.join(project_root, 'app/static'), 'app/static')]
 
-# Alembic Migrations hinzufügen
-datas += [(os.path.join(project_root, 'alembic'), 'alembic')]
-datas += [(os.path.join(project_root, 'alembic.ini'), '.')]
+# Alembic Migrations hinzufügen (falls vorhanden)
+if os.path.exists(os.path.join(project_root, 'alembic')):
+    datas += [(os.path.join(project_root, 'alembic'), 'alembic')]
+if os.path.exists(os.path.join(project_root, 'alembic.ini')):
+    datas += [(os.path.join(project_root, 'alembic.ini'), '.')]
 
-# .env.example hinzufügen
-datas += [(os.path.join(project_root, '.env.example'), '.')]
+# .env.example hinzufügen (falls vorhanden)
+if os.path.exists(os.path.join(project_root, '.env.example')):
+    datas += [(os.path.join(project_root, '.env.example'), '.')]
 
 # Ruleset-Vorlagen (falls vorhanden)
 if os.path.exists(os.path.join(project_root, 'rulesets')):

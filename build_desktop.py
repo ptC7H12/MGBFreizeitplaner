@@ -16,6 +16,13 @@ def check_python_version():
     if version.major != 3 or version.minor < 11:
         print(f"[FEHLER] Python 3.11+ erforderlich, aber {version.major}.{version.minor} gefunden!")
         return False
+
+    if version.minor == 13:
+        print(f"\n[WARNUNG] Python 3.13 wird noch nicht vollständig unterstützt!")
+        print(f"[WARNUNG] Einige Pakete können Probleme verursachen.")
+        print(f"[WARNUNG] Empfohlen: Python 3.11 oder 3.12")
+        print(f"[INFO] Build wird trotzdem versucht...\n")
+
     print(f"[OK] Python {version.major}.{version.minor}.{version.micro}")
     return True
 
