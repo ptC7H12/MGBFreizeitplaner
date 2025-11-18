@@ -85,7 +85,7 @@
         </form>
     </div>
 
-    {% if participants %}
+    {% if participant_data %}
     <div class="overflow-x-auto">
         <table id="participants-table" class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -95,43 +95,53 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rolle</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Familie</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preis</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bezahlt</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Offen</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktionen</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                {% for participant in participants %}
+                {% for data in participant_data %}
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">{{ participant.full_name }}</div>
-                        {% if participant.email %}
-                        <div class="text-sm text-gray-500">{{ participant.email }}</div>
+                        <div class="text-sm font-medium text-gray-900">{{ data.participant.full_name }}</div>
+                        {% if data.participant.email %}
+                        <div class="text-sm text-gray-500">{{ data.participant.email }}</div>
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{ participant.birth_date.strftime('%d.%m.%Y') }} ({{ participant.age_at_event }} Jahre)
+                        {{ data.participant.birth_date.strftime('%d.%m.%Y') }} ({{ data.participant.age_at_event }} Jahre)
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        {% if participant.role %}
+                        {% if data.participant.role %}
                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                            {{ participant.role.display_name }}
+                            {{ data.participant.role.display_name }}
                         </span>
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {% if participant.family %}
-                        <a href="/families/{{ participant.family.id }}" class="text-blue-600 hover:text-blue-800">
-                            {{ participant.family.name }}
+                        {% if data.participant.family %}
+                        <a href="/families/{{ data.participant.family.id }}" class="text-blue-600 hover:text-blue-800">
+                            {{ data.participant.family.name }}
                         </a>
                         {% else %}
                         -
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {{ "%.2f"|format(participant.final_price) }} €
+                        {{ "%.2f"|format(data.participant.final_price) }} €
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                        {{ "%.2f"|format(data.total_paid) }} €
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <a href="/participants/{{ participant.id }}" class="text-blue-600 hover:text-blue-800 mr-3">Anzeigen</a>
-                        <a href="/participants/{{ participant.id }}/edit" class="text-green-600 hover:text-green-800">Bearbeiten</a>
+                        <span class="{% if data.outstanding > 0 %}text-orange-600{% else %}text-gray-600{% endif %}">
+                            {{ "%.2f"|format(data.outstanding) }} €
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <a href="/participants/{{ data.participant.id }}" class="text-blue-600 hover:text-blue-800 mr-3">Anzeigen</a>
+                        <a href="/participants/{{ data.participant.id }}/edit" class="text-green-600 hover:text-green-800">Bearbeiten</a>
                     </td>
                 </tr>
                 {% endfor %}
