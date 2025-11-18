@@ -282,6 +282,20 @@ async def import_ruleset_github(
                 status_code=303
             )
 
+        # Prüfe ob URL auf eine Datei zeigt (muss .yaml oder .yml enden)
+        if not (github_url.endswith('.yaml') or github_url.endswith('.yml')):
+            return RedirectResponse(
+                url=f"/rulesets/import{source_param}{error_separator}error=URL muss auf eine YAML-Datei (.yaml oder .yml) zeigen, nicht auf ein Verzeichnis.",
+                status_code=303
+            )
+
+        # Prüfe ob es eine Verzeichnis-URL ist (/tree/ statt /blob/)
+        if "github.com" in github_url and "/tree/" in github_url:
+            return RedirectResponse(
+                url=f"/rulesets/import{source_param}{error_separator}error=URL zeigt auf ein Verzeichnis. Bitte die URL zur spezifischen YAML-Datei verwenden (mit /blob/ statt /tree/).",
+                status_code=303
+            )
+
         # GitHub-URLs automatisch zu Raw-URLs konvertieren
         # Von: https://github.com/user/repo/blob/branch/path/file.yaml
         # Zu: https://raw.githubusercontent.com/user/repo/branch/path/file.yaml
