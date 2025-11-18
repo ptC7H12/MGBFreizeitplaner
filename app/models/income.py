@@ -2,7 +2,7 @@
 from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Date, DateTime, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
-from app.utils.datetime_helper import get_utc_timestamp
+from app.utils.datetime_utils import get_utc_timestamp
 
 
 class Income(Base):
