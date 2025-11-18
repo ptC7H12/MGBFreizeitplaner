@@ -650,6 +650,7 @@ async def toggle_ruleset(
     try:
         # Neuer Status ermitteln
         new_status = not ruleset.is_active
+        logger.info(f"Toggling ruleset {ruleset_id} ('{ruleset.name}'): {ruleset.is_active} → {new_status}")
 
         # Wenn das Ruleset aktiviert wird, alle anderen desselben Events deaktivieren
         if new_status is True:
@@ -661,7 +662,10 @@ async def toggle_ruleset(
             ).all()
 
             deactivated_count = len(other_rulesets)
+            logger.info(f"Found {deactivated_count} other active rulesets to deactivate")
+
             for other_ruleset in other_rulesets:
+                logger.info(f"  Deactivating ruleset {other_ruleset.id} ('{other_ruleset.name}')")
                 other_ruleset.is_active = False
 
             # Dieses Ruleset aktivieren
@@ -678,6 +682,7 @@ async def toggle_ruleset(
             flash(request, f"Regelwerk '{ruleset.name}' deaktiviert", "info")
 
         db.commit()
+        logger.info(f"Successfully toggled ruleset {ruleset_id} to {new_status}")
         return RedirectResponse(url=f"/rulesets/{ruleset_id}", status_code=303)
     except Exception as e:
         db.rollback()
