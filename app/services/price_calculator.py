@@ -39,9 +39,9 @@ class PriceCalculator:
                 role_name, ruleset_data.get("role_discounts", {})
             )
 
-        # Familienrabatt ermitteln
+        # Familienrabatt ermitteln (nur für Kinder unter 18)
         family_discount_percent = PriceCalculator._get_family_discount(
-            family_children_count, ruleset_data.get("family_discount", {})
+            age, family_children_count, ruleset_data.get("family_discount", {})
         )
 
         # Alle Rabatte vom Basispreis berechnen (nicht gestapelt!)
@@ -100,20 +100,28 @@ class PriceCalculator:
         return 0.0
 
     @staticmethod
-    def _get_family_discount(child_position: int, family_discount_config: dict) -> float:
+    def _get_family_discount(age: int, child_position: int, family_discount_config: dict) -> float:
         """
         Ermittelt den Familienrabatt in Prozent
+
+        WICHTIG: Familienrabatte gelten nur für Kinder (unter 18 Jahre).
+        Erwachsene (18+) erhalten KEINEN Familienrabatt.
 
         Unterstützt Rabatte für:
         - Erstes Kind (first_child_percent, optional, Standard: 0%)
         - Zweites Kind (second_child_percent)
         - Drittes und weitere Kinder (third_plus_child_percent)
 
-        Beispiel: Bei 3 Kindern mit Rabatten [0%, 25%, 50%]:
-        - Kind 1 (ältestes): 0% Rabatt
+        Beispiel: Bei 3 Kindern mit Rabatten [25%, 25%, 25%]:
+        - Kind 1 (ältestes): 25% Rabatt
         - Kind 2: 25% Rabatt
-        - Kind 3 (jüngstes): 50% Rabatt
+        - Kind 3 (jüngstes): 25% Rabatt
+        - Erwachsene: 0% Rabatt
         """
+        # Familienrabatte gelten NUR für Kinder (unter 18)
+        if age >= 18:
+            return 0.0
+
         if not family_discount_config.get("enabled", False):
             return 0.0
 
@@ -281,8 +289,9 @@ class PriceCalculator:
             )
 
         # Familienrabatt ermitteln (vom Basispreis, NICHT gestapelt!)
+        # Nur für Kinder unter 18
         breakdown['family_discount_percent'] = PriceCalculator._get_family_discount(
-            family_children_count, ruleset_data.get("family_discount", {})
+            age, family_children_count, ruleset_data.get("family_discount", {})
         )
         breakdown['family_discount_amount'] = breakdown['base_price'] * (
             breakdown['family_discount_percent'] / 100
