@@ -47,14 +47,15 @@ async def cash_status(
     expected_income_participants = sum(p.final_price for p in participants)
 
     # Sonstige Einnahmen (Zuschüsse/Förderungen)
-    other_income = db.query(func.sum(Income.amount)).filter(
+    # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+    other_income = float(db.query(func.sum(Income.amount)).filter(
         Income.event_id == event_id
-    ).scalar() or 0.0
+    ).scalar() or 0)
 
     # Alle Ausgaben (gesamt)
-    total_expenses = db.query(func.sum(Expense.amount)).filter(
+    total_expenses = float(db.query(func.sum(Expense.amount)).filter(
         Expense.event_id == event_id
-    ).scalar() or 0.0
+    ).scalar() or 0)
 
     # Erwarteter Saldo
     expected_balance = expected_income_participants + other_income - total_expenses
@@ -62,18 +63,18 @@ async def cash_status(
     # === IST-Werte (Getätigte Zahlungen) ===
 
     # Tatsächliche Einnahmen durch Teilnehmer-Zahlungen
-    actual_income_participants = db.query(func.sum(Payment.amount)).filter(
+    actual_income_participants = float(db.query(func.sum(Payment.amount)).filter(
         Payment.event_id == event_id
-    ).scalar() or 0.0
+    ).scalar() or 0)
 
     # Sonstige Einnahmen (gleich wie Soll, da diese direkt gebucht werden)
     actual_other_income = other_income
 
     # Beglichene Ausgaben
-    settled_expenses = db.query(func.sum(Expense.amount)).filter(
+    settled_expenses = float(db.query(func.sum(Expense.amount)).filter(
         Expense.event_id == event_id,
         Expense.is_settled == True
-    ).scalar() or 0.0
+    ).scalar() or 0)
 
     # Aktueller Saldo
     actual_balance = actual_income_participants + actual_other_income - settled_expenses
@@ -87,10 +88,10 @@ async def cash_status(
     outstanding_other_income = 0.0
 
     # Noch zu begleichende Ausgaben
-    open_expenses = db.query(func.sum(Expense.amount)).filter(
+    open_expenses = float(db.query(func.sum(Expense.amount)).filter(
         Expense.event_id == event_id,
         Expense.is_settled == False
-    ).scalar() or 0.0
+    ).scalar() or 0)
 
     # Differenz Saldo
     balance_difference = expected_balance - actual_balance
