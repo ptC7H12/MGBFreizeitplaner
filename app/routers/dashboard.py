@@ -171,12 +171,13 @@ async def dashboard(request: Request, db: Session = Depends(get_db), event_id: i
     # Rabatte für nicht-zuschussberechtigte Rollen berechnen (werden auf Gruppe umgelegt)
     non_subsidy_discounts = calculate_non_subsidy_discount_sum(db, event_id)
 
-    # Sonstige Einnahmen = Differenz zwischen Basispreis und rabattiertem Preis MINUS nicht-zuschussberechtigte Rabatte
-    # Nur zuschussberechtigte Rabatte werden als "Sonstige Einnahmen" erwartet
-    soll_sonstige_einnahmen = base_prices_sum - soll_zahlungseingaenge - non_subsidy_discounts
+    # Gesamteinnahmen (Soll) = Basispreise MINUS nicht-zuschussberechtigte Rabatte
+    # (Nicht-zuschussberechtigte Rabatte sind Umlagen auf die Gruppe, keine erwarteten Einnahmen)
+    soll_einnahmen_gesamt = base_prices_sum - non_subsidy_discounts
 
-    # Gesamteinnahmen (Soll) = Basispreise (= Zahlungseingänge + Rabattbetrag)
-    soll_einnahmen_gesamt = base_prices_sum
+    # Sonstige Einnahmen = Differenz zwischen erwarteten Gesamteinnahmen und Zahlungseingängen
+    # Dies sind die erwarteten Zuschüsse (nur zuschussberechtigte Rabatte)
+    soll_sonstige_einnahmen = soll_einnahmen_gesamt - soll_zahlungseingaenge
 
     ist_zahlungseingaenge = float(db.query(func.sum(Payment.amount)).filter(Payment.event_id == event_id).scalar() or 0)
     ist_sonstige_einnahmen = soll_sonstige_einnahmen  # Sonstige Einnahmen werden direkt erfasst

@@ -186,17 +186,21 @@ async def cash_status(
     # Rabatte für nicht-zuschussberechtigte Rollen berechnen (werden auf Gruppe umgelegt)
     non_subsidy_discounts = calculate_non_subsidy_discount_sum(db, event_id)
 
-    # Sonstige Einnahmen = Differenz zwischen Basispreis und rabattiertem Preis MINUS nicht-zuschussberechtigte Rabatte
-    # Nur zuschussberechtigte Rabatte werden als "Sonstige Einnahmen" erwartet
-    other_income = base_prices_sum - expected_income_participants - non_subsidy_discounts
+    # Gesamteinnahmen (Soll) = Basispreise MINUS nicht-zuschussberechtigte Rabatte
+    # (Nicht-zuschussberechtigte Rabatte sind Umlagen auf die Gruppe, keine erwarteten Einnahmen)
+    expected_total_income = base_prices_sum - non_subsidy_discounts
+
+    # Sonstige Einnahmen = Differenz zwischen erwarteten Gesamteinnahmen und Zahlungseingängen
+    # Dies sind die erwarteten Zuschüsse (nur zuschussberechtigte Rabatte)
+    other_income = expected_total_income - expected_income_participants
 
     # Alle Ausgaben (gesamt)
     total_expenses = float(db.query(func.sum(Expense.amount)).filter(
         Expense.event_id == event_id
     ).scalar() or 0)
 
-    # Erwarteter Saldo (jetzt basierend auf Basispreisen)
-    expected_balance = base_prices_sum - total_expenses
+    # Erwarteter Saldo (basierend auf erwarteten Gesamteinnahmen)
+    expected_balance = expected_total_income - total_expenses
 
     # === IST-Werte (Getätigte Zahlungen) ===
 
@@ -271,9 +275,9 @@ async def cash_status(
             # SOLL-Werte
             "expected_income_participants": expected_income_participants,
             "expected_other_income": other_income,
+            "expected_total_income": expected_total_income,
             "expected_expenses": total_expenses,
             "expected_balance": expected_balance,
-            "non_subsidy_discounts": non_subsidy_discounts,  # Umlage auf Gruppe (nicht zuschussberechtigt)
             # IST-Werte
             "actual_income_participants": actual_income_participants,
             "actual_other_income": actual_other_income,
