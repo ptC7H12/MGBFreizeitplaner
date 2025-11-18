@@ -129,7 +129,7 @@ app.include_router(backups.router)
 
 @app.get("/health")
 async def health_check():
-    """Health-Check-Endpunkt für Docker"""
+    """Health-Check-Endpunkt"""
     return {
         "status": "healthy",
         "app": settings.app_name,

@@ -180,9 +180,8 @@ git pull
 alembic upgrade head
 
 # App neu starten
-docker-compose restart
-# ODER
-systemctl restart freizeit-kassen-system
+# Stoppe die laufende Anwendung (Ctrl+C) und starte neu:
+python -m app.main
 ```
 
 **4.2 Prüfen**
@@ -195,8 +194,6 @@ alembic current
 
 # Logs prüfen
 tail -f logs/app.log
-# ODER
-docker-compose logs -f web
 ```
 
 ---

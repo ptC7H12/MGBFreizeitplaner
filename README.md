@@ -57,7 +57,6 @@ Ein Web-basiertes Kassensystem für Kinder-, Jugend- und Familienfreizeiten mit 
 - **Datenbank**: SQLite mit SQLAlchemy ORM
 - **Validierung**: Pydantic für Input-Validierung
 - **PDF-Generierung**: ReportLab für Rechnungen
-- **Deployment**: Docker + Docker Compose
 
 ## Installation
 
@@ -112,29 +111,7 @@ Ein Web-basiertes Kassensystem für Kinder-, Jugend- und Familienfreizeiten mit 
 
 ---
 
-### 🐳 Option 3: Mit Docker
-
-**Für Server-Deployment oder Entwickler mit Docker-Erfahrung**
-
-1. Repository klonen:
-```bash
-git clone <repository-url>
-cd MGBFreizeitplaner
-```
-
-2. Docker Container starten:
-```bash
-docker-compose up -d
-```
-
-3. Anwendung aufrufen:
-```
-http://localhost:8000
-```
-
----
-
-### 💻 Option 4: Manuelle Installation (Entwickler)
+### 💻 Option 3: Manuelle Installation (Entwickler)
 
 **Für Entwickler die am Code arbeiten möchten**
 
@@ -231,8 +208,6 @@ MGBFreizeitplaner/
 ├── rulesets/
 │   └── examples/            # Beispiel-Regelwerke
 ├── tests/                   # Tests
-├── docker-compose.yml       # Docker Compose Konfiguration
-├── Dockerfile               # Docker Image Definition
 ├── requirements.txt         # Python Dependencies
 └── README.md               # Diese Datei
 ```
@@ -354,7 +329,7 @@ family_discount:
 - `POST /settings/edit` - Einstellungen aktualisieren
 
 ### System
-- `GET /health` - Health-Check für Docker
+- `GET /health` - Health-Check
 
 ## Validierung
 
@@ -453,7 +428,6 @@ Beide Skripte erstellen ZIP-Archive im `releases/` Ordner.
 - ✅ Zentralisiertes Error-Handling mit Flash-Messages
 - ✅ Pydantic Input-Validierung über alle Formulare
 - ✅ Responsive UI mit Tailwind CSS und HTMX
-- ✅ Docker-Support
 - ✅ Logging-System
 
 ### v0.1.0 - Grundgerüst
@@ -461,7 +435,6 @@ Beide Skripte erstellen ZIP-Archive im `releases/` Ordner.
 - FastAPI-App mit Basis-Routing
 - SQLAlchemy-Modelle
 - Basis-Templates
-- Docker-Setup
 
 ## Backup & Restore
 
