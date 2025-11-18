@@ -178,6 +178,22 @@ async def import_ruleset_upload(
         content = await file.read()
         yaml_string = content.decode('utf-8')
 
+        # Bereinige YAML-String von Editor-Metadaten und unsichtbaren Zeichen
+        # Entferne BOM (Byte Order Mark) falls vorhanden
+        if yaml_string.startswith('\ufeff'):
+            yaml_string = yaml_string[1:]
+
+        # Teile in Zeilen und filtere Editor-spezifische Zeilen
+        lines = yaml_string.split('\n')
+        cleaned_lines = []
+        for line in lines:
+            # Überspringe Zeilen mit Editor-Metadaten
+            if '--tab-size-preference' in line or '# editorconfig' in line.lower():
+                continue
+            cleaned_lines.append(line)
+
+        yaml_string = '\n'.join(cleaned_lines)
+
         # YAML parsen
         parser = RulesetParser()
         data = parser.parse_yaml_string(yaml_string)
