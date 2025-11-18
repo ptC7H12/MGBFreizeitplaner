@@ -53,6 +53,7 @@ def clean_build():
         if dir_path.exists():
             shutil.rmtree(dir_path)
             print(f"[OK] {dir_name}/ gelöscht")
+    return True
 
 
 def run_pyinstaller():
@@ -134,6 +135,7 @@ https://github.com/ptC7H12/MGBFreizeitplaner
     readme_file = dist_dir / "README.txt"
     readme_file.write_text(readme_content, encoding="utf-8")
     print("[OK] README.txt erstellt")
+    return True
 
 
 def main():
