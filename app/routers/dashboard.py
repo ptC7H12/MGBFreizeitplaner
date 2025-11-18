@@ -6,11 +6,57 @@ from sqlalchemy import func, extract
 from datetime import date, timedelta
 
 from app.database import get_db
-from app.models import Participant, Payment, Expense, Event, Family, Role, Income
+from app.models import Participant, Payment, Expense, Event, Family, Role, Income, Ruleset
 from app.dependencies import get_current_event_id
 from app.templates_config import templates
+from app.services.price_calculator import PriceCalculator
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+def calculate_base_prices_sum(db: Session, event_id: int) -> float:
+    """
+    Berechnet die Summe der Basispreise (ohne Rabatte) für alle Teilnehmer eines Events.
+
+    Args:
+        db: Datenbank-Session
+        event_id: ID des Events
+
+    Returns:
+        Summe der Basispreise in Euro
+    """
+    # Event und Ruleset laden
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        return 0.0
+
+    ruleset = db.query(Ruleset).filter(Ruleset.id == event.ruleset_id).first()
+    if not ruleset:
+        return 0.0
+
+    # Alle aktiven Teilnehmer laden
+    participants = db.query(Participant).filter(
+        Participant.event_id == event_id,
+        Participant.is_active == True
+    ).all()
+
+    total_base_price = 0.0
+
+    for participant in participants:
+        # Alter berechnen
+        age = event.start_date.year - participant.birth_date.year
+        if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+            age -= 1
+
+        # Basispreis aus Altersgruppen ermitteln (ohne Rabatte)
+        base_price = PriceCalculator._get_base_price_by_age(
+            age,
+            ruleset.rules.get("age_groups", [])
+        )
+
+        total_base_price += base_price
+
+    return round(total_base_price, 2)
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -23,9 +69,21 @@ async def dashboard(request: Request, db: Session = Depends(get_db), event_id: i
 
     # Finanzielle Übersicht (gefiltert nach event_id)
     # Einnahmen - Konvertiere Decimal zu float um Typ-Konflikte zu vermeiden
-    soll_zahlungseingaenge = float(db.query(func.sum(Participant.calculated_price)).filter(Participant.event_id == event_id).scalar() or 0)
-    soll_sonstige_einnahmen = float(db.query(func.sum(Income.amount)).filter(Income.event_id == event_id).scalar() or 0)
-    soll_einnahmen_gesamt = soll_zahlungseingaenge + soll_sonstige_einnahmen
+
+    # Basispreise ohne Rabatte berechnen
+    base_prices_sum = calculate_base_prices_sum(db, event_id)
+
+    # Zahlungseingänge mit Rabatten (was Teilnehmer tatsächlich zahlen sollen)
+    soll_zahlungseingaenge = float(db.query(func.sum(Participant.calculated_price)).filter(
+        Participant.event_id == event_id,
+        Participant.is_active == True
+    ).scalar() or 0)
+
+    # Sonstige Einnahmen = Differenz zwischen Basispreis und rabattiertem Preis (Rabattbetrag)
+    soll_sonstige_einnahmen = base_prices_sum - soll_zahlungseingaenge
+
+    # Gesamteinnahmen (Soll) = Basispreise (= Zahlungseingänge + Rabattbetrag)
+    soll_einnahmen_gesamt = base_prices_sum
 
     ist_zahlungseingaenge = float(db.query(func.sum(Payment.amount)).filter(Payment.event_id == event_id).scalar() or 0)
     ist_sonstige_einnahmen = soll_sonstige_einnahmen  # Sonstige Einnahmen werden direkt erfasst
@@ -38,8 +96,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db), event_id: i
         Expense.is_settled == True
     ).scalar() or 0)
 
-    # Saldo
-    saldo_gesamt = ist_einnahmen_gesamt - soll_ausgaben_gesamt
+    # Saldo: Soll-Einnahmen - Soll-Ausgaben (korrigiert!)
+    saldo_gesamt = soll_einnahmen_gesamt - soll_ausgaben_gesamt
 
     # Offene Beträge
     offene_zahlungseingaenge = soll_zahlungseingaenge - ist_zahlungseingaenge
