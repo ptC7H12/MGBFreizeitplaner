@@ -82,7 +82,7 @@ class PriceCalculator:
     @staticmethod
     def _get_role_discount(role_name: Optional[str], role_discounts: dict) -> float:
         """
-        Ermittelt den Rollenrabatt in Prozent.
+        Ermittelt den Rollenrabatt in Prozent (case-insensitive).
 
         Args:
             role_name: Optional Name der Rolle
@@ -94,9 +94,11 @@ class PriceCalculator:
         if not role_name:
             return 0.0
 
+        # Case-insensitive Suche im role_discounts Dictionary
         role_name_lower = role_name.lower()
-        if role_name_lower in role_discounts:
-            return float(role_discounts[role_name_lower].get("discount_percent", 0))
+        for key, value in role_discounts.items():
+            if key.lower() == role_name_lower:
+                return float(value.get("discount_percent", 0))
         return 0.0
 
     @staticmethod
