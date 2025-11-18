@@ -89,25 +89,8 @@ if os.path.exists(os.path.join(project_root, 'rulesets')):
 if os.path.exists(os.path.join(project_root, 'VERSION.txt')):
     datas += [(os.path.join(project_root, 'VERSION.txt'), '.')]
 
-# PyWebView binaries sammeln
+# Keine manuelle Sammlung mehr - wird durch Hook erledigt
 binaries = []
-try:
-    # Sammle alle dynamischen Bibliotheken von webview (inkl. WebView2Loader.dll)
-    webview_binaries = collect_dynamic_libs('webview')
-    if webview_binaries:
-        binaries += webview_binaries
-        print(f"[INFO] PyWebView binaries gefunden: {len(webview_binaries)} DLLs")
-except Exception as e:
-    print(f"[WARNUNG] Konnte PyWebView binaries nicht sammeln: {e}")
-
-# PyWebView data files sammeln (falls vorhanden)
-try:
-    webview_datas = collect_data_files('webview')
-    if webview_datas:
-        datas += webview_datas
-        print(f"[INFO] PyWebView data files gefunden: {len(webview_datas)} Dateien")
-except Exception as e:
-    print(f"[WARNUNG] Konnte PyWebView data files nicht sammeln: {e}")
 
 a = Analysis(
     ['desktop_app.py'],
@@ -115,7 +98,7 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=[os.path.join(project_root, 'hooks')],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
