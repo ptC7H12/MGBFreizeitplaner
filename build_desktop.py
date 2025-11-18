@@ -63,6 +63,30 @@ def clean_build():
     return True
 
 
+def create_icon_if_missing():
+    """Erstellt Icon falls nicht vorhanden"""
+    icon_path = Path("app_icon.ico")
+    if not icon_path.exists():
+        print("\n[INFO] Icon nicht gefunden, erstelle Icon...")
+        try:
+            subprocess.run(
+                [sys.executable, "create_icon.py"],
+                check=True
+            )
+            if icon_path.exists():
+                print("[OK] Icon erstellt")
+                return True
+            else:
+                print("[WARNUNG] Icon konnte nicht erstellt werden")
+                return False
+        except subprocess.CalledProcessError as e:
+            print(f"[WARNUNG] Icon-Erstellung fehlgeschlagen: {e}")
+            return False
+    else:
+        print("\n[OK] Icon gefunden: app_icon.ico")
+        return True
+
+
 def run_pyinstaller():
     """Führt PyInstaller mit der Spec-Datei aus"""
     print("\n[INFO] Starte PyInstaller Build...")
@@ -167,6 +191,7 @@ def main():
     steps = [
         ("Requirements installieren", install_requirements),
         ("Build bereinigen", clean_build),
+        ("Icon erstellen/prüfen", create_icon_if_missing),
         ("PyInstaller ausführen", run_pyinstaller),
         ("Build verifizieren", verify_build),
         ("Zusätzliche Dateien kopieren", copy_additional_files),

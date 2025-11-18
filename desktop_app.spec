@@ -134,7 +134,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # TODO: Icon hinzufügen falls vorhanden
+    icon='app_icon.ico',  # Windows .ico Icon
 )
 
 coll = COLLECT(
