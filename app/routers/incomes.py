@@ -44,11 +44,13 @@ async def list_incomes(
             if role_name not in incomes_by_role:
                 incomes_by_role[role_name] = {"role": income.role, "incomes": [], "total": 0.0}
             incomes_by_role[role_name]["incomes"].append(income)
-            incomes_by_role[role_name]["total"] += income.amount
+            # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+            incomes_by_role[role_name]["total"] += float(income.amount)
         else:
             incomes_without_role.append(income)
 
-    total_income = sum(i.amount for i in incomes)
+    # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+    total_income = float(sum((i.amount for i in incomes), 0))
 
     return templates.TemplateResponse(
         "incomes/list.html",
