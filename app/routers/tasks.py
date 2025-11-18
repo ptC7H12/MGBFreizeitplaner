@@ -81,6 +81,7 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
     participants_with_but = db.query(Participant).filter(
         Participant.event_id == event_id,
         Participant.bildung_teilhabe_id.isnot(None),
+        Participant.bildung_teilhabe_id != "",  # Leere Strings ausschließen
         Participant.is_active == True
     ).all()
 
