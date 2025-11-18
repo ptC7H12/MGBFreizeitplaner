@@ -22,21 +22,21 @@ async def dashboard(request: Request, db: Session = Depends(get_db), event_id: i
     total_families = db.query(func.count(Family.id)).filter(Family.event_id == event_id).scalar() or 0
 
     # Finanzielle Übersicht (gefiltert nach event_id)
-    # Einnahmen
-    soll_zahlungseingaenge = db.query(func.sum(Participant.calculated_price)).filter(Participant.event_id == event_id).scalar() or 0.0
-    soll_sonstige_einnahmen = db.query(func.sum(Income.amount)).filter(Income.event_id == event_id).scalar() or 0.0
+    # Einnahmen - Konvertiere Decimal zu float um Typ-Konflikte zu vermeiden
+    soll_zahlungseingaenge = float(db.query(func.sum(Participant.calculated_price)).filter(Participant.event_id == event_id).scalar() or 0)
+    soll_sonstige_einnahmen = float(db.query(func.sum(Income.amount)).filter(Income.event_id == event_id).scalar() or 0)
     soll_einnahmen_gesamt = soll_zahlungseingaenge + soll_sonstige_einnahmen
 
-    ist_zahlungseingaenge = db.query(func.sum(Payment.amount)).filter(Payment.event_id == event_id).scalar() or 0.0
+    ist_zahlungseingaenge = float(db.query(func.sum(Payment.amount)).filter(Payment.event_id == event_id).scalar() or 0)
     ist_sonstige_einnahmen = soll_sonstige_einnahmen  # Sonstige Einnahmen werden direkt erfasst
     ist_einnahmen_gesamt = ist_zahlungseingaenge + ist_sonstige_einnahmen
 
     # Ausgaben
-    soll_ausgaben_gesamt = db.query(func.sum(Expense.amount)).filter(Expense.event_id == event_id).scalar() or 0.0
-    ausgaben_beglichen = db.query(func.sum(Expense.amount)).filter(
+    soll_ausgaben_gesamt = float(db.query(func.sum(Expense.amount)).filter(Expense.event_id == event_id).scalar() or 0)
+    ausgaben_beglichen = float(db.query(func.sum(Expense.amount)).filter(
         Expense.event_id == event_id,
         Expense.is_settled == True
-    ).scalar() or 0.0
+    ).scalar() or 0)
 
     # Saldo
     saldo_gesamt = ist_einnahmen_gesamt - soll_ausgaben_gesamt
