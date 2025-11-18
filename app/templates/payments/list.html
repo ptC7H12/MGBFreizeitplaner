@@ -35,7 +35,7 @@
             <dd class="mt-1 text-3xl font-semibold text-blue-600">
                 {{ "%.2f"|format(expected_income) }} €
             </dd>
-            {% set total_received = payments|sum(attribute='amount') %}
+            {% set total_received = payments|sum(attribute='amount')|float %}
             {% set difference = expected_income - total_received %}
             <p class="mt-2 text-sm {% if difference > 0 %}text-red-600{% elif difference < 0 %}text-green-600{% else %}text-gray-500{% endif %}">
                 {% if difference > 0 %}
