@@ -80,11 +80,13 @@ async def dashboard(request: Request, db: Session = Depends(get_db), event_id: i
     # Basispreise ohne Rabatte berechnen
     base_prices_sum = calculate_base_prices_sum(db, event_id)
 
-    # Zahlungseingänge mit Rabatten (was Teilnehmer tatsächlich zahlen sollen)
-    soll_zahlungseingaenge = float(db.query(func.sum(Participant.calculated_price)).filter(
+    # Zahlungseingänge mit Rabatten und manuellen Preisen (was Teilnehmer tatsächlich zahlen sollen)
+    # Verwende final_price (berücksichtigt manual_price_override UND calculated_price)
+    participants = db.query(Participant).filter(
         Participant.event_id == event_id,
         Participant.is_active == True
-    ).scalar() or 0)
+    ).all()
+    soll_zahlungseingaenge = float(sum((p.final_price for p in participants), 0))
 
     # Sonstige Einnahmen = Differenz zwischen Basispreis und rabattiertem Preis (Rabattbetrag)
     soll_sonstige_einnahmen = base_prices_sum - soll_zahlungseingaenge
