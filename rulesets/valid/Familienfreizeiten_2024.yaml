@@ -20,9 +20,11 @@ role_discounts:
   Kinderstunde:
     discount_percent: 40
     max_count: 5
+    subsidy_eligible: true  # Zuschussberechtigt
   Küchenteam:
     discount_percent: 100
     max_count: 6
+    subsidy_eligible: false  # NICHT zuschussberechtigt (Umlage auf Gruppe)
 family_discount:
   enabled: true
   first_child_percent: 25

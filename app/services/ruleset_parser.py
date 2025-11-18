@@ -122,11 +122,13 @@ class RulesetParser:
             "role_discounts": {
                 "betreuer": {
                     "discount_percent": 50,
-                    "max_count": 10
+                    "max_count": 10,
+                    "subsidy_eligible": True  # Zuschussberechtigt (Standard)
                 },
                 "kueche": {
                     "discount_percent": 100,
-                    "max_count": 2
+                    "max_count": 2,
+                    "subsidy_eligible": False  # NICHT zuschussberechtigt (Umlage auf Gruppe)
                 }
             },
             "family_discount": {
