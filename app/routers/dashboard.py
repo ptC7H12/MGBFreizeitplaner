@@ -25,12 +25,19 @@ def calculate_base_prices_sum(db: Session, event_id: int) -> float:
     Returns:
         Summe der Basispreise in Euro
     """
-    # Event und Ruleset laden
+    # Event laden
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:
         return 0.0
 
-    ruleset = db.query(Ruleset).filter(Ruleset.id == event.ruleset_id).first()
+    # Aktives Ruleset für das Event finden
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.event_id == event_id,
+        Ruleset.is_active == True,
+        Ruleset.valid_from <= event.start_date,
+        Ruleset.valid_until >= event.start_date
+    ).first()
+
     if not ruleset:
         return 0.0
 
@@ -51,7 +58,7 @@ def calculate_base_prices_sum(db: Session, event_id: int) -> float:
         # Basispreis aus Altersgruppen ermitteln (ohne Rabatte)
         base_price = PriceCalculator._get_base_price_by_age(
             age,
-            ruleset.rules.get("age_groups", [])
+            ruleset.age_groups or []
         )
 
         total_base_price += base_price
