@@ -438,7 +438,7 @@ async def complete_task(
         participant = db.query(Participant).filter(Participant.id == reference_id).first()
         if participant:
             # Berechne ausstehenden Betrag
-            final_price = participant.final_price
+            final_price = float(participant.final_price)
             total_paid = float(db.query(func.sum(Payment.amount)).filter(
                 Payment.participant_id == participant.id
             ).scalar() or 0)
