@@ -82,6 +82,86 @@ def calculate_base_prices_sum(db: Session, event_id: int) -> float:
     return round(total_base_price, 2)
 
 
+def calculate_non_subsidy_discount_sum(db: Session, event_id: int) -> float:
+    """
+    Berechnet die Summe der Rabatte für nicht-zuschussberechtigte Rollen.
+    Diese Rabatte werden auf die Gruppe umgelegt und nicht durch Zuschüsse gedeckt.
+
+    Args:
+        db: Datenbank-Session
+        event_id: ID des Events
+
+    Returns:
+        Summe der nicht-zuschussberechtigten Rabatte in Euro
+    """
+    # Event laden
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        return 0.0
+
+    # Aktives Ruleset für das Event finden
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.event_id == event_id,
+        Ruleset.is_active == True,
+        Ruleset.valid_from <= event.start_date,
+        Ruleset.valid_until >= event.start_date
+    ).first()
+
+    if not ruleset or not ruleset.role_discounts:
+        return 0.0
+
+    # Alle aktiven Teilnehmer mit Rollen laden
+    participants = db.query(Participant).filter(
+        Participant.event_id == event_id,
+        Participant.is_active == True,
+        Participant.role_id.isnot(None)
+    ).all()
+
+    total_non_subsidy_discount = 0.0
+
+    for participant in participants:
+        if not participant.role:
+            continue
+
+        # Rolle im Regelwerk finden
+        role_name_lower = participant.role.name.lower()
+        role_config = None
+
+        for key, value in ruleset.role_discounts.items():
+            if key.lower() == role_name_lower:
+                role_config = value
+                break
+
+        if not role_config:
+            continue
+
+        # Prüfen ob Rolle zuschussberechtigt ist (Standard: true)
+        subsidy_eligible = role_config.get("subsidy_eligible", True)
+
+        # Nur nicht-zuschussberechtigte Rollen berücksichtigen
+        if subsidy_eligible:
+            continue
+
+        # Alter berechnen
+        age = event.start_date.year - participant.birth_date.year
+        if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+            age -= 1
+
+        # Basispreis ermitteln
+        base_price = PriceCalculator._get_base_price_by_age(
+            age,
+            ruleset.age_groups or []
+        )
+
+        # Rabatt berechnen
+        discount_percent = role_config.get("discount_percent", 0)
+        discount_amount = base_price * (discount_percent / 100)
+
+        total_non_subsidy_discount += discount_amount
+
+    return round(total_non_subsidy_discount, 2)
+
+
 @router.get("/", response_class=HTMLResponse)
 async def cash_status(
     request: Request,
@@ -103,8 +183,12 @@ async def cash_status(
     ).all()
     expected_income_participants = float(sum((p.final_price for p in participants), 0))
 
-    # Sonstige Einnahmen = Differenz zwischen Basispreis und rabattiertem Preis (Rabattbetrag)
-    other_income = base_prices_sum - expected_income_participants
+    # Rabatte für nicht-zuschussberechtigte Rollen berechnen (werden auf Gruppe umgelegt)
+    non_subsidy_discounts = calculate_non_subsidy_discount_sum(db, event_id)
+
+    # Sonstige Einnahmen = Differenz zwischen Basispreis und rabattiertem Preis MINUS nicht-zuschussberechtigte Rabatte
+    # Nur zuschussberechtigte Rabatte werden als "Sonstige Einnahmen" erwartet
+    other_income = base_prices_sum - expected_income_participants - non_subsidy_discounts
 
     # Alle Ausgaben (gesamt)
     total_expenses = float(db.query(func.sum(Expense.amount)).filter(
@@ -189,6 +273,7 @@ async def cash_status(
             "expected_other_income": other_income,
             "expected_expenses": total_expenses,
             "expected_balance": expected_balance,
+            "non_subsidy_discounts": non_subsidy_discounts,  # Umlage auf Gruppe (nicht zuschussberechtigt)
             # IST-Werte
             "actual_income_participants": actual_income_participants,
             "actual_other_income": actual_other_income,
