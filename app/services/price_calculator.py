@@ -68,15 +68,22 @@ class PriceCalculator:
         Returns:
             Basispreis für die Altersgruppe
         """
+        logger.debug(f"Suche Basispreis für Alter {age} in {len(age_groups)} Altersgruppen")
         for group in age_groups:
             min_age = group.get("min_age", 0)
             max_age = group.get("max_age", 999)
+            logger.debug(f"Prüfe Gruppe: min={min_age}, max={max_age}, group={group}")
             if min_age <= age <= max_age:
                 # Neues Format: base_price direkt aus age_group
                 if "base_price" in group:
-                    return float(group.get("base_price", 0))
+                    price = float(group.get("base_price", 0))
+                    logger.info(f"Basispreis für Alter {age}: {price}€ (Gruppe {min_age}-{max_age})")
+                    return price
                 # Legacy Format: price als Fallback
-                return float(group.get("price", 0))
+                price = float(group.get("price", 0))
+                logger.info(f"Basispreis für Alter {age}: {price}€ (Gruppe {min_age}-{max_age}, legacy format)")
+                return price
+        logger.warning(f"Keine passende Altersgruppe für Alter {age} gefunden! Rückgabe: 0.0")
         return 0.0
 
     @staticmethod
@@ -302,7 +309,7 @@ class PriceCalculator:
         if breakdown['family_discount_percent'] > 0:
             breakdown['has_discounts'] = True
             breakdown['discount_reasons'].append(
-                f"Familienrabatt ({family_children_count}. Kind): {breakdown['family_discount_percent']:.0f}%"
+                f"Kinderzuschuss durch MGB ({family_children_count}. Kind): {breakdown['family_discount_percent']:.0f}%"
             )
 
         # Preis nach automatischen Rabatten (für Display-Zwecke)

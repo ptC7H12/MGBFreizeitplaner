@@ -67,6 +67,7 @@ class InvoiceGenerator:
 
         if not ruleset:
             # Kein Regelwerk vorhanden - Minimales Breakdown zurückgeben
+            logger.warning(f"Kein aktives Regelwerk gefunden für Event {participant.event.start_date}")
             return {
                 'base_price': 0.0,
                 'role_discount_percent': 0.0,
@@ -89,6 +90,9 @@ class InvoiceGenerator:
             'role_discounts': ruleset.role_discounts or {},
             'family_discount': ruleset.family_discount or {}
         }
+
+        logger.info(f"Verwende Ruleset '{ruleset.name}' für Teilnehmer {participant.full_name} (Alter: {participant.age_at_event})")
+        logger.debug(f"Age groups: {ruleset_data['age_groups']}")
 
         # Position in Familie ermitteln
         family_position = 1
@@ -251,8 +255,8 @@ class InvoiceGenerator:
                     description += f"• Rollenrabatt ({role_name}): -{breakdown['role_discount_percent']:.0f}% (-{breakdown['role_discount_amount']:.2f} €)\n"
                     description += f"  → Nach Rollenrabatt: {breakdown['price_after_role_discount']:.2f} €\n"
                 if breakdown['family_discount_percent'] > 0:
-                    description += f"• Familienrabatt: -{breakdown['family_discount_percent']:.0f}% (-{breakdown['family_discount_amount']:.2f} €)\n"
-                    description += f"  → Nach Familienrabatt: {breakdown['price_after_family_discount']:.2f} €\n"
+                    description += f"• Kinderzuschuss durch MGB: -{breakdown['family_discount_percent']:.0f}% (-{breakdown['family_discount_amount']:.2f} €)\n"
+                    description += f"  → Nach Kinderzuschuss: {breakdown['price_after_family_discount']:.2f} €\n"
                 if breakdown['manual_discount_percent'] > 0:
                     description += f"• Zusätzlicher Rabatt: -{breakdown['manual_discount_percent']:.0f}% (-{breakdown['manual_discount_amount']:.2f} €)\n"
                     if participant.discount_reason:
@@ -485,7 +489,7 @@ class InvoiceGenerator:
                     if breakdown['role_discount_percent'] > 0:
                         description += f"• Rollenrabatt: -{breakdown['role_discount_percent']:.0f}% (-{breakdown['role_discount_amount']:.2f} €) → {breakdown['price_after_role_discount']:.2f} €\n"
                     if breakdown['family_discount_percent'] > 0:
-                        description += f"• Familienrabatt: -{breakdown['family_discount_percent']:.0f}% (-{breakdown['family_discount_amount']:.2f} €) → {breakdown['price_after_family_discount']:.2f} €\n"
+                        description += f"• Kinderzuschuss durch MGB: -{breakdown['family_discount_percent']:.0f}% (-{breakdown['family_discount_amount']:.2f} €) → {breakdown['price_after_family_discount']:.2f} €\n"
                     if breakdown['manual_discount_percent'] > 0:
                         description += f"• Zusätzl. Rabatt: -{breakdown['manual_discount_percent']:.0f}%"
                         if participant.discount_reason:
