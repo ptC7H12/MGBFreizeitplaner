@@ -105,7 +105,31 @@ async def list_participants(
     # Berechne Zahlungsinformationen für jeden Teilnehmer
     participant_data = []
     for participant in participants:
-        total_paid = float(sum((payment.amount for payment in participant.payments), 0))
+        # Direkte Zahlungen des Teilnehmers
+        direct_payments = float(sum((payment.amount for payment in participant.payments), 0))
+
+        # Anteilige Familienzahlungen berechnen
+        family_payment_share = 0.0
+        if participant.family_id:
+            # Lade Familie mit Zahlungen und Teilnehmern
+            family = db.query(Family).filter(Family.id == participant.family_id).options(
+                joinedload(Family.payments),
+                joinedload(Family.participants)
+            ).first()
+
+            if family:
+                # Gesamtzahlungen der Familie
+                family_total_payments = float(sum((payment.amount for payment in family.payments), 0))
+
+                # Gesamtpreis aller Familienmitglieder
+                family_total_price = float(sum((p.final_price for p in family.participants), 0))
+
+                # Anteilige Verteilung: (Teilnehmerpreis / Familiengesamtpreis) * Familienzahlungen
+                if family_total_price > 0:
+                    family_payment_share = (float(participant.final_price) / family_total_price) * family_total_payments
+
+        # Gesamtzahlung = direkte Zahlungen + anteilige Familienzahlungen
+        total_paid = direct_payments + family_payment_share
         outstanding = float(participant.final_price) - total_paid
 
         # Zahlungsstatus-Filter anwenden
