@@ -134,8 +134,8 @@ async def dashboard(request: Request, db: Session = Depends(get_db), event_id: i
         # Zahlungsquoten
         "zahlungsquote_eingaenge": zahlungsquote_eingaenge,
         "zahlungsquote_ausgaben": zahlungsquote_ausgaben,
-        # Legacy (für Kompatibilität)
-        "total_revenue_target": soll_zahlungseingaenge,
+        # Legacy (für Kompatibilität) - Ziel = Basispreis ohne Rabatte
+        "total_revenue_target": base_prices_sum,
         "total_payments": ist_zahlungseingaenge,
         "total_expenses": soll_ausgaben_gesamt,
         "outstanding": offene_zahlungseingaenge,
