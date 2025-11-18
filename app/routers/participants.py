@@ -106,6 +106,17 @@ async def list_participants(
         joinedload(Participant.payments)
     ).order_by(Participant.last_name).all()
 
+    # Berechne Zahlungsinformationen für jeden Teilnehmer
+    participant_data = []
+    for participant in participants:
+        total_paid = float(sum((payment.amount for payment in participant.payments), 0))
+        outstanding = float(participant.final_price) - total_paid
+        participant_data.append({
+            "participant": participant,
+            "total_paid": total_paid,
+            "outstanding": outstanding
+        })
+
     # Für Filter-Dropdown (auch nach event_id gefiltert)
     roles = db.query(Role).filter(Role.is_active == True, Role.event_id == event_id).all()
     families = db.query(Family).filter(Family.event_id == event_id).order_by(Family.name).all()
@@ -147,7 +158,7 @@ async def list_participants(
         {
             "request": request,
             "title": "Teilnehmer & Familien",
-            "participants": participants,
+            "participant_data": participant_data,
             "roles": roles,
             "families": families,
             "family_data": family_data,
