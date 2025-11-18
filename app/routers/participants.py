@@ -629,15 +629,23 @@ def _process_import_row(
     # Werte aus der Zeile extrahieren
     first_name = str(row[0]).strip() if row[0] else ""
     last_name = str(row[1]).strip() if row[1] else ""
-    
+
     # Geburtsdatum: Kann als date/datetime-Objekt oder String kommen
     birth_date_raw = row[2] if len(row) > 2 and row[2] else None
-    
+
     gender = str(row[3]).strip() if row[3] and len(row) > 3 else ""
     email = str(row[4]).strip() if row[4] and len(row) > 4 else ""
     phone = str(row[5]).strip() if row[5] and len(row) > 5 else ""
     address = str(row[6]).strip() if row[6] and len(row) > 6 else ""
-    family_number = str(row[7]).strip() if row[7] and len(row) > 7 else ""
+
+    # Familien-Nummer: Konvertiere Zahlen zu Int dann String (verhindert 1.0 vs "1" Problem)
+    family_number = ""
+    if len(row) > 7 and row[7]:
+        if isinstance(row[7], (int, float)):
+            # Excel gibt manchmal Zahlen als Float zurück (1.0) - konvertiere zu Int für Konsistenz
+            family_number = str(int(row[7]))
+        else:
+            family_number = str(row[7]).strip()
 
     # Validierung
     row_errors = []
@@ -843,7 +851,7 @@ async def confirm_import(
             # Damit ist sichergestellt, dass der erste in der Excel/CSV auch als erster verwendet wird
             sorted_members = sorted(members, key=lambda m: m.get('row', 0))
             first_member = sorted_members[0]
-            family_name = f"{first_member['last_name']} {first_member['first_name']}"
+            family_name = f"Familie {first_member['last_name']} {first_member['first_name']}"
 
             # Familie erstellen
             new_family = Family(
