@@ -209,8 +209,10 @@ async def cash_status(
         Payment.event_id == event_id
     ).scalar() or 0)
 
-    # Sonstige Einnahmen (gleich wie Soll, da diese direkt gebucht werden)
-    actual_other_income = other_income
+    # Sonstige Einnahmen (z.B. erhaltene Zuschüsse)
+    # TODO: Hier könnte eine separate Erfassung für Zuschüsse implementiert werden
+    # Für jetzt: 0, bis tatsächlich erfasst
+    actual_other_income = 0.0
 
     # Beglichene Ausgaben
     settled_expenses = float(db.query(func.sum(Expense.amount)).filter(
@@ -226,8 +228,8 @@ async def cash_status(
     # Ausstehende Einnahmen (Teilnehmer)
     outstanding_income_participants = expected_income_participants - actual_income_participants
 
-    # Ausstehende sonstige Einnahmen (immer 0, da direkt gebucht)
-    outstanding_other_income = 0.0
+    # Ausstehende sonstige Einnahmen (erwartete Zuschüsse minus erhaltene)
+    outstanding_other_income = other_income - actual_other_income
 
     # Noch zu begleichende Ausgaben
     open_expenses = float(db.query(func.sum(Expense.amount)).filter(
