@@ -5,7 +5,7 @@ PyInstaller Spec-Datei für MGBFreizeitplaner Desktop-App
 Erstellt eine standalone Windows .exe mit allen Abhängigkeiten.
 """
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, collect_dynamic_libs
 import os
 
 # Arbeitsverzeichnis
@@ -14,6 +14,13 @@ project_root = os.path.abspath(SPECPATH)
 
 # Sammle alle Hidden Imports für FastAPI und Dependencies
 hiddenimports = [
+    # PyWebView
+    'webview',
+    'webview.platforms.winforms',
+    'webview.platforms.edgechromium',
+    'clr',
+    'pythonnet',
+    # Uvicorn
     'uvicorn.logging',
     'uvicorn.loops',
     'uvicorn.loops.auto',
@@ -24,6 +31,7 @@ hiddenimports = [
     'uvicorn.protocols.websockets.auto',
     'uvicorn.lifespan',
     'uvicorn.lifespan.on',
+    # App modules
     'app.main',
     'app.config',
     'app.database',
@@ -31,9 +39,11 @@ hiddenimports = [
     'app.routers',
     'app.services',
     'app.utils',
+    # Database
     'sqlalchemy',
     'sqlalchemy.ext.declarative',
     'alembic',
+    # Other
     'jinja2',
     'email_validator',
     'reportlab',
@@ -44,6 +54,7 @@ hiddenimports = [
 ]
 
 # Sammle alle Submodule
+hiddenimports += collect_submodules('webview')
 hiddenimports += collect_submodules('app')
 hiddenimports += collect_submodules('uvicorn')
 hiddenimports += collect_submodules('fastapi')
@@ -78,10 +89,30 @@ if os.path.exists(os.path.join(project_root, 'rulesets')):
 if os.path.exists(os.path.join(project_root, 'VERSION.txt')):
     datas += [(os.path.join(project_root, 'VERSION.txt'), '.')]
 
+# PyWebView binaries sammeln
+binaries = []
+try:
+    # Sammle alle dynamischen Bibliotheken von webview (inkl. WebView2Loader.dll)
+    webview_binaries = collect_dynamic_libs('webview')
+    if webview_binaries:
+        binaries += webview_binaries
+        print(f"[INFO] PyWebView binaries gefunden: {len(webview_binaries)} DLLs")
+except Exception as e:
+    print(f"[WARNUNG] Konnte PyWebView binaries nicht sammeln: {e}")
+
+# PyWebView data files sammeln (falls vorhanden)
+try:
+    webview_datas = collect_data_files('webview')
+    if webview_datas:
+        datas += webview_datas
+        print(f"[INFO] PyWebView data files gefunden: {len(webview_datas)} Dateien")
+except Exception as e:
+    print(f"[WARNUNG] Konnte PyWebView data files nicht sammeln: {e}")
+
 a = Analysis(
     ['desktop_app.py'],
     pathex=[project_root],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
