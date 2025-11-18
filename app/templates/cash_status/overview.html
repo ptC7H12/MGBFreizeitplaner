@@ -68,7 +68,7 @@
 <div class="mb-2">
     <h2 class="text-xl font-bold text-gray-900">Getätigte Zahlungen (IST) - Aktueller Stand</h2>
 </div>
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 ring-2 ring-green-200 p-4 rounded-lg bg-green-50/30">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 ring-4 ring-green-300 p-4 rounded-lg bg-green-100">
     <!-- Tatsächliche Einnahmen (Teilnehmer) -->
     <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-green-500">
         <div class="px-4 py-5 sm:p-6">
@@ -155,8 +155,9 @@
     <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-orange-400">
         <div class="px-4 py-5 sm:p-6">
             <dt class="text-sm font-medium text-gray-500 truncate">Saldo</dt>
-            <dd class="mt-1 text-3xl font-semibold {% if balance_difference > 0 %}text-orange-600{% elif balance_difference < 0 %}text-green-600{% else %}text-gray-400{% endif %}">
-                {{ "%.2f"|format(balance_difference) }} €
+            {% set balance_diff = -balance_difference %}
+            <dd class="mt-1 text-3xl font-semibold {% if balance_diff > 0 %}text-green-600{% elif balance_diff < 0 %}text-orange-600{% else %}text-gray-400{% endif %}">
+                {% if balance_diff >= 0 %}+{% endif %}{{ "%.2f"|format(balance_diff) }} €
             </dd>
             <p class="mt-1 text-xs text-gray-500">
                 {% if balance_difference > 0 %}
