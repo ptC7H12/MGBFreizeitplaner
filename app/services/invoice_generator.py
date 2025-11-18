@@ -102,8 +102,8 @@ class InvoiceGenerator:
         # PriceCalculator verwenden für konsistente Berechnung
         breakdown = PriceCalculator.calculate_participant_price_with_breakdown(
             age=participant.age_at_event,
-            role_name=participant.role.name,
-            role_display_name=participant.role.display_name,
+            role_name=participant.role.name if participant.role else None,
+            role_display_name=participant.role.display_name if participant.role else None,
             ruleset_data=ruleset_data,
             family_children_count=family_position,
             discount_percent=participant.discount_percent,
@@ -237,7 +237,8 @@ class InvoiceGenerator:
         description = f"<b>Teilnahmegebühr {participant.event.name}</b>\n"
         description += f"Zeitraum: {participant.event.start_date.strftime('%d.%m.%Y')} - {participant.event.end_date.strftime('%d.%m.%Y')}\n"
         description += f"Teilnehmer: {participant.full_name} ({participant.age_at_event} Jahre)\n"
-        description += f"Rolle: {participant.role.display_name}\n"
+        if participant.role:
+            description += f"Rolle: {participant.role.display_name}\n"
 
         # Rabatt-Details hinzufügen
         if breakdown['has_discounts']:
@@ -246,7 +247,8 @@ class InvoiceGenerator:
                 # Normale Berechnung
                 description += f"• Basispreis (Altersgruppe): {breakdown['base_price']:.2f} €\n"
                 if breakdown['role_discount_percent'] > 0:
-                    description += f"• Rollenrabatt ({participant.role.display_name}): -{breakdown['role_discount_percent']:.0f}% (-{breakdown['role_discount_amount']:.2f} €)\n"
+                    role_name = participant.role.display_name if participant.role else "Rolle"
+                    description += f"• Rollenrabatt ({role_name}): -{breakdown['role_discount_percent']:.0f}% (-{breakdown['role_discount_amount']:.2f} €)\n"
                     description += f"  → Nach Rollenrabatt: {breakdown['price_after_role_discount']:.2f} €\n"
                 if breakdown['family_discount_percent'] > 0:
                     description += f"• Familienrabatt: -{breakdown['family_discount_percent']:.0f}% (-{breakdown['family_discount_amount']:.2f} €)\n"
@@ -471,7 +473,8 @@ class InvoiceGenerator:
             description = f"<b>{participant.full_name}</b>\n"
             description += f"{participant.event.name}\n"
             description += f"Zeitraum: {participant.event.start_date.strftime('%d.%m.%Y')} - {participant.event.end_date.strftime('%d.%m.%Y')}\n"
-            description += f"Alter: {participant.age_at_event} Jahre, Rolle: {participant.role.display_name}\n"
+            role_info = f", Rolle: {participant.role.display_name}" if participant.role else ""
+            description += f"Alter: {participant.age_at_event} Jahre{role_info}\n"
 
             # Rabatt-Details hinzufügen
             if breakdown['has_discounts']:
