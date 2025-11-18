@@ -220,7 +220,7 @@
                     >
                     <p class="mt-1 text-xs text-gray-500">
                         Aktueller Preis: {{ "%.2f"|format(participant.calculated_price) }} € (berechnet)
-                        {% if participant.manual_price_override %}
+                        {% if participant.manual_price_override is not none and participant.manual_price_override > 0 %}
                         <br><span class="text-orange-600 font-medium">Manueller Preis aktiv: {{ "%.2f"|format(participant.manual_price_override) }} € - Feld leer lassen zum Zurücksetzen</span>
                         {% endif %}
                     </p>
