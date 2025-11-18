@@ -209,10 +209,11 @@ async def cash_status(
         Payment.event_id == event_id
     ).scalar() or 0)
 
-    # Sonstige Einnahmen (z.B. erhaltene Zuschüsse)
-    # TODO: Hier könnte eine separate Erfassung für Zuschüsse implementiert werden
-    # Für jetzt: 0, bis tatsächlich erfasst
-    actual_other_income = 0.0
+    # Sonstige Einnahmen (z.B. erhaltene Zuschüsse, Spenden)
+    # Aus Income-Tabelle abfragen
+    actual_other_income = float(db.query(func.sum(Income.amount)).filter(
+        Income.event_id == event_id
+    ).scalar() or 0)
 
     # Beglichene Ausgaben
     settled_expenses = float(db.query(func.sum(Expense.amount)).filter(
@@ -423,7 +424,7 @@ async def transaction_history(
         transaction_dict = {
             'id': t.id,
             'type': t.type,
-            'amount': t.amount,
+            'amount': float(t.amount),  # Konvertiere Decimal zu float
             'transaction_date': t.transaction_date,
             'method': t.method,
             'reference': t.reference,
