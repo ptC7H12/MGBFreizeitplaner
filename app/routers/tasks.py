@@ -130,8 +130,9 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
     ).all()
 
     for participant in participants_with_payments:
-        final_price = participant.manual_price_override if participant.manual_price_override is not None else participant.calculated_price
-        outstanding = final_price - participant.total_paid
+        final_price = float(participant.manual_price_override if participant.manual_price_override is not None else participant.calculated_price)
+        total_paid = float(participant.total_paid)
+        outstanding = final_price - total_paid
 
         if outstanding > 0.01:  # Nur wenn mehr als 1 Cent ausstehend
             if not is_task_completed(completed_tasks, "outstanding_payment", participant.id):
@@ -201,7 +202,8 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
     for role_income in role_incomes:
         role_id = role_income.id
         role_name = role_income.display_name
-        total_subsidy = role_income.total_income
+        # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+        total_subsidy = float(role_income.total_income or 0)
 
         # Berechne erwartete Rabatte für alle Teilnehmer mit dieser Rolle
         participants_with_role = db.query(Participant).filter(
