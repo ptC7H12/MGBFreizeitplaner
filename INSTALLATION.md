@@ -377,67 +377,6 @@ python3 --version
 
 ---
 
-## 🐳 Docker Installation
-
-### Voraussetzungen
-
-- Docker Desktop (Windows/macOS)
-- Docker Engine (Linux)
-
-### Installation
-
-**Windows/macOS:**
-1. Installiere Docker Desktop von https://www.docker.com/products/docker-desktop/
-2. Starte Docker Desktop
-3. Klone Repository:
-   ```bash
-   git clone <repository-url>
-   cd MGBFreizeitplaner
-   ```
-4. Starte mit:
-   ```bash
-   docker-compose up -d
-   ```
-
-**Linux:**
-1. Installiere Docker:
-   ```bash
-   # Ubuntu/Debian
-   sudo apt install docker.io docker-compose
-
-   # Fedora
-   sudo dnf install docker docker-compose
-   ```
-2. Starte Docker-Service:
-   ```bash
-   sudo systemctl start docker
-   sudo systemctl enable docker
-   ```
-3. Klone Repository und starte:
-   ```bash
-   git clone <repository-url>
-   cd MGBFreizeitplaner
-   sudo docker-compose up -d
-   ```
-
-### Docker Troubleshooting
-
-**Problem: "Cannot connect to Docker daemon"**
-- Docker Desktop nicht gestartet (Windows/macOS)
-- Docker Service nicht gestartet (Linux):
-  ```bash
-  sudo systemctl start docker
-  ```
-
-**Problem: Port 8000 bereits belegt**
-- Ändere Port in `docker-compose.yml`:
-  ```yaml
-  ports:
-    - "8080:8000"  # Ändere ersten Port
-  ```
-
----
-
 ## 💻 Manuelle Installation (Entwickler)
 
 Für Entwickler die am Code arbeiten möchten.
@@ -543,12 +482,6 @@ Bei Problemen:
 2. Entpacke in neuen Ordner
 3. Kopiere alte `freizeit_kassen.db` in neuen Ordner (um Daten zu behalten)
 4. Starte neu
-
-### Docker
-```bash
-docker-compose pull
-docker-compose up -d
-```
 
 ### Manuelle Installation
 ```bash
