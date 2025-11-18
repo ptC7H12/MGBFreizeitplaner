@@ -70,7 +70,10 @@ async def list_participants(
     event_id: int = Depends(get_current_event_id),
     search: Optional[str] = "",
     role_id: Optional[str] = "",
-    family_id: Optional[str] = ""
+    payment_status: Optional[str] = "",
+    family_search: Optional[str] = "",
+    family_role_id: Optional[str] = "",
+    family_payment_status: Optional[str] = ""
 ):
     """Liste aller Teilnehmer mit Such- und Filterfunktionen"""
     query = db.query(Participant).filter(Participant.event_id == event_id)
@@ -91,13 +94,6 @@ async def list_participants(
         except ValueError:
             pass  # Ungültige ID ignorieren
 
-    # Familienfilter (nur wenn nicht leer)
-    if family_id and family_id.strip():
-        try:
-            query = query.filter(Participant.family_id == int(family_id))
-        except ValueError:
-            pass  # Ungültige ID ignorieren
-
     # Eager Loading für related objects um N+1 Queries zu vermeiden
     participants = query.options(
         joinedload(Participant.role),
@@ -111,6 +107,13 @@ async def list_participants(
     for participant in participants:
         total_paid = float(sum((payment.amount for payment in participant.payments), 0))
         outstanding = float(participant.final_price) - total_paid
+
+        # Zahlungsstatus-Filter anwenden
+        if payment_status == "paid" and outstanding > 0.01:
+            continue  # Überspringe nicht vollständig bezahlte
+        elif payment_status == "outstanding" and outstanding <= 0.01:
+            continue  # Überspringe vollständig bezahlte
+
         participant_data.append({
             "participant": participant,
             "total_paid": total_paid,
@@ -133,6 +136,24 @@ async def list_participants(
 
     family_data = []
     for family in families_with_participants:
+        # Suchfilter für Familien
+        if family_search and family_search.strip():
+            search_filter = family_search.strip().lower()
+            family_name = (family.name or "").lower()
+            contact_person = (family.contact_person or "").lower()
+            if search_filter not in family_name and search_filter not in contact_person:
+                continue  # Überspringe Familien, die nicht zur Suche passen
+
+        # Rollenfilter für Familien - prüfe ob ein Teilnehmer der Familie diese Rolle hat
+        if family_role_id and family_role_id.strip():
+            try:
+                role_id_int = int(family_role_id)
+                has_role = any(p.role_id == role_id_int for p in family.participants)
+                if not has_role:
+                    continue  # Überspringe Familien ohne Teilnehmer mit dieser Rolle
+            except ValueError:
+                pass
+
         # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
         total_price = float(sum((p.final_price for p in family.participants), 0))
 
@@ -144,13 +165,20 @@ async def list_participants(
             for payment in participant.payments), 0
         ))
         total_paid = family_payments + member_payments
+        outstanding = total_price - total_paid
+
+        # Zahlungsstatus-Filter für Familien
+        if family_payment_status == "paid" and outstanding > 0.01:
+            continue  # Überspringe nicht vollständig bezahlte Familien
+        elif family_payment_status == "outstanding" and outstanding <= 0.01:
+            continue  # Überspringe vollständig bezahlte Familien
 
         family_data.append({
             "family": family,
             "participant_count": len(family.participants),
             "total_price": total_price,
             "total_paid": total_paid,
-            "outstanding": total_price - total_paid
+            "outstanding": outstanding
         })
 
     return templates.TemplateResponse(
@@ -164,7 +192,10 @@ async def list_participants(
             "family_data": family_data,
             "search": search,
             "selected_role_id": role_id,
-            "selected_family_id": family_id
+            "payment_status": payment_status,
+            "family_search": family_search,
+            "family_role_id": family_role_id,
+            "family_payment_status": family_payment_status
         }
     )
 
