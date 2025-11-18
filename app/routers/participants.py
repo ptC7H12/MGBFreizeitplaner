@@ -207,6 +207,7 @@ async def create_participant(
     """Erstellt einen neuen Teilnehmer"""
     try:
         # Konvertiere leere Strings zu None oder passenden Werten
+        email_val = None if not email or email.strip() == "" else email
         manual_price_override_val = None if not manual_price_override or manual_price_override.strip() == "" else float(manual_price_override)
         discount_percent_val = 0.0 if not discount_percent or discount_percent.strip() == "" else float(discount_percent)
         role_id_val = int(role_id)  # Pflichtfeld, muss immer eine Zahl sein
@@ -218,7 +219,7 @@ async def create_participant(
             last_name=last_name,
             birth_date=birth_date,
             gender=gender,
-            email=email,
+            email=email_val,
             phone=phone,
             address=address,
             bildung_teilhabe_id=bildung_teilhabe_id,
@@ -1347,6 +1348,7 @@ async def update_participant(
 
     try:
         # Konvertiere leere Strings zu None oder passenden Werten
+        email_val = None if not email or email.strip() == "" else email
         manual_price_override_val = None if not manual_price_override or manual_price_override.strip() == "" else float(manual_price_override)
         discount_percent_val = 0.0 if not discount_percent or discount_percent.strip() == "" else float(discount_percent)
         role_id_val = None if not role_id or role_id.strip() == "" else int(role_id)
@@ -1358,7 +1360,7 @@ async def update_participant(
             last_name=last_name,
             birth_date=birth_date,
             gender=gender,
-            email=email,
+            email=email_val,
             phone=phone,
             address=address,
             bildung_teilhabe_id=bildung_teilhabe_id,
