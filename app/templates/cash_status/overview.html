@@ -22,7 +22,7 @@
 <div class="mb-2">
     <h2 class="text-lg font-semibold text-gray-700">Zu erwartende Werte (SOLL)</h2>
 </div>
-<div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
     <!-- Erwartete Einnahmen (Teilnehmer) -->
     <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-blue-400">
         <div class="px-4 py-5 sm:p-6">
@@ -39,16 +39,6 @@
             <dt class="text-sm font-medium text-gray-500 truncate">Sonstige Einnahmen</dt>
             <dd class="mt-1 text-3xl font-semibold text-gray-900">
                 {{ "%.2f"|format(expected_other_income) }} €
-            </dd>
-        </div>
-    </div>
-
-    <!-- Umlage auf Gruppe (nicht Zuschussberechtigt) -->
-    <div class="bg-white overflow-hidden shadow rounded-lg border-l-4 border-orange-400">
-        <div class="px-4 py-5 sm:p-6">
-            <dt class="text-sm font-medium text-gray-500 truncate">Umlage (nicht Zuschuss)</dt>
-            <dd class="mt-1 text-3xl font-semibold text-orange-600">
-                {{ "%.2f"|format(non_subsidy_discounts) }} €
             </dd>
         </div>
     </div>
