@@ -103,7 +103,7 @@ async def _try_import_ruleset_from_github(
 
         # YAML parsen
         parser = RulesetParser()
-        data = parser.parse_yaml_content(yaml_content)
+        data = parser.parse_yaml_string(yaml_content)
 
         # Validieren
         is_valid, error_msg = parser.validate_ruleset(data)

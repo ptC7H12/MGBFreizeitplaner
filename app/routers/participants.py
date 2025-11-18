@@ -950,6 +950,7 @@ async def confirm_import(
                     logger.debug(f"Assigned to family_id: {family_id}")
 
                 # Preis berechnen: Nur Basispreis basierend auf Alter (aus age_groups)
+                # Familienrabatte werden später vom PriceCalculator berechnet
                 final_price = 0.0
                 if ruleset and ruleset.age_groups:
                     # Finde passende Altersgruppe
@@ -957,33 +958,15 @@ async def confirm_import(
                         min_age = age_group.get("min_age", 0)
                         max_age = age_group.get("max_age", 999)
                         if min_age <= age <= max_age:
-                            base_price = age_group.get("base_price", 0.0)
+                            # YAML verwendet "price", nicht "base_price"
+                            base_price = age_group.get("price", 0.0)
                             final_price = base_price
                             logger.debug(f"Calculated base price from age group: {final_price}€ (age: {age})")
                             break
-
-                    # Familienrabatt anwenden falls Familie vorhanden
-                    if family_id and final_price > 0:
-                        family_discount = ruleset.family_discount or {}
-                        # Zähle Familienmitglieder
-                        family_members_count = len([p for p in data.get("participants", [])
-                                                   if p.get("family_number") == family_number and not p.get("has_error")])
-
-                        # Familienrabatt nach Anzahl der Mitglieder
-                        discount_percent = 0
-                        for member_count, discount in sorted(family_discount.items(), key=lambda x: int(x[0]), reverse=True):
-                            if family_members_count >= int(member_count):
-                                discount_percent = discount
-                                break
-
-                        if discount_percent > 0:
-                            discount_amount = final_price * (discount_percent / 100)
-                            final_price -= discount_amount
-                            logger.debug(f"Applied family discount: {discount_percent}% = {discount_amount}€, new price: {final_price}€")
                 else:
                     logger.warning(f"No ruleset or age_groups found, price will be 0.0")
 
-                logger.debug(f"Final calculated price: {final_price}€")
+                logger.debug(f"Final calculated price (before family/role discounts): {final_price}€")
         
                 # Teilnehmer erstellen
                 new_participant = Participant(
@@ -1014,6 +997,32 @@ async def confirm_import(
         logger.info(f"Committing changes: {imported_count} participants to import")
         db.commit()
         logger.info(f"✓ Import completed: {imported_count} imported, {skipped_count} skipped")
+
+        # Preise für alle importierten Teilnehmer neu berechnen (für Familienrabatte)
+        logger.info("Recalculating prices with family and role discounts...")
+        all_participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True
+        ).all()
+
+        recalculated_count = 0
+        for participant in all_participants:
+            try:
+                # Preis mit PriceCalculator neu berechnen (inkl. Familienrabatte)
+                new_price = PriceCalculator.calculate_price_from_db(
+                    db=db,
+                    event_id=event_id,
+                    role_id=participant.role_id,
+                    birth_date=participant.birth_date,
+                    family_id=participant.family_id
+                )
+                participant.calculated_price = new_price
+                recalculated_count += 1
+            except Exception as e:
+                logger.warning(f"Could not recalculate price for {participant.full_name}: {e}")
+
+        db.commit()
+        logger.info(f"✓ Recalculated prices for {recalculated_count} participants")
 
         # Erfolgs-Nachricht
         message = f"{imported_count} Teilnehmer erfolgreich importiert"
