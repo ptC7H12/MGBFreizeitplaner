@@ -1,8 +1,9 @@
 """
 PyInstaller Hook für webview (pywebview)
 
-Sammelt nur die benötigten DLLs für die Zielarchitektur (x64)
-und vermeidet Probleme mit mehrfachen Architektur-Varianten.
+Sammelt ALLE DLLs für alle Architekturen und stellt sicher,
+dass die Verzeichnisstruktur korrekt erstellt wird.
+Der Runtime Hook (pyi_rth_webview.py) wählt dann die richtige Architektur.
 """
 from PyInstaller.utils.hooks import collect_data_files
 import os
@@ -17,11 +18,12 @@ hiddenimports = [
     'webview.window',
     'webview.menu',
     'webview.js',
+    'webview.js.css',
     'clr',
     'pythonnet',
 ]
 
-# Sammle data files, aber nur für die richtige Architektur
+# Sammle data files und binaries
 datas = []
 binaries = []
 
@@ -30,45 +32,42 @@ try:
     import webview
     webview_path = os.path.dirname(webview.__file__)
 
-    # Sammle nur x64 DLLs für Windows 64-bit
+    # Sammle ALLE WebView2Loader.dll für alle Architekturen
     if sys.platform == 'win32':
-        # WebView2Loader.dll für x64
-        dll_x64 = os.path.join(webview_path, 'lib', 'runtimes', 'win-x64', 'native', 'WebView2Loader.dll')
-        if os.path.exists(dll_x64):
-            binaries.append((dll_x64, 'webview/lib/runtimes/win-x64/native'))
+        architectures = ['win-x64', 'win-x86', 'win-arm64']
 
-        # WebView2Loader.dll für x86 (falls benötigt)
-        dll_x86 = os.path.join(webview_path, 'lib', 'runtimes', 'win-x86', 'native', 'WebView2Loader.dll')
-        if os.path.exists(dll_x86):
-            binaries.append((dll_x86, 'webview/lib/runtimes/win-x86/native'))
+        for arch in architectures:
+            dll_path = os.path.join(webview_path, 'lib', 'runtimes', arch, 'native', 'WebView2Loader.dll')
+            if os.path.exists(dll_path):
+                # Ziel-Pfad im bundle
+                dest_dir = os.path.join('webview', 'lib', 'runtimes', arch, 'native')
+                binaries.append((dll_path, dest_dir))
 
-        # Andere webview DLLs im lib-Verzeichnis
+        # Andere DLLs im lib-Verzeichnis
         lib_dir = os.path.join(webview_path, 'lib')
         if os.path.exists(lib_dir):
             for root, dirs, files in os.walk(lib_dir):
-                # Überspringe ARM64-Verzeichnisse
-                if 'arm64' in root.lower():
-                    continue
-
                 for file in files:
                     if file.endswith(('.dll', '.pyd')):
                         src = os.path.join(root, file)
                         # Relativer Pfad von webview_path
-                        rel_path = os.path.relpath(os.path.dirname(src), webview_path)
-                        binaries.append((src, os.path.join('webview', rel_path)))
+                        rel_dir = os.path.relpath(os.path.dirname(src), webview_path)
+                        dest_dir = os.path.join('webview', rel_dir)
+                        binaries.append((src, dest_dir))
 
-    # Sammle andere notwendige data files (aber keine DLLs)
+    # Sammle andere notwendige data files
     for root, dirs, files in os.walk(webview_path):
-        # Überspringe ARM64 und unnötige Verzeichnisse
-        if 'arm64' in root.lower() or '__pycache__' in root:
+        # Überspringe __pycache__
+        if '__pycache__' in root:
             continue
 
         for file in files:
             # Nur non-binary data files
-            if not file.endswith(('.dll', '.pyd', '.pyc')):
+            if not file.endswith(('.dll', '.pyd', '.pyc', '.so')):
                 src = os.path.join(root, file)
-                rel_path = os.path.relpath(os.path.dirname(src), webview_path)
-                datas.append((src, os.path.join('webview', rel_path)))
+                rel_dir = os.path.relpath(os.path.dirname(src), webview_path)
+                dest_dir = os.path.join('webview', rel_dir)
+                datas.append((src, dest_dir))
 
 except ImportError:
     pass

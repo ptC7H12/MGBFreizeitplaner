@@ -100,7 +100,7 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[os.path.join(project_root, 'hooks')],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[os.path.join(project_root, 'hooks', 'pyi_rth_webview.py')],
     excludes=[
         'matplotlib',
         'numpy',
