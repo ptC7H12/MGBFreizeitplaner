@@ -1253,6 +1253,7 @@ async def view_participant(
     # Zahlungen des Teilnehmers
     # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
     total_paid = float(sum((payment.amount for payment in participant.payments), 0))
+    outstanding = float(participant.final_price) - total_paid
 
     return templates.TemplateResponse(
         "participants/detail.html",
@@ -1261,7 +1262,7 @@ async def view_participant(
             "title": f"{participant.full_name}",
             "participant": participant,
             "total_paid": total_paid,
-            "outstanding": participant.final_price - total_paid
+            "outstanding": outstanding
         }
     )
 
