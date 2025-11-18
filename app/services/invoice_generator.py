@@ -58,8 +58,9 @@ class InvoiceGenerator:
         from app.models import Ruleset, Participant
         from app.services.price_calculator import PriceCalculator
 
-        # Aktives Regelwerk finden
+        # Aktives Regelwerk finden - zuerst nach event_id, dann nach Datum
         ruleset = self.db.query(Ruleset).filter(
+            Ruleset.event_id == participant.event_id,
             Ruleset.is_active == True,
             Ruleset.valid_from <= participant.event.start_date,
             Ruleset.valid_until >= participant.event.start_date
