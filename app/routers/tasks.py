@@ -432,6 +432,32 @@ async def complete_task(
             expense.is_settled = True
             logger.info(f"Marked expense {expense.id} as settled")
 
+    # Spezielle Behandlung für outstanding_payment
+    # Wenn Zahlungseingang als erledigt markiert wird, automatisch Payment erstellen
+    if task_type == "outstanding_payment":
+        participant = db.query(Participant).filter(Participant.id == reference_id).first()
+        if participant:
+            # Berechne ausstehenden Betrag
+            final_price = participant.final_price
+            total_paid = float(db.query(func.sum(Payment.amount)).filter(
+                Payment.participant_id == participant.id
+            ).scalar() or 0)
+            outstanding = final_price - total_paid
+
+            if outstanding > 0.01:  # Nur wenn mehr als 1 Cent ausstehend
+                # Erstelle automatisch einen Zahlungseingang
+                new_payment = Payment(
+                    amount=outstanding,
+                    payment_date=date.today(),
+                    payment_method="Automatisch",
+                    reference=f"Aufgabe erledigt: {participant.full_name}",
+                    notes=note if note else "Zahlungseingang automatisch aus erledigter Aufgabe erstellt",
+                    event_id=event_id,
+                    participant_id=participant.id
+                )
+                db.add(new_payment)
+                logger.info(f"Automatically created payment of {outstanding}€ for participant {participant.id}")
+
     db.commit()
     flash(request, "Aufgabe wurde als erledigt markiert", "success")
     logger.info(f"Task completed successfully: type={task_type}, reference_id={reference_id}")
