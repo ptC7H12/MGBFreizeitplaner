@@ -146,15 +146,16 @@ async def view_family(
         return RedirectResponse(url="/participants#families", status_code=303)
 
     # Finanzielle Übersicht
-    total_price = sum(p.final_price for p in family.participants)
+    # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+    total_price = float(sum((p.final_price for p in family.participants), 0))
 
     # Zahlungen: Sowohl direkte Familienzahlungen als auch Zahlungen an einzelne Mitglieder
-    family_payments = sum(payment.amount for payment in family.payments)
-    member_payments = sum(
-        payment.amount
+    family_payments = float(sum((payment.amount for payment in family.payments), 0))
+    member_payments = float(sum(
+        (payment.amount
         for participant in family.participants
-        for payment in participant.payments
-    )
+        for payment in participant.payments), 0
+    ))
     total_paid = family_payments + member_payments
 
     # Alle Zahlungen für die Historie sammeln (Familie + alle Teilnehmer)

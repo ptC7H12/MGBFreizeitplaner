@@ -40,11 +40,12 @@ async def cash_status(
     # === SOLL-Werte (Zu erwartende Werte) ===
 
     # Erwartete Einnahmen durch Teilnehmer
+    # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
     participants = db.query(Participant).filter(
         Participant.event_id == event_id,
         Participant.is_active == True
     ).all()
-    expected_income_participants = sum(p.final_price for p in participants)
+    expected_income_participants = float(sum((p.final_price for p in participants), 0))
 
     # Sonstige Einnahmen (Zuschüsse/Förderungen)
     # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden

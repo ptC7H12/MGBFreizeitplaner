@@ -43,8 +43,9 @@ async def list_payments(
     payments = query.order_by(Payment.payment_date.desc()).all()
 
     # Erwartete Einnahme berechnen (Summe aller final_price der Teilnehmer)
+    # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
     participants = db.query(Participant).filter(Participant.event_id == event_id).all()
-    expected_income = sum(p.final_price for p in participants)
+    expected_income = float(sum((p.final_price for p in participants), 0))
 
     return templates.TemplateResponse(
         "payments/list.html",

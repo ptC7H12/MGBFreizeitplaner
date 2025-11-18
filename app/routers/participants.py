@@ -122,15 +122,16 @@ async def list_participants(
 
     family_data = []
     for family in families_with_participants:
-        total_price = sum(p.final_price for p in family.participants)
+        # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+        total_price = float(sum((p.final_price for p in family.participants), 0))
 
         # Zahlungen: Sowohl direkte Familienzahlungen als auch Zahlungen an einzelne Mitglieder
-        family_payments = sum(payment.amount for payment in family.payments)
-        member_payments = sum(
-            payment.amount
+        family_payments = float(sum((payment.amount for payment in family.payments), 0))
+        member_payments = float(sum(
+            (payment.amount
             for participant in family.participants
-            for payment in participant.payments
-        )
+            for payment in participant.payments), 0
+        ))
         total_paid = family_payments + member_payments
 
         family_data.append({
@@ -1140,8 +1141,9 @@ async def export_participants_excel(
         ws.cell(row=row_num, column=7).fill = summary_fill
 
         # Gesamtpreise
-        total_price = sum(p.final_price for p in all_participants)
-        total_paid = sum(sum(pay.amount for pay in p.payments) for p in all_participants)
+        # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+        total_price = float(sum((p.final_price for p in all_participants), 0))
+        total_paid = float(sum((sum((pay.amount for pay in p.payments), 0) for p in all_participants), 0))
         total_outstanding = total_price - total_paid
 
         ws.cell(row=row_num, column=10, value=total_price).font = summary_font
@@ -1193,8 +1195,9 @@ def _write_participant_row(ws: Worksheet, row_num: int, participant: Participant
         age -= 1
 
     # Zahlungen berechnen
-    total_paid = sum(payment.amount for payment in participant.payments)
-    outstanding = participant.final_price - total_paid
+    # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+    total_paid = float(sum((payment.amount for payment in participant.payments), 0))
+    outstanding = float(participant.final_price) - total_paid
 
     # Daten in Zellen schreiben
     ws.cell(row=row_num, column=1, value=participant.last_name)
@@ -1248,7 +1251,8 @@ async def view_participant(
         return RedirectResponse(url="/participants", status_code=303)
 
     # Zahlungen des Teilnehmers
-    total_paid = sum(payment.amount for payment in participant.payments)
+    # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+    total_paid = float(sum((payment.amount for payment in participant.payments), 0))
 
     return templates.TemplateResponse(
         "participants/detail.html",
@@ -1471,8 +1475,9 @@ async def generate_payment_qr_code(
         raise HTTPException(status_code=400, detail="Bank-Daten nicht konfiguriert")
 
     # Berechne offenen Betrag
-    total_paid = sum(payment.amount for payment in participant.payments)
-    outstanding = participant.final_price - total_paid
+    # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
+    total_paid = float(sum((payment.amount for payment in participant.payments), 0))
+    outstanding = float(participant.final_price) - total_paid
 
     if outstanding <= 0:
         outstanding = participant.final_price  # Zeige Gesamtpreis wenn bereits bezahlt
