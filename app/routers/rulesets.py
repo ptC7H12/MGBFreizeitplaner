@@ -305,14 +305,19 @@ async def import_ruleset_github(
             year = event.start_date.year
 
             # Event-Typ zu Dateinamen-Prefix mappen
+            # Event-Typen sind: familienfreizeit, kinderfreizeit, jugendfreizeit, teeniefreizeit, sonstige
             event_type_mapping = {
-                "Familie": "Familienfreizeiten",
-                "Kinder": "Kinderfreizeiten",
-                "Jugend": "Jugendfreizeiten",
-                "Erwachsene": "Erwachsenenfreizeiten",
+                "familienfreizeit": "Familienfreizeiten",
+                "kinderfreizeit": "Kinderfreizeiten",
+                "jugendfreizeit": "Jugendfreizeiten",
+                "teeniefreizeit": "Teeniefreizeiten",
             }
 
-            filename_prefix = event_type_mapping.get(event.event_type, event.event_type.capitalize() + "freizeiten")
+            filename_prefix = event_type_mapping.get(event.event_type.lower())
+            if not filename_prefix:
+                # Fallback: Capitalize first letter and use as-is
+                filename_prefix = event.event_type.capitalize()
+
             filename = f"{filename_prefix}_{year}.yaml"
 
             # URL zum Dateinamen konstruieren
