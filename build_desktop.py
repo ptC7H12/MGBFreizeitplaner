@@ -93,14 +93,29 @@ def install_requirements():
 
 
 def clean_build():
-    """Löscht alte Build-Artefakte"""
-    print("\n[INFO] Bereinige vorherige Builds...")
-    dirs_to_clean = ["dist", "build", "MGBFreizeitplaner.build", "MGBFreizeitplaner.dist", "MGBFreizeitplaner.onefile-build"]
+    """Löscht alte Build-Artefakte (behält Cache für schnellere Rebuilds)"""
+    # Prüfe ob vollständige Bereinigung gewünscht
+    full_clean = "--clean" in sys.argv or "-c" in sys.argv
+
+    if full_clean:
+        print("\n[INFO] Vollständige Bereinigung (inkl. Cache)...")
+        dirs_to_clean = ["dist", "build", "desktop_app.build", "desktop_app.dist", "desktop_app.onefile-build"]
+    else:
+        print("\n[INFO] Bereinige Output (Cache bleibt für schnellere Rebuilds)...")
+        # Nur dist löschen, .build Cache behalten
+        dirs_to_clean = ["dist"]
+
     for dir_name in dirs_to_clean:
         dir_path = Path(dir_name)
         if dir_path.exists():
             shutil.rmtree(dir_path)
             print(f"[OK] {dir_name}/ gelöscht")
+
+    if not full_clean:
+        build_cache = Path("desktop_app.build")
+        if build_cache.exists():
+            print(f"[INFO] Cache behalten: desktop_app.build/ (für inkrementelle Builds)")
+
     return True
 
 
