@@ -133,6 +133,11 @@ def run_nuitka():
     print("\n[INFO] Starte Nuitka Build...")
     print("[INFO] Dies kann 10-30 Minuten dauern (Kompilierung zu C)...\n")
 
+    # Debug-Modus prüfen (Konsole bleibt sichtbar für Fehlersuche)
+    debug_mode = "--debug" in sys.argv or "-d" in sys.argv
+    if debug_mode:
+        print("[DEBUG] Debug-Modus aktiv - Konsole bleibt sichtbar")
+
     # Nuitka Kommando zusammenstellen
     cmd = [
         sys.executable, "-m", "nuitka",
@@ -140,8 +145,8 @@ def run_nuitka():
         # Standalone Mode
         "--standalone",
 
-        # Windows-spezifisch
-        "--windows-console-mode=disable",  # Kein Konsolen-Fenster
+        # Windows-spezifisch - Im Debug-Modus Konsole sichtbar lassen
+        "--windows-console-mode=disable" if not debug_mode else "--windows-console-mode=attach",
 
         # Icon
         "--windows-icon-from-ico=app_icon.ico",
