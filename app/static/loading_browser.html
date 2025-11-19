@@ -128,92 +128,53 @@
     <script>
         // Konfiguration
         const SERVER_URL = 'http://localhost:8000';
-        const AUTH_URL = SERVER_URL + '/auth/';
         const POLL_INTERVAL = 500; // ms
         const MAX_ATTEMPTS = 120; // 60 Sekunden Timeout
 
         let attempts = 0;
         let pollTimer = null;
+        window.serverReady = false;
 
-        async function checkServer() {
-            try {
-                const response = await fetch(SERVER_URL + '/health', {
-                    method: 'GET',
-                    mode: 'cors',
-                    cache: 'no-cache'
-                });
+        function tryLoadScript() {
+            // Entferne vorherige Script-Tags
+            const oldScript = document.getElementById('ready-script');
+            if (oldScript) {
+                oldScript.remove();
+            }
 
-                if (response.ok) {
-                    // Server ist bereit!
-                    document.getElementById('status').textContent = 'Server bereit - Weiterleitung...';
-                    document.getElementById('version').textContent = 'Anwendung wird geladen...';
+            // Erstelle neues Script-Tag
+            const script = document.createElement('script');
+            script.id = 'ready-script';
+            script.src = SERVER_URL + '/ready.js?t=' + Date.now();
 
-                    // Kurz warten damit der User die Meldung sieht
-                    setTimeout(() => {
-                        window.location.href = AUTH_URL;
-                    }, 500);
-
-                    return true;
-                }
-            } catch (error) {
+            script.onerror = function() {
                 // Server noch nicht bereit, weiter versuchen
-            }
+                attempts++;
 
-            // Fallback: Versuche direkt die Auth-Seite
-            try {
-                const response = await fetch(AUTH_URL, {
-                    method: 'HEAD',
-                    mode: 'cors',
-                    cache: 'no-cache'
-                });
-
-                if (response.ok) {
-                    document.getElementById('status').textContent = 'Server bereit - Weiterleitung...';
-                    setTimeout(() => {
-                        window.location.href = AUTH_URL;
-                    }, 500);
-                    return true;
+                // Status aktualisieren
+                if (attempts > 10) {
+                    document.getElementById('version').textContent =
+                        'Warte auf Server... (' + Math.floor(attempts * POLL_INTERVAL / 1000) + 's)';
                 }
-            } catch (error) {
-                // Weiter versuchen
-            }
 
-            return false;
-        }
-
-        async function poll() {
-            attempts++;
-
-            // Status aktualisieren
-            if (attempts > 10) {
-                document.getElementById('version').textContent =
-                    `Warte auf Server... (${Math.floor(attempts * POLL_INTERVAL / 1000)}s)`;
-            }
-
-            const serverReady = await checkServer();
-
-            if (serverReady) {
-                if (pollTimer) {
-                    clearInterval(pollTimer);
-                    pollTimer = null;
+                // Timeout erreicht
+                if (attempts >= MAX_ATTEMPTS) {
+                    if (pollTimer) {
+                        clearInterval(pollTimer);
+                        pollTimer = null;
+                    }
+                    document.getElementById('error').classList.add('show');
+                    document.getElementById('status').textContent = 'Timeout beim Warten auf Server';
+                    document.getElementById('version').textContent = '';
                 }
-                return;
-            }
+            };
 
-            // Timeout erreicht
-            if (attempts >= MAX_ATTEMPTS) {
-                if (pollTimer) {
-                    clearInterval(pollTimer);
-                    pollTimer = null;
-                }
-                document.getElementById('error').classList.add('show');
-                document.getElementById('status').textContent = 'Timeout beim Warten auf Server';
-                document.getElementById('version').textContent = '';
-            }
+            document.head.appendChild(script);
         }
 
         function startPolling() {
             attempts = 0;
+            window.serverReady = false;
             document.getElementById('error').classList.remove('show');
             document.getElementById('status').innerHTML = 'Server wird gestartet<span class="dots"></span>';
             document.getElementById('version').textContent = 'Initialisiere Datenbank und Dienste...';
@@ -222,11 +183,15 @@
                 clearInterval(pollTimer);
             }
 
-            // Sofort einmal prüfen
-            poll();
+            // Sofort einmal versuchen
+            tryLoadScript();
 
             // Dann regelmäßig
-            pollTimer = setInterval(poll, POLL_INTERVAL);
+            pollTimer = setInterval(function() {
+                if (!window.serverReady) {
+                    tryLoadScript();
+                }
+            }, POLL_INTERVAL);
         }
 
         // Starte Polling wenn Seite geladen

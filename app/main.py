@@ -137,6 +137,16 @@ async def health_check():
     }
 
 
+@app.get("/ready.js")
+async def ready_script():
+    """JavaScript-Endpunkt für Ladescreen - leitet weiter wenn Server bereit"""
+    from fastapi.responses import Response
+    return Response(
+        content="window.serverReady = true; window.location.href = '/auth/';",
+        media_type="application/javascript"
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     """Weiterleitung zur Landing Page oder Dashboard"""
