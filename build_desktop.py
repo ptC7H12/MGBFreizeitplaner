@@ -7,8 +7,22 @@ Nuitka bietet bessere Performance und Code-Schutz als PyInstaller.
 import subprocess
 import sys
 import shutil
+import zipfile
+import os
 from pathlib import Path
+from datetime import datetime
 import platform
+
+# Projektverzeichnis
+PROJECT_ROOT = Path(__file__).parent
+RELEASE_DIR = PROJECT_ROOT / "releases"
+
+# Version aus version.txt lesen
+VERSION_FILE = PROJECT_ROOT / "version.txt"
+try:
+    VERSION = VERSION_FILE.read_text().strip()
+except Exception:
+    VERSION = "0.0.0"  # Fallback
 
 
 def check_python_version():
@@ -338,6 +352,63 @@ https://github.com/ptC7H12/MGBFreizeitplaner
     return True
 
 
+def create_release_zip():
+    """Erstellt ZIP-Archiv im releases-Verzeichnis"""
+    print("\n[INFO] Erstelle Release-ZIP...")
+
+    # Finde das dist-Verzeichnis
+    dist_dir = None
+    for path in [Path("dist/desktop_app.dist"), Path("dist")]:
+        if path.exists() and (path / "MGBFreizeitplaner.exe").exists():
+            dist_dir = path
+            break
+        if path.exists() and (path / "desktop_app.exe").exists():
+            dist_dir = path
+            break
+
+    if not dist_dir:
+        print("[FEHLER] Build-Verzeichnis nicht gefunden!")
+        return False
+
+    # Erstelle releases-Verzeichnis falls nicht vorhanden
+    RELEASE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # ZIP-Name mit Version und Datum
+    timestamp = datetime.now().strftime("%Y%m%d")
+    zip_name = f"MGBFreizeitplaner-{VERSION}-windows-desktop-{timestamp}.zip"
+    zip_path = RELEASE_DIR / zip_name
+
+    # Alte Desktop-Releases löschen
+    for old_zip in RELEASE_DIR.glob("MGBFreizeitplaner-*-windows-desktop-*.zip"):
+        old_zip.unlink()
+        print(f"[OK] Alte Release gelöscht: {old_zip.name}")
+
+    # ZIP erstellen
+    print(f"[INFO] Erstelle {zip_name}...")
+    print("[INFO] Dies kann einige Minuten dauern...")
+
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(dist_dir):
+            # Überspringe Cache-Dateien
+            dirs[:] = [d for d in dirs if d not in ['__pycache__', '.pytest_cache']]
+
+            for file in files:
+                if file.endswith('.pyc'):
+                    continue
+
+                file_path = Path(root) / file
+                # Archivname relativ zum dist_dir, mit Ordnername
+                arcname = Path("MGBFreizeitplaner") / file_path.relative_to(dist_dir)
+                zipf.write(file_path, arcname)
+
+    # Dateigröße anzeigen
+    size_mb = zip_path.stat().st_size / (1024 * 1024)
+    print(f"[OK] {zip_name} erstellt ({size_mb:.1f} MB)")
+    print(f"[INFO] Pfad: {zip_path.absolute()}")
+
+    return True
+
+
 def main():
     """Hauptfunktion - orchestriert den Build-Prozess"""
     print("=" * 60)
@@ -366,6 +437,7 @@ def main():
         ("Nuitka ausführen", run_nuitka),
         ("Build verifizieren", verify_build),
         ("Zusätzliche Dateien kopieren", copy_additional_files),
+        ("Release-ZIP erstellen", create_release_zip),
     ]
 
     for step_name, step_func in steps:
@@ -383,8 +455,10 @@ def main():
     print("=" * 60)
     print("\n[OK] Desktop-Anwendung wurde erstellt:")
     print("     dist/desktop_app.dist/")
-    print("\n[INFO] Der komplette Ordner 'dist/desktop_app.dist/' kann")
-    print("       auf andere Windows-PCs kopiert werden.")
+    print(f"\n[OK] Release-ZIP erstellt in:")
+    print(f"     releases/MGBFreizeitplaner-{VERSION}-windows-desktop-*.zip")
+    print("\n[INFO] Der komplette Ordner oder das ZIP kann")
+    print("       auf andere Windows-PCs verteilt werden.")
     print("\n[INFO] Zum Testen:")
     print("       cd dist/desktop_app.dist")
     print("       ./MGBFreizeitplaner.exe")
