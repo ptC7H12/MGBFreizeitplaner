@@ -36,5 +36,7 @@ openpyxl==3.1.5
 # Development
 python-dotenv==1.0.1
 
-# Build Tools (pin setuptools to avoid deprecation warning in altgraph/PyInstaller)
-setuptools<81
+# Build Tools (Nuitka for creating standalone .exe)
+nuitka>=2.0
+ordered-set
+zstandard

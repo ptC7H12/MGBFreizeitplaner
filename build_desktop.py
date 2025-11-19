@@ -1,7 +1,8 @@
 """
-Build-Skript für MGBFreizeitplaner Desktop-Anwendung
+Build-Skript für MGBFreizeitplaner Desktop-Anwendung mit Nuitka
 
-Erstellt eine standalone .exe für Windows mit PyInstaller.
+Erstellt eine standalone .exe für Windows durch Kompilierung zu C.
+Nuitka bietet bessere Performance und Code-Schutz als PyInstaller.
 """
 import subprocess
 import sys
@@ -19,7 +20,6 @@ def check_python_version():
 
     if version.minor == 13:
         print(f"\n[WARNUNG] Python 3.13 wird noch nicht vollständig unterstützt!")
-        print(f"[WARNUNG] Einige Pakete können Probleme verursachen.")
         print(f"[WARNUNG] Empfohlen: Python 3.11 oder 3.12")
         print(f"[INFO] Build wird trotzdem versucht...\n")
 
@@ -36,14 +36,55 @@ def check_platform():
     return system
 
 
+def check_nuitka():
+    """Prüft ob Nuitka installiert ist"""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "nuitka", "--version"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            version = result.stdout.strip().split('\n')[0]
+            print(f"[OK] Nuitka gefunden: {version}")
+            return True
+        else:
+            print("[FEHLER] Nuitka nicht gefunden!")
+            return False
+    except Exception as e:
+        print(f"[FEHLER] Nuitka nicht gefunden: {e}")
+        return False
+
+
+def check_compiler():
+    """Prüft ob ein C-Compiler verfügbar ist (nur Windows)"""
+    if platform.system() != "Windows":
+        return True
+
+    # Nuitka sucht automatisch nach MSVC oder MinGW
+    print("[INFO] C-Compiler wird beim Build automatisch erkannt...")
+    print("[INFO] Falls kein Compiler gefunden wird:")
+    print("       - Visual Studio Build Tools installieren")
+    print("       - Oder: MinGW-w64 installieren")
+    return True
+
+
 def install_requirements():
-    """Installiert alle Requirements inklusive PyInstaller und PyWebView"""
+    """Installiert alle Requirements inklusive Nuitka"""
     print("\n[INFO] Installiere Build-Abhängigkeiten...")
     try:
+        # Installiere requirements.txt
         subprocess.run(
             [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
             check=True
         )
+
+        # Installiere Nuitka falls nicht vorhanden
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "nuitka", "ordered-set", "zstandard"],
+            check=True
+        )
+
         print("[OK] Abhängigkeiten installiert")
         return True
     except subprocess.CalledProcessError as e:
@@ -52,14 +93,29 @@ def install_requirements():
 
 
 def clean_build():
-    """Löscht alte Build-Artefakte"""
-    print("\n[INFO] Bereinige vorherige Builds...")
-    dirs_to_clean = ["dist", "build"]
+    """Löscht alte Build-Artefakte (behält Cache für schnellere Rebuilds)"""
+    # Prüfe ob vollständige Bereinigung gewünscht
+    full_clean = "--clean" in sys.argv or "-c" in sys.argv
+
+    if full_clean:
+        print("\n[INFO] Vollständige Bereinigung (inkl. Cache)...")
+        dirs_to_clean = ["dist", "build", "desktop_app.build", "desktop_app.dist", "desktop_app.onefile-build"]
+    else:
+        print("\n[INFO] Bereinige Output (Cache bleibt für schnellere Rebuilds)...")
+        # Nur dist löschen, .build Cache behalten
+        dirs_to_clean = ["dist"]
+
     for dir_name in dirs_to_clean:
         dir_path = Path(dir_name)
         if dir_path.exists():
             shutil.rmtree(dir_path)
             print(f"[OK] {dir_name}/ gelöscht")
+
+    if not full_clean:
+        build_cache = Path("desktop_app.build")
+        if build_cache.exists():
+            print(f"[INFO] Cache behalten: desktop_app.build/ (für inkrementelle Builds)")
+
     return True
 
 
@@ -87,41 +143,148 @@ def create_icon_if_missing():
         return True
 
 
-def run_pyinstaller():
-    """Führt PyInstaller mit der Spec-Datei aus"""
-    print("\n[INFO] Starte PyInstaller Build...")
-    print("[INFO] Dies kann 5-10 Minuten dauern...\n")
+def run_nuitka():
+    """Führt Nuitka Build aus"""
+    print("\n[INFO] Starte Nuitka Build...")
+    print("[INFO] Dies kann 10-30 Minuten dauern (Kompilierung zu C)...\n")
+
+    # Debug-Modus prüfen (Konsole bleibt sichtbar für Fehlersuche)
+    debug_mode = "--debug" in sys.argv or "-d" in sys.argv
+    if debug_mode:
+        print("[DEBUG] Debug-Modus aktiv - Konsole bleibt sichtbar")
+
+    # Nuitka Kommando zusammenstellen
+    cmd = [
+        sys.executable, "-m", "nuitka",
+
+        # Standalone Mode
+        "--standalone",
+
+        # Windows-spezifisch - Im Debug-Modus Konsole sichtbar lassen
+        "--windows-console-mode=disable" if not debug_mode else "--windows-console-mode=attach",
+
+        # Icon
+        "--windows-icon-from-ico=app_icon.ico",
+
+        # Output
+        "--output-dir=dist",
+        "--output-filename=MGBFreizeitplaner.exe",
+
+        # Includes - Pakete die eingebunden werden müssen
+        "--include-package=app",
+        "--include-package=webview",
+        "--include-package=uvicorn",
+        "--include-package=fastapi",
+        "--include-package=sqlalchemy",
+        "--include-package=alembic",
+        "--include-package=jinja2",
+        "--include-package=pydantic",
+        "--include-package=reportlab",
+        "--include-package=qrcode",
+        "--include-package=openpyxl",
+        "--include-package=yaml",
+        "--include-package=email_validator",
+        "--include-package=pythonnet",
+        "--include-package=clr_loader",
+
+        # Data Files
+        "--include-data-dir=app/templates=app/templates",
+        "--include-data-dir=app/static=app/static",
+        "--include-data-dir=rulesets=rulesets",
+
+        # Version file
+        "--include-data-files=version.txt=version.txt" if Path("version.txt").exists() else "",
+
+        # Package data (z.B. limits Lua scripts für Redis)
+        "--include-package-data=limits",
+
+        # Alembic falls vorhanden
+        "--include-data-dir=alembic=alembic" if Path("alembic").exists() else "",
+
+        # Entferne nicht benötigte Module (nicht-Windows Plattformen)
+        "--nofollow-import-to=webview.platforms.android",
+        "--nofollow-import-to=webview.platforms.gtk",
+        "--nofollow-import-to=webview.platforms.cocoa",
+        "--nofollow-import-to=webview.platforms.qt",
+
+        # SQLAlchemy: Nur SQLite wird benötigt - entferne andere Dialekte (spart RAM beim Build)
+        "--nofollow-import-to=sqlalchemy.dialects.postgresql",
+        "--nofollow-import-to=sqlalchemy.dialects.mysql",
+        "--nofollow-import-to=sqlalchemy.dialects.oracle",
+        "--nofollow-import-to=sqlalchemy.dialects.mssql",
+        "--nofollow-import-to=sqlalchemy.dialects.firebird",
+        "--nofollow-import-to=sqlalchemy.dialects.sybase",
+        "--nofollow-import-to=sqlalchemy.ext.mypy",
+
+        # Andere nicht benötigte Module
+        "--nofollow-import-to=matplotlib",
+        "--nofollow-import-to=numpy",
+        "--nofollow-import-to=pandas",
+        "--nofollow-import-to=scipy",
+        "--nofollow-import-to=pytest",
+        "--nofollow-import-to=IPython",
+        "--nofollow-import-to=jupyter",
+
+        # Reduziere parallele Kompilierung um RAM zu sparen
+        "--jobs=2",
+
+        # Hauptdatei
+        "desktop_app.py",
+    ]
+
+    # Leere Strings entfernen
+    cmd = [c for c in cmd if c]
 
     try:
-        subprocess.run(
-            [sys.executable, "-m", "PyInstaller", "desktop_app.spec"],
-            check=True
-        )
-        print("\n[OK] PyInstaller Build abgeschlossen")
+        subprocess.run(cmd, check=True)
+        print("\n[OK] Nuitka Build abgeschlossen")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"\n[FEHLER] PyInstaller Build fehlgeschlagen: {e}")
+        print(f"\n[FEHLER] Nuitka Build fehlgeschlagen: {e}")
         return False
 
 
 def verify_build():
     """Prüft ob die .exe erstellt wurde"""
-    exe_path = Path("dist/MGBFreizeitplaner/MGBFreizeitplaner.exe")
-    if not exe_path.exists():
-        print(f"[FEHLER] .exe wurde nicht erstellt: {exe_path}")
-        return False
+    # Nuitka erstellt dist/desktop_app.dist/
+    exe_path = Path("dist/desktop_app.dist/MGBFreizeitplaner.exe")
 
-    size_mb = exe_path.stat().st_size / (1024 * 1024)
-    print(f"[OK] .exe erstellt: {exe_path}")
-    print(f"[INFO] Größe: {size_mb:.1f} MB")
-    return True
+    # Alternative Pfade prüfen
+    alt_paths = [
+        Path("dist/MGBFreizeitplaner.exe"),
+        Path("dist/desktop_app.dist/desktop_app.exe"),
+    ]
+
+    for path in [exe_path] + alt_paths:
+        if path.exists():
+            size_mb = path.stat().st_size / (1024 * 1024)
+            print(f"[OK] .exe erstellt: {path}")
+            print(f"[INFO] Größe: {size_mb:.1f} MB")
+            return True
+
+    print(f"[FEHLER] .exe wurde nicht erstellt")
+    print("[INFO] Prüfe dist/ Verzeichnis manuell")
+    return False
 
 
 def copy_additional_files():
     """Kopiert zusätzliche Dateien ins Dist-Verzeichnis"""
     print("\n[INFO] Kopiere zusätzliche Dateien...")
 
-    dist_dir = Path("dist/MGBFreizeitplaner")
+    # Finde das dist-Verzeichnis
+    dist_dir = None
+    for path in [Path("dist/desktop_app.dist"), Path("dist")]:
+        if path.exists() and (path / "MGBFreizeitplaner.exe").exists():
+            dist_dir = path
+            break
+        if path.exists() and (path / "desktop_app.exe").exists():
+            dist_dir = path
+            break
+
+    if not dist_dir:
+        dist_dir = Path("dist/desktop_app.dist")
+        if not dist_dir.exists():
+            dist_dir = Path("dist")
 
     # .env erstellen wenn nicht vorhanden
     env_file = dist_dir / ".env"
@@ -131,9 +294,15 @@ def copy_additional_files():
             shutil.copy(env_example, env_file)
             print("[OK] .env erstellt")
 
+    # alembic.ini kopieren
+    alembic_ini = Path("alembic.ini")
+    if alembic_ini.exists():
+        shutil.copy(alembic_ini, dist_dir / "alembic.ini")
+        print("[OK] alembic.ini kopiert")
+
     # README erstellen
-    readme_content = """MGBFreizeitplaner - Desktop-Version
-=====================================
+    readme_content = """MGBFreizeitplaner - Desktop-Version (Nuitka Build)
+=================================================
 
 STARTEN:
 --------
@@ -154,8 +323,8 @@ Sie die Backup-Funktion in der Anwendung.
 
 VERTEILUNG:
 -----------
-Der komplette Ordner "MGBFreizeitplaner" kann auf andere
-Windows-PCs kopiert werden (keine Installation nötig).
+Der komplette Ordner kann auf andere Windows-PCs kopiert
+werden (keine Installation nötig).
 
 SUPPORT:
 --------
@@ -172,8 +341,8 @@ https://github.com/ptC7H12/MGBFreizeitplaner
 def main():
     """Hauptfunktion - orchestriert den Build-Prozess"""
     print("=" * 60)
-    print("  MGBFreizeitplaner - Desktop Build")
-    print("  Windows .exe erstellen mit PyInstaller")
+    print("  MGBFreizeitplaner - Desktop Build mit Nuitka")
+    print("  Kompiliert Python zu nativen C-Code")
     print("=" * 60)
 
     # Arbeitsverzeichnis ins Projektroot wechseln
@@ -190,9 +359,11 @@ def main():
     # Build-Prozess
     steps = [
         ("Requirements installieren", install_requirements),
+        ("Nuitka prüfen", check_nuitka),
+        ("Compiler prüfen", check_compiler),
         ("Build bereinigen", clean_build),
         ("Icon erstellen/prüfen", create_icon_if_missing),
-        ("PyInstaller ausführen", run_pyinstaller),
+        ("Nuitka ausführen", run_nuitka),
         ("Build verifizieren", verify_build),
         ("Zusätzliche Dateien kopieren", copy_additional_files),
     ]
@@ -211,11 +382,11 @@ def main():
     print("  BUILD ERFOLGREICH!")
     print("=" * 60)
     print("\n[OK] Desktop-Anwendung wurde erstellt:")
-    print("     dist/MGBFreizeitplaner/MGBFreizeitplaner.exe")
-    print("\n[INFO] Der komplette Ordner 'dist/MGBFreizeitplaner/' kann")
+    print("     dist/desktop_app.dist/")
+    print("\n[INFO] Der komplette Ordner 'dist/desktop_app.dist/' kann")
     print("       auf andere Windows-PCs kopiert werden.")
     print("\n[INFO] Zum Testen:")
-    print("       cd dist/MGBFreizeitplaner")
+    print("       cd dist/desktop_app.dist")
     print("       ./MGBFreizeitplaner.exe")
     print()
 
