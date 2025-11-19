@@ -2,7 +2,7 @@
 
 Dieses Verzeichnis enthält YAML-Dateien mit Regelwerken für die Preisberechnung von Freizeiten.
 
-**Für detaillierte Dokumentation siehe**: [REGELWERK_DOKUMENTATION.md](../REGELWERK_DOKUMENTATION.md)
+**Für detaillierte Dokumentation siehe**: [REGELWERK_DOKUMENTATION.md](../docs/REGELWERK_DOKUMENTATION.md)
 
 ## Schnellstart
 
@@ -46,4 +46,4 @@ family_discount:
 2. In der Anwendung unter "Regelwerke" importieren
 3. Als aktives Regelwerk für ein Event festlegen
 
-**Vollständige Dokumentation**: [REGELWERK_DOKUMENTATION.md](../REGELWERK_DOKUMENTATION.md)
+**Vollständige Dokumentation**: [REGELWERK_DOKUMENTATION.md](../docs/REGELWERK_DOKUMENTATION.md)
