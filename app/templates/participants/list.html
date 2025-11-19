@@ -67,13 +67,10 @@
                 </select>
             </div>
             <div class="min-w-[150px]">
-                <select name="family_id" id="family-filter" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
-                    <option value="">Alle Familien</option>
-                    {% for family in families %}
-                    <option value="{{ family.id }}" {% if selected_family_id == family.id %}selected{% endif %}>
-                        {{ family.name }}
-                    </option>
-                    {% endfor %}
+                <select name="payment_status" id="payment-status-filter" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Alle Status</option>
+                    <option value="paid" {% if payment_status == 'paid' %}selected{% endif %}>Bezahlt</option>
+                    <option value="outstanding" {% if payment_status == 'outstanding' %}selected{% endif %}>Offen</option>
                 </select>
             </div>
             <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
@@ -85,7 +82,7 @@
         </form>
     </div>
 
-    {% if participants %}
+    {% if participant_data %}
     <div class="overflow-x-auto">
         <table id="participants-table" class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -95,43 +92,53 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rolle</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Familie</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preis</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bezahlt</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Offen</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aktionen</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-                {% for participant in participants %}
+                {% for data in participant_data %}
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm font-medium text-gray-900">{{ participant.full_name }}</div>
-                        {% if participant.email %}
-                        <div class="text-sm text-gray-500">{{ participant.email }}</div>
+                        <div class="text-sm font-medium text-gray-900">{{ data.participant.full_name }}</div>
+                        {% if data.participant.email %}
+                        <div class="text-sm text-gray-500">{{ data.participant.email }}</div>
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{ participant.birth_date.strftime('%d.%m.%Y') }} ({{ participant.age_at_event }} Jahre)
+                        {{ data.participant.birth_date.strftime('%d.%m.%Y') }} ({{ data.participant.age_at_event }} Jahre)
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        {% if participant.role %}
+                        {% if data.participant.role %}
                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                            {{ participant.role.display_name }}
+                            {{ data.participant.role.display_name }}
                         </span>
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {% if participant.family %}
-                        <a href="/families/{{ participant.family.id }}" class="text-blue-600 hover:text-blue-800">
-                            {{ participant.family.name }}
+                        {% if data.participant.family %}
+                        <a href="/families/{{ data.participant.family.id }}" class="text-blue-600 hover:text-blue-800">
+                            {{ data.participant.family.name }}
                         </a>
                         {% else %}
                         -
                         {% endif %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {{ "%.2f"|format(participant.final_price) }} €
+                        {{ "%.2f"|format(data.participant.final_price) }} €
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                        {{ "%.2f"|format(data.total_paid) }} €
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <a href="/participants/{{ participant.id }}" class="text-blue-600 hover:text-blue-800 mr-3">Anzeigen</a>
-                        <a href="/participants/{{ participant.id }}/edit" class="text-green-600 hover:text-green-800">Bearbeiten</a>
+                        <span class="{% if data.outstanding > 0 %}text-orange-600{% else %}text-gray-600{% endif %}">
+                            {{ "%.2f"|format(data.outstanding) }} €
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <a href="/participants/{{ data.participant.id }}" class="text-blue-600 hover:text-blue-800 mr-3">Anzeigen</a>
+                        <a href="/participants/{{ data.participant.id }}/edit" class="text-green-600 hover:text-green-800">Bearbeiten</a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -164,6 +171,44 @@
                 </svg>
                 Neue Familie
             </a>
+        </div>
+
+        <!-- Such- und Filterbereich für Familien -->
+        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <form method="get" action="/participants#families" class="flex flex-wrap gap-4">
+                <div class="flex-1 min-w-[200px]">
+                    <input
+                        type="text"
+                        name="family_search"
+                        placeholder="Familienname oder Ansprechpartner suchen..."
+                        value="{{ family_search if family_search else '' }}"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    >
+                </div>
+                <div class="min-w-[150px]">
+                    <select name="family_role_id" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Alle Rollen</option>
+                        {% for role in roles %}
+                        <option value="{{ role.id }}" {% if family_role_id == role.id %}selected{% endif %}>
+                            {{ role.display_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="min-w-[150px]">
+                    <select name="family_payment_status" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Alle Status</option>
+                        <option value="paid" {% if family_payment_status == 'paid' %}selected{% endif %}>Bezahlt</option>
+                        <option value="outstanding" {% if family_payment_status == 'outstanding' %}selected{% endif %}>Offen</option>
+                    </select>
+                </div>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                    Filtern
+                </button>
+                <a href="/participants#families" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">
+                    Zurücksetzen
+                </a>
+            </form>
         </div>
 
         {% if family_data %}
@@ -324,8 +369,9 @@ document.addEventListener('DOMContentLoaded', function() {
         activeTab.classList.add('border-blue-500', 'text-blue-600');
     }
 
-    // Check URL hash and switch tab if needed
-    if (window.location.hash === '#families') {
+    // Check URL hash and switch tab if needed, or if family filters are set
+    const hasFamilyFilters = {{ 'true' if family_search or family_role_id or family_payment_status else 'false' }};
+    if (window.location.hash === '#families' || hasFamilyFilters) {
         switchTab('families');
     }
 

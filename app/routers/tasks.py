@@ -71,6 +71,7 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
         "manual_price_override": [],
         "overdue_payments": [],
         "income_subsidy_mismatch": [],
+        "family_subsidy_mismatch": [],
         "role_count_exceeded": [],
         "birthday_gifts": [],
         "kitchen_team_gift": [],
@@ -219,7 +220,8 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
             age_groups = ruleset.age_groups or []
 
             for participant in participants_with_role:
-                if participant.calculated_price and participant.age_at_event is not None:
+                # Berechne die tatsächlich gewährten Rollenrabatte (egal ob calculated oder manual_price_override)
+                if participant.age_at_event is not None:
                     # Berechne Basispreis aus Altersgruppen
                     base_price = PriceCalculator._get_base_price_by_age(participant.age_at_event, age_groups)
 
@@ -246,6 +248,80 @@ async def list_tasks(request: Request, db: Session = Depends(get_db), event_id: 
                     "difference": difference,
                     "total_subsidy": total_subsidy,
                     "expected_discounts": expected_discounts
+                })
+
+    # 10b. Kinderzuschuss-Differenz (Familienrabatte vs. Zuschüsse)
+    # Prüfe, ob es einen "Kinderzuschuss" Income-Eintrag gibt
+    family_subsidy_income = db.query(func.sum(Income.amount)).filter(
+        Income.event_id == event_id,
+        Income.description.like('%Kinderzuschuss%')
+    ).scalar()
+
+    if family_subsidy_income and float(family_subsidy_income) > 0:
+        total_family_subsidy = float(family_subsidy_income)
+
+        # Berechne erwartete Familienrabatte für Kinder ohne manuelle Preisüberschreibung
+        children_participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True,
+            Participant.manual_price_override.is_(None)  # Nur ohne manuelle Preisüberschreibung
+        ).all()
+
+        expected_family_discounts = 0.0
+        if ruleset and ruleset.family_discount:
+            from app.models import Family
+            from app.services.price_calculator import PriceCalculator
+
+            family_discount_config = ruleset.family_discount or {}
+            age_groups = ruleset.age_groups or []
+
+            # Gruppiere Kinder nach Familie
+            families_dict = {}
+            for participant in children_participants:
+                # Nur Kinder unter 18
+                if participant.age_at_event < 18 and participant.family_id:
+                    if participant.family_id not in families_dict:
+                        families_dict[participant.family_id] = []
+                    families_dict[participant.family_id].append(participant)
+
+            # Berechne Familienrabatte
+            for family_id, family_participants in families_dict.items():
+                # Sortiere nach Geburtsdatum (ältestes zuerst)
+                family_participants.sort(key=lambda p: p.birth_date)
+
+                for idx, participant in enumerate(family_participants):
+                    child_position = idx + 1  # 1 = ältestes Kind, 2 = zweites, etc.
+
+                    # Berechne Basispreis
+                    base_price = PriceCalculator._get_base_price_by_age(participant.age_at_event, age_groups)
+
+                    # Ermittle Familienrabatt-Prozentsatz
+                    family_discount_percent = PriceCalculator._get_family_discount(
+                        participant.age_at_event,
+                        child_position,
+                        family_discount_config
+                    )
+
+                    if family_discount_percent > 0:
+                        family_discount_amount = base_price * (family_discount_percent / 100)
+                        expected_family_discounts += family_discount_amount
+
+        # Berechne Differenz
+        difference = total_family_subsidy - expected_family_discounts
+
+        # Wenn Differenz signifikant (mehr als 1€), erstelle Task
+        if abs(difference) > 1.0:
+            if not is_task_completed(completed_tasks, "family_subsidy_mismatch", event_id):
+                status = "zu viel" if difference > 0 else "zu wenig"
+                tasks["family_subsidy_mismatch"].append({
+                    "id": event_id,
+                    "title": "Kinderzuschuss-Differenz (Familienrabatte)",
+                    "description": f"Zuschuss: {total_family_subsidy:.2f}€ | Familienrabatte: {expected_family_discounts:.2f}€ | Differenz: {abs(difference):.2f}€ ({status})",
+                    "link": f"/incomes",
+                    "task_type": "family_subsidy_mismatch",
+                    "difference": difference,
+                    "total_subsidy": total_family_subsidy,
+                    "expected_discounts": expected_family_discounts
                 })
 
     # 11. Rollenüberschreitungen (zu viele Teilnehmer einer Rolle zugewiesen)
@@ -431,6 +507,32 @@ async def complete_task(
         if expense:
             expense.is_settled = True
             logger.info(f"Marked expense {expense.id} as settled")
+
+    # Spezielle Behandlung für outstanding_payment
+    # Wenn Zahlungseingang als erledigt markiert wird, automatisch Payment erstellen
+    if task_type == "outstanding_payment":
+        participant = db.query(Participant).filter(Participant.id == reference_id).first()
+        if participant:
+            # Berechne ausstehenden Betrag
+            final_price = float(participant.final_price)
+            total_paid = float(db.query(func.sum(Payment.amount)).filter(
+                Payment.participant_id == participant.id
+            ).scalar() or 0)
+            outstanding = final_price - total_paid
+
+            if outstanding > 0.01:  # Nur wenn mehr als 1 Cent ausstehend
+                # Erstelle automatisch einen Zahlungseingang
+                new_payment = Payment(
+                    amount=outstanding,
+                    payment_date=date.today(),
+                    payment_method="Automatisch",
+                    reference=f"Aufgabe erledigt: {participant.full_name}",
+                    notes=note if note else "Zahlungseingang automatisch aus erledigter Aufgabe erstellt",
+                    event_id=event_id,
+                    participant_id=participant.id
+                )
+                db.add(new_payment)
+                logger.info(f"Automatically created payment of {outstanding}€ for participant {participant.id}")
 
     db.commit()
     flash(request, "Aufgabe wurde als erledigt markiert", "success")

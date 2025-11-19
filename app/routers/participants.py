@@ -15,7 +15,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.database import get_db, transaction
-from app.models import Participant, Role, Event, Family, Ruleset, Setting
+from app.models import Participant, Role, Event, Family, Ruleset, Setting, Task
 from app.services.price_calculator import PriceCalculator
 from app.services.qrcode_service import QRCodeService
 from app.services.excel_service import ExcelService
@@ -63,6 +63,95 @@ def _calculate_price_for_participant(
     )
 
 
+def _check_and_update_role_count_task(
+    db: Session,
+    event_id: int,
+    role_id: Optional[int]
+) -> None:
+    """
+    Prüft ob die Rollenanzahl überschritten wurde und erstellt/aktualisiert/schließt die entsprechende Task.
+
+    Wird nach dem Erstellen, Bearbeiten oder Löschen eines Teilnehmers aufgerufen.
+
+    Args:
+        db: Datenbank-Session
+        event_id: ID der Veranstaltung
+        role_id: ID der Rolle (kann None sein)
+    """
+    if not role_id:
+        return  # Keine Rolle zugewiesen, nichts zu prüfen
+
+    # Hole die Rolle mit allen Informationen
+    role = db.query(Role).filter(Role.id == role_id, Role.event_id == event_id).first()
+    if not role:
+        return
+
+    # Hole das aktive Ruleset für dieses Event
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.event_id == event_id,
+        Ruleset.is_active == True
+    ).first()
+
+    if not ruleset or not ruleset.role_discounts:
+        return  # Kein Ruleset oder keine Rollenrabatte konfiguriert
+
+    # Prüfe ob diese Rolle ein max_count hat
+    role_config = ruleset.role_discounts.get(role.name)
+    if not role_config:
+        return  # Rolle nicht im Ruleset gefunden
+
+    max_count = role_config.get("max_count")
+    if max_count is None:
+        return  # Keine Begrenzung für diese Rolle
+
+    # Zähle aktive Teilnehmer mit dieser Rolle
+    current_count = db.query(Participant).filter(
+        Participant.event_id == event_id,
+        Participant.role_id == role.id,
+        Participant.is_active == True
+    ).count()
+
+    # Suche nach bestehender Task für diese Rolle
+    existing_task = db.query(Task).filter(
+        Task.event_id == event_id,
+        Task.task_type == "role_count_exceeded",
+        Task.reference_id == role.id
+    ).first()
+
+    # Überschreitung?
+    if current_count > max_count:
+        excess_count = current_count - max_count
+        description = f"Aktuell: {current_count} | Maximum: {max_count} | Überschreitung: {excess_count}"
+
+        if existing_task:
+            # Task existiert bereits - aktualisiere sie
+            existing_task.description = description
+            existing_task.is_completed = False  # Wieder öffnen, falls sie abgeschlossen war
+            existing_task.updated_at = utcnow()
+            logger.info(f"Role count task updated and reopened for {role.display_name}: {description}")
+        else:
+            # Task existiert noch nicht - erstelle sie
+            new_task = Task(
+                event_id=event_id,
+                task_type="role_count_exceeded",
+                reference_id=role.id,
+                title=f"Zu viele {role.display_name} zugewiesen",
+                description=description,
+                is_completed=False
+            )
+            db.add(new_task)
+            logger.info(f"Role count task created for {role.display_name}: {description}")
+    else:
+        # Keine Überschreitung mehr
+        if existing_task and not existing_task.is_completed:
+            # Task existiert und ist offen - schließe sie automatisch
+            existing_task.is_completed = True
+            existing_task.updated_at = utcnow()
+            logger.info(f"Role count task auto-completed for {role.display_name}: within limit ({current_count}/{max_count})")
+
+    # Änderungen werden durch den äußeren db.commit() gespeichert
+
+
 @router.get("/", response_class=HTMLResponse)
 async def list_participants(
     request: Request,
@@ -70,7 +159,10 @@ async def list_participants(
     event_id: int = Depends(get_current_event_id),
     search: Optional[str] = "",
     role_id: Optional[str] = "",
-    family_id: Optional[str] = ""
+    payment_status: Optional[str] = "",
+    family_search: Optional[str] = "",
+    family_role_id: Optional[str] = "",
+    family_payment_status: Optional[str] = ""
 ):
     """Liste aller Teilnehmer mit Such- und Filterfunktionen"""
     query = db.query(Participant).filter(Participant.event_id == event_id)
@@ -91,13 +183,6 @@ async def list_participants(
         except ValueError:
             pass  # Ungültige ID ignorieren
 
-    # Familienfilter (nur wenn nicht leer)
-    if family_id and family_id.strip():
-        try:
-            query = query.filter(Participant.family_id == int(family_id))
-        except ValueError:
-            pass  # Ungültige ID ignorieren
-
     # Eager Loading für related objects um N+1 Queries zu vermeiden
     participants = query.options(
         joinedload(Participant.role),
@@ -105,6 +190,48 @@ async def list_participants(
         joinedload(Participant.event),
         joinedload(Participant.payments)
     ).order_by(Participant.last_name).all()
+
+    # Berechne Zahlungsinformationen für jeden Teilnehmer
+    participant_data = []
+    for participant in participants:
+        # Direkte Zahlungen des Teilnehmers
+        direct_payments = float(sum((payment.amount for payment in participant.payments), 0))
+
+        # Anteilige Familienzahlungen berechnen
+        family_payment_share = 0.0
+        if participant.family_id:
+            # Lade Familie mit Zahlungen und Teilnehmern
+            family = db.query(Family).filter(Family.id == participant.family_id).options(
+                joinedload(Family.payments),
+                joinedload(Family.participants)
+            ).first()
+
+            if family:
+                # Gesamtzahlungen der Familie
+                family_total_payments = float(sum((payment.amount for payment in family.payments), 0))
+
+                # Gesamtpreis aller Familienmitglieder
+                family_total_price = float(sum((p.final_price for p in family.participants), 0))
+
+                # Anteilige Verteilung: (Teilnehmerpreis / Familiengesamtpreis) * Familienzahlungen
+                if family_total_price > 0:
+                    family_payment_share = (float(participant.final_price) / family_total_price) * family_total_payments
+
+        # Gesamtzahlung = direkte Zahlungen + anteilige Familienzahlungen
+        total_paid = direct_payments + family_payment_share
+        outstanding = float(participant.final_price) - total_paid
+
+        # Zahlungsstatus-Filter anwenden
+        if payment_status == "paid" and outstanding > 0.01:
+            continue  # Überspringe nicht vollständig bezahlte
+        elif payment_status == "outstanding" and outstanding <= 0.01:
+            continue  # Überspringe vollständig bezahlte
+
+        participant_data.append({
+            "participant": participant,
+            "total_paid": total_paid,
+            "outstanding": outstanding
+        })
 
     # Für Filter-Dropdown (auch nach event_id gefiltert)
     roles = db.query(Role).filter(Role.is_active == True, Role.event_id == event_id).all()
@@ -122,6 +249,24 @@ async def list_participants(
 
     family_data = []
     for family in families_with_participants:
+        # Suchfilter für Familien
+        if family_search and family_search.strip():
+            search_filter = family_search.strip().lower()
+            family_name = (family.name or "").lower()
+            contact_person = (family.contact_person or "").lower()
+            if search_filter not in family_name and search_filter not in contact_person:
+                continue  # Überspringe Familien, die nicht zur Suche passen
+
+        # Rollenfilter für Familien - prüfe ob ein Teilnehmer der Familie diese Rolle hat
+        if family_role_id and family_role_id.strip():
+            try:
+                role_id_int = int(family_role_id)
+                has_role = any(p.role_id == role_id_int for p in family.participants)
+                if not has_role:
+                    continue  # Überspringe Familien ohne Teilnehmer mit dieser Rolle
+            except ValueError:
+                pass
+
         # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
         total_price = float(sum((p.final_price for p in family.participants), 0))
 
@@ -133,13 +278,20 @@ async def list_participants(
             for payment in participant.payments), 0
         ))
         total_paid = family_payments + member_payments
+        outstanding = total_price - total_paid
+
+        # Zahlungsstatus-Filter für Familien
+        if family_payment_status == "paid" and outstanding > 0.01:
+            continue  # Überspringe nicht vollständig bezahlte Familien
+        elif family_payment_status == "outstanding" and outstanding <= 0.01:
+            continue  # Überspringe vollständig bezahlte Familien
 
         family_data.append({
             "family": family,
             "participant_count": len(family.participants),
             "total_price": total_price,
             "total_paid": total_paid,
-            "outstanding": total_price - total_paid
+            "outstanding": outstanding
         })
 
     return templates.TemplateResponse(
@@ -147,13 +299,16 @@ async def list_participants(
         {
             "request": request,
             "title": "Teilnehmer & Familien",
-            "participants": participants,
+            "participant_data": participant_data,
             "roles": roles,
             "families": families,
             "family_data": family_data,
             "search": search,
             "selected_role_id": role_id,
-            "selected_family_id": family_id
+            "payment_status": payment_status,
+            "family_search": family_search,
+            "family_role_id": family_role_id,
+            "family_payment_status": family_payment_status
         }
     )
 
@@ -299,6 +454,10 @@ async def create_participant(
             db.add(participant)
             db.flush()  # Generiert ID ohne zu committen
         # Auto-commit erfolgt hier
+
+        # Prüfe Rollenüberschreitung und aktualisiere Task
+        _check_and_update_role_count_task(db, event_id, participant.role_id)
+        db.commit()  # Speichere Task-Änderungen
 
         flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich erstellt", "success")
         return RedirectResponse(url=f"/participants/{participant.id}", status_code=303)
@@ -1400,11 +1559,29 @@ async def update_participant(
         participant.discount_reason = participant_data.discount_reason
         participant.manual_price_override = participant_data.manual_price_override
         # event_id bleibt unverändert (Sicherheit!)
+
+        # Speichere alte role_id für Rollenüberschreitungs-Prüfung
+        old_role_id = participant.role_id
+
         participant.role_id = participant_data.role_id
         participant.family_id = participant_data.family_id
         participant.calculated_price = calculated_price
 
         db.commit()
+
+        # Prüfe Rollenüberschreitung für beide Rollen (alte und neue), falls geändert
+        if old_role_id != participant.role_id:
+            # Alte Rolle: Prüfe ob Überschreitung behoben wurde
+            if old_role_id:
+                _check_and_update_role_count_task(db, event_id, old_role_id)
+            # Neue Rolle: Prüfe ob neue Überschreitung entstanden ist
+            if participant.role_id:
+                _check_and_update_role_count_task(db, event_id, participant.role_id)
+            db.commit()  # Speichere Task-Änderungen
+        else:
+            # Rolle hat sich nicht geändert, aber prüfe trotzdem (z.B. für manuelle Korrekturen)
+            _check_and_update_role_count_task(db, event_id, participant.role_id)
+            db.commit()  # Speichere Task-Änderungen
 
         flash(request, f"Teilnehmer {participant.full_name} wurde erfolgreich aktualisiert", "success")
         return RedirectResponse(url=f"/participants/{participant_id}", status_code=303)
@@ -1453,10 +1630,17 @@ async def delete_participant(
 
     try:
         participant_name = participant.full_name
+        participant_role_id = participant.role_id  # Speichere für Rollenüberschreitungs-Prüfung
+
         # Soft-Delete: Statt db.delete() markieren wir als gelöscht
         participant.is_active = False
         participant.deleted_at = utcnow()
         db.commit()
+
+        # Prüfe Rollenüberschreitung (möglicherweise wurde sie durch Löschen behoben)
+        _check_and_update_role_count_task(db, event_id, participant_role_id)
+        db.commit()  # Speichere Task-Änderungen
+
         logger.info(f"Participant soft-deleted: {participant_name} (ID: {participant_id})")
         flash(request, f"Teilnehmer {participant_name} wurde erfolgreich gelöscht", "success")
         return RedirectResponse(url="/participants", status_code=303)

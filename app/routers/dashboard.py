@@ -180,10 +180,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db), event_id: i
     soll_sonstige_einnahmen = soll_einnahmen_gesamt - soll_zahlungseingaenge
 
     ist_zahlungseingaenge = float(db.query(func.sum(Payment.amount)).filter(Payment.event_id == event_id).scalar() or 0)
-    # Sonstige Einnahmen (z.B. erhaltene Zuschüsse)
-    # TODO: Hier könnte eine separate Erfassung für Zuschüsse implementiert werden
-    # Für jetzt: 0, bis tatsächlich erfasst
-    ist_sonstige_einnahmen = 0.0
+    # Sonstige Einnahmen (z.B. erhaltene Zuschüsse, Spenden)
+    # Aus Income-Tabelle abfragen
+    ist_sonstige_einnahmen = float(db.query(func.sum(Income.amount)).filter(Income.event_id == event_id).scalar() or 0)
     ist_einnahmen_gesamt = ist_zahlungseingaenge + ist_sonstige_einnahmen
 
     # Ausgaben
