@@ -364,6 +364,30 @@ Download Portable-Version: [GitHub Releases](../../releases)
     print(f"✅ README erstellt")
 
 
+def clean_standalone_windows_files():
+    """Entfernt nur Dateien, die von diesem Skript erstellt wurden"""
+    print("🧹 Räume alte Windows-Standalone-Builds auf...")
+
+    # Lösche spezifischen Build-Ordner
+    standalone_build_dir = BUILD_DIR / "MGBFreizeitplaner-Windows-Standalone"
+    if standalone_build_dir.exists():
+        shutil.rmtree(standalone_build_dir)
+        print(f"  ✓ Entfernt: {standalone_build_dir.name}")
+
+    # Lösche nur Windows-Standalone Release-Dateien
+    if RELEASE_DIR.exists():
+        for release_file in RELEASE_DIR.glob("MGBFreizeitplaner-*-windows-standalone-*.zip"):
+            release_file.unlink()
+            print(f"  ✓ Entfernt: {release_file.name}")
+
+    # Erstelle Verzeichnisse falls nicht vorhanden
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    RELEASE_DIR.mkdir(parents=True, exist_ok=True)
+    DOWNLOAD_CACHE.mkdir(parents=True, exist_ok=True)
+
+    print("✅ Aufgeräumt!\n")
+
+
 def create_package():
     """Erstellt Windows Standalone-Paket"""
     print("\n" + "="*60)
@@ -371,14 +395,8 @@ def create_package():
     print(f"📌 Version: {VERSION}")
     print("="*60 + "\n")
 
-    # Vorbereitung
-    print("🧹 Räume alte Builds auf...")
-    if BUILD_DIR.exists():
-        shutil.rmtree(BUILD_DIR)
-    BUILD_DIR.mkdir(parents=True)
-    RELEASE_DIR.mkdir(parents=True, exist_ok=True)
-    DOWNLOAD_CACHE.mkdir(parents=True, exist_ok=True)
-    print("✅ Aufgeräumt!\n")
+    # Vorbereitung - Lösche nur eigene Dateien
+    clean_standalone_windows_files()
 
     # Erstelle Build-Verzeichnis
     platform_dir = BUILD_DIR / "MGBFreizeitplaner-Windows-Standalone"

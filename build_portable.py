@@ -253,13 +253,26 @@ Bei Problemen: https://github.com/[YOUR_REPO]/issues
 
 
 def clean_build_dirs():
-    """Entfernt alte Build-Verzeichnisse"""
-    print("🧹 Räume alte Build-Verzeichnisse auf...")
-    for dir_path in [BUILD_DIR, RELEASE_DIR]:
-        if dir_path.exists():
-            shutil.rmtree(dir_path)
-    BUILD_DIR.mkdir(parents=True)
-    RELEASE_DIR.mkdir(parents=True)
+    """Entfernt nur Dateien, die von diesem Skript erstellt wurden"""
+    print("🧹 Räume alte Portable-Builds auf...")
+
+    # Lösche nur die portable-spezifischen Build-Ordner
+    for platform in ["windows", "macos", "linux"]:
+        portable_build_dir = BUILD_DIR / f"MGBFreizeitplaner-{platform}"
+        if portable_build_dir.exists():
+            shutil.rmtree(portable_build_dir)
+            print(f"  ✓ Entfernt: {portable_build_dir.name}")
+
+    # Lösche nur portable Release-Dateien (nicht standalone)
+    if RELEASE_DIR.exists():
+        for release_file in RELEASE_DIR.glob("MGBFreizeitplaner-*-portable-*.zip"):
+            release_file.unlink()
+            print(f"  ✓ Entfernt: {release_file.name}")
+
+    # Erstelle Verzeichnisse falls nicht vorhanden
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    RELEASE_DIR.mkdir(parents=True, exist_ok=True)
+
     print("✅ Aufgeräumt!")
 
 

@@ -404,14 +404,30 @@ fi
 
 
 def clean_build_dirs():
-    """Entfernt alte Build-Verzeichnisse"""
-    print("🧹 Räume alte Build-Verzeichnisse auf...")
-    for dir_path in [BUILD_DIR]:
-        if dir_path.exists():
-            shutil.rmtree(dir_path)
-    BUILD_DIR.mkdir(parents=True)
+    """Entfernt nur Dateien, die von diesem Skript erstellt wurden"""
+    print("🧹 Räume alte Embedded-Standalone-Builds auf...")
+
+    # Lösche nur die embedded-standalone-spezifischen Build-Ordner
+    for platform in ["windows", "macos", "linux"]:
+        # Dieses Skript erstellt: MGBFreizeitplaner-{platform}-standalone
+        embedded_build_dir = BUILD_DIR / f"MGBFreizeitplaner-{platform}-standalone"
+        if embedded_build_dir.exists():
+            shutil.rmtree(embedded_build_dir)
+            print(f"  ✓ Entfernt: {embedded_build_dir.name}")
+
+    # Lösche nur embedded-standalone Release-Dateien
+    # (nicht die Windows-Standalone vom anderen Skript, die hat großes W im Ordnernamen)
+    if RELEASE_DIR.exists():
+        for platform in ["windows", "macos", "linux"]:
+            for release_file in RELEASE_DIR.glob(f"MGBFreizeitplaner-*-{platform}-standalone-*.zip"):
+                release_file.unlink()
+                print(f"  ✓ Entfernt: {release_file.name}")
+
+    # Erstelle Verzeichnisse falls nicht vorhanden
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
     RELEASE_DIR.mkdir(parents=True, exist_ok=True)
     DOWNLOAD_CACHE.mkdir(parents=True, exist_ok=True)
+
     print("✅ Aufgeräumt!")
 
 
