@@ -9,68 +9,6 @@ import os
 import platform
 from pathlib import Path
 
-# PyInstaller Fix für WebView2 DLLs
-# Muss VOR dem Import von webview ausgeführt werden
-if getattr(sys, 'frozen', False):
-    # Wir laufen als PyInstaller Bundle
-    base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
-
-    # Erkenne Architektur
-    machine = platform.machine().lower()
-    if machine in ('amd64', 'x86_64'):
-        arch = 'win-x64'
-    elif machine in ('x86', 'i386', 'i686'):
-        arch = 'win-x86'
-    elif machine in ('arm64', 'aarch64'):
-        arch = 'win-arm64'
-    else:
-        arch = 'win-x64'  # Fallback
-
-    # Setze Umgebungsvariablen für webview
-    os.environ['WEBVIEW_PLATFORM'] = arch
-
-    # Patch webview.util.interop_dll_path bevor webview importiert wird
-    import importlib.util
-
-    # Finde webview Modul
-    spec = importlib.util.find_spec('webview.util')
-    if spec and spec.origin:
-        # Lade webview.util
-        import webview.util
-
-        # Original-Funktion speichern
-        original_interop_dll_path = webview.util.interop_dll_path
-
-        # Neue Funktion definieren
-        def patched_interop_dll_path(platform_name):
-            """Patched version die mit PyInstaller Bundle funktioniert"""
-            dll_name = f'{platform_name}'
-
-            # Versuche DLL im PyInstaller Bundle zu finden
-            possible_paths = [
-                os.path.join(base_path, 'webview', 'lib', 'runtimes', dll_name, 'native'),
-                os.path.join(base_path, 'webview', 'lib', dll_name),
-                os.path.join(base_path, dll_name),
-            ]
-
-            for path in possible_paths:
-                dll_file = os.path.join(path, 'WebView2Loader.dll')
-                if os.path.exists(dll_file):
-                    return path
-
-            # Fallback zur Original-Funktion
-            try:
-                return original_interop_dll_path(platform_name)
-            except:
-                # Wenn alles fehlschlägt, verwende arch-Variable
-                fallback_path = os.path.join(base_path, 'webview', 'lib', 'runtimes', arch, 'native')
-                if os.path.exists(fallback_path):
-                    return fallback_path
-                raise FileNotFoundError(f'Cannot find WebView2Loader.dll for {platform_name}')
-
-        # Ersetze die Funktion
-        webview.util.interop_dll_path = patched_interop_dll_path
-
 import webview
 import threading
 import uvicorn
