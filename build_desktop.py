@@ -3,10 +3,6 @@ Build-Skript für MGBFreizeitplaner Desktop-Anwendung
 
 Erstellt eine standalone .exe für Windows mit PyInstaller.
 """
-import warnings
-# Unterdrücke pkg_resources Deprecation-Warnung von altgraph/PyInstaller
-warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=UserWarning)
-
 import subprocess
 import sys
 import shutil
