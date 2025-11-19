@@ -198,7 +198,8 @@ def main():
         resizable=True,
         frameless=False,
         easy_drag=True,
-        min_size=(800, 600)
+        min_size=(800, 600),
+        text_select=True  # Ermöglicht Text-Markierung und Kopieren
     )
 
     # Event-Handler für Fenster-Schließen registrieren
