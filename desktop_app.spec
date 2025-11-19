@@ -20,6 +20,9 @@ hiddenimports = [
     'webview.platforms.edgechromium',
     'clr',
     'pythonnet',
+    'clr_loader',
+    'clr_loader.ffi',
+    'clr_loader.util',
     # Uvicorn
     'uvicorn.logging',
     'uvicorn.loops',
@@ -61,9 +64,15 @@ hiddenimports += collect_submodules('fastapi')
 hiddenimports += collect_submodules('sqlalchemy')
 hiddenimports += collect_submodules('alembic')
 hiddenimports += collect_submodules('reportlab')
+hiddenimports += collect_submodules('pythonnet')
+hiddenimports += collect_submodules('clr_loader')
 
 # Data Files - Templates, Static Files, Migrations, etc.
 datas = []
+
+# Pythonnet und clr_loader Data Files (wichtig für .NET Runtime)
+datas += collect_data_files('pythonnet')
+datas += collect_data_files('clr_loader')
 
 # Templates hinzufügen
 datas += [(os.path.join(project_root, 'app/templates'), 'app/templates')]
@@ -89,8 +98,10 @@ if os.path.exists(os.path.join(project_root, 'rulesets')):
 if os.path.exists(os.path.join(project_root, 'VERSION.txt')):
     datas += [(os.path.join(project_root, 'VERSION.txt'), '.')]
 
-# Keine manuelle Sammlung mehr - wird durch Hook erledigt
+# Binaries für pythonnet und clr_loader
 binaries = []
+binaries += collect_dynamic_libs('pythonnet')
+binaries += collect_dynamic_libs('clr_loader')
 
 a = Analysis(
     ['desktop_app.py'],
@@ -100,7 +111,10 @@ a = Analysis(
     hiddenimports=hiddenimports,
     hookspath=[os.path.join(project_root, 'hooks')],
     hooksconfig={},
-    runtime_hooks=[os.path.join(project_root, 'hooks', 'pyi_rth_webview.py')],
+    runtime_hooks=[
+        os.path.join(project_root, 'hooks', 'pyi_rth_pythonnet.py'),
+        os.path.join(project_root, 'hooks', 'pyi_rth_webview.py'),
+    ],
     excludes=[
         'matplotlib',
         'numpy',
