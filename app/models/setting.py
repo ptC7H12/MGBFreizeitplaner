@@ -30,7 +30,7 @@ class Setting(Base):
     invoice_footer_text = Column(Text, nullable=True, default="Vielen Dank für Ihre Zahlung!")
 
     # Regelwerk-Einstellungen
-    default_github_repo = Column(String(500), nullable=True, default="https://github.com/ptC7H12/MGBFreizeitplaner/tree/main/rulesets/valid/")
+    default_github_repo = Column(String(500), nullable=True, default="https://raw.githubusercontent.com/ptC7H12/MGBFreizeitplaner/refs/heads/main/rulesets/valid/")
 
     # Timestamps
     created_at = Column(DateTime, default=get_utc_timestamp, nullable=False)
