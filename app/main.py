@@ -142,7 +142,7 @@ async def ready_script():
     """JavaScript-Endpunkt für Ladescreen - leitet weiter wenn Server bereit"""
     from fastapi.responses import Response
     return Response(
-        content="window.serverReady = true; window.location.href = '/auth/';",
+        content="window.serverReady = true; window.location.href = 'http://localhost:8000/auth/';",
         media_type="application/javascript"
     )
 
