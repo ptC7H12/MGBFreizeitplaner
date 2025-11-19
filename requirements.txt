@@ -35,3 +35,6 @@ openpyxl==3.1.5
 
 # Development
 python-dotenv==1.0.1
+
+# Build Tools (pin setuptools to avoid deprecation warning in altgraph/PyInstaller)
+setuptools<81
