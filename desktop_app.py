@@ -96,6 +96,35 @@ def on_closing():
     return True
 
 
+def start_server_and_redirect(window, host, port):
+    """Startet den Server im Hintergrund und leitet dann zur App weiter"""
+    # Server in separatem Thread starten
+    server_thread = ServerThread(host, port)
+    server_thread.start()
+
+    # Warten bis Server gestartet ist
+    server_thread.started.wait(timeout=5)
+
+    # Warten bis Server verfügbar ist
+    if wait_for_server(host, port, timeout=60):
+        logger.info("Server bereit - leite zur Anwendung weiter...")
+        window.load_url(f'http://{host}:{port}')
+    else:
+        logger.error("Server konnte nicht gestartet werden!")
+        # Fehlermeldung im Fenster anzeigen
+        window.load_html("""
+            <html>
+            <body style="font-family: sans-serif; padding: 50px; text-align: center; background: #fee2e2;">
+                <h1 style="color: #dc2626;">Fehler beim Starten</h1>
+                <p>Der Server konnte nicht gestartet werden.</p>
+                <p>Bitte starten Sie die Anwendung neu.</p>
+            </body>
+            </html>
+        """)
+
+    return server_thread
+
+
 def main():
     """Hauptfunktion - startet Server und Desktop-Fenster"""
 
@@ -113,24 +142,15 @@ def main():
         logger.error(f"Fehler: {e}")
         sys.exit(1)
 
-    # Server in separatem Thread starten
-    server_thread = ServerThread(host, port)
-    server_thread.start()
+    # Pfad zur Ladescreen-HTML
+    loading_screen = project_root / "app" / "static" / "loading.html"
 
-    # Warten bis Server gestartet ist
-    server_thread.started.wait(timeout=5)
-
-    # Warten bis Server verfügbar ist
-    if not wait_for_server(host, port):
-        logger.error("Server konnte nicht gestartet werden!")
-        sys.exit(1)
-
-    # Desktop-Fenster erstellen und anzeigen
-    logger.info("Öffne Desktop-Fenster...")
+    # Desktop-Fenster sofort mit Ladescreen erstellen und anzeigen
+    logger.info("Öffne Desktop-Fenster mit Ladescreen...")
 
     window = webview.create_window(
         title='MGBFreizeitplaner - Freizeit-Kassen-System',
-        url=f'http://{host}:{port}',
+        url=loading_screen.as_uri(),
         width=1400,
         height=900,
         resizable=True,
@@ -143,12 +163,20 @@ def main():
     # Event-Handler für Fenster-Schließen registrieren
     window.events.closing += on_closing
 
-    # WebView starten (blockiert bis Fenster geschlossen wird)
-    webview.start(debug=False)
+    # Server-Thread-Referenz für späteren Zugriff
+    server_thread_holder = [None]
+
+    def on_loaded():
+        """Callback wenn das Fenster geladen ist - startet Server im Hintergrund"""
+        server_thread_holder[0] = start_server_and_redirect(window, host, port)
+
+    # WebView starten - Server wird nach Fensteröffnung gestartet
+    webview.start(on_loaded, debug=False)
 
     # Nach dem Schließen des Fensters: Server beenden
     logger.info("Fenster geschlossen, beende Server...")
-    server_thread.stop()
+    if server_thread_holder[0]:
+        server_thread_holder[0].stop()
 
     # Kurz warten damit Server sauber herunterfahren kann
     time.sleep(1)

@@ -271,7 +271,6 @@ if not exist "%PYTHON_EXE%" (
 )
 
 echo [INFO] Verwende embedded Python
-echo.
 
 REM Check if .env file exists
 if not exist ".env" (
@@ -282,21 +281,18 @@ if not exist ".env" (
 )
 
 REM Start the application
+echo.
 echo ========================================
 echo   Starte Anwendung
 echo ========================================
 echo.
-echo Die Anwendung ist verfuegbar unter:
-echo   http://localhost:8000/auth
-echo.
 echo Druecke Ctrl+C um die Anwendung zu beenden
 echo.
-echo [INFO] Browser wird automatisch geoeffnet...
-echo.
 
-REM Start browser in background after 3 seconds using PowerShell
-start /b powershell -WindowStyle Hidden -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:8000/auth'"
+REM Oeffne Browser sofort mit Ladeseite
+start "" "%~dp0app\\static\\loading_browser.html"
 
+REM Starte Server
 "%PYTHON_EXE%" -m app.main
 
 if errorlevel 1 (

@@ -85,12 +85,14 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   Starte Anwendung..." -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Die Anwendung ist verfügbar unter:" -ForegroundColor Green
-Write-Host "  http://localhost:8000/auth" -ForegroundColor Cyan
-Write-Host ""
 Write-Host "Drücke Ctrl+C um die Anwendung zu beenden" -ForegroundColor Yellow
 Write-Host ""
 
+# Oeffne Browser sofort mit Ladeseite
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Start-Process "$scriptDir\app\static\loading_browser.html"
+
+# Starte Server
 python -m app.main
 
 # If app exits with error
