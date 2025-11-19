@@ -180,6 +180,17 @@ def run_nuitka():
         "--nofollow-import-to=webview.platforms.gtk",
         "--nofollow-import-to=webview.platforms.cocoa",
         "--nofollow-import-to=webview.platforms.qt",
+
+        # SQLAlchemy: Nur SQLite wird benötigt - entferne andere Dialekte (spart RAM beim Build)
+        "--nofollow-import-to=sqlalchemy.dialects.postgresql",
+        "--nofollow-import-to=sqlalchemy.dialects.mysql",
+        "--nofollow-import-to=sqlalchemy.dialects.oracle",
+        "--nofollow-import-to=sqlalchemy.dialects.mssql",
+        "--nofollow-import-to=sqlalchemy.dialects.firebird",
+        "--nofollow-import-to=sqlalchemy.dialects.sybase",
+        "--nofollow-import-to=sqlalchemy.ext.mypy",
+
+        # Andere nicht benötigte Module
         "--nofollow-import-to=matplotlib",
         "--nofollow-import-to=numpy",
         "--nofollow-import-to=pandas",
@@ -187,6 +198,9 @@ def run_nuitka():
         "--nofollow-import-to=pytest",
         "--nofollow-import-to=IPython",
         "--nofollow-import-to=jupyter",
+
+        # Reduziere parallele Kompilierung um RAM zu sparen
+        "--jobs=2",
 
         # Hauptdatei
         "desktop_app.py",
