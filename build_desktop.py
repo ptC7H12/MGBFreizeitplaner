@@ -175,10 +175,11 @@ def run_nuitka():
         # Alembic falls vorhanden
         "--include-data-dir=alembic=alembic" if Path("alembic").exists() else "",
 
-        # Plugin für Anti-Bloat (entfernt unnötige Imports)
-        "--plugin-enable=anti-bloat",
-
-        # Entferne nicht benötigte Module
+        # Entferne nicht benötigte Module (nicht-Windows Plattformen)
+        "--nofollow-import-to=webview.platforms.android",
+        "--nofollow-import-to=webview.platforms.gtk",
+        "--nofollow-import-to=webview.platforms.cocoa",
+        "--nofollow-import-to=webview.platforms.qt",
         "--nofollow-import-to=matplotlib",
         "--nofollow-import-to=numpy",
         "--nofollow-import-to=pandas",
