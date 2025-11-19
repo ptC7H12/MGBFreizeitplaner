@@ -87,7 +87,7 @@ async def _try_import_ruleset_from_github(
         # GitHub Raw URL konstruieren
         # Von: https://github.com/ptC7H12/MGBFreizeitplaner/tree/main/rulesets/valid/
         # Zu: https://raw.githubusercontent.com/ptC7H12/MGBFreizeitplaner/main/rulesets/valid/Familienfreizeiten_2024.yaml
-        raw_url = base_url.replace("github.com", "raw.githubusercontent.com").replace("/tree/", "/refs/heads") + filename
+        raw_url = base_url.replace("github.com", "raw.githubusercontent.com").replace("/tree/", "/") + filename
 
         logger.info(f"Attempting to import ruleset from: {raw_url}")
 
