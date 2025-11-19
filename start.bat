@@ -98,17 +98,13 @@ echo ========================================
 echo   Starte Anwendung
 echo ========================================
 echo.
-echo Die Anwendung ist verfuegbar unter:
-echo   http://localhost:8000/auth
-echo.
 echo Druecke Ctrl+C um die Anwendung zu beenden
 echo.
-echo [INFO] Browser wird automatisch geoeffnet...
-echo.
 
-REM Start browser in background after 3 seconds using PowerShell
-start /b powershell -WindowStyle Hidden -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:8000/auth'"
+REM Oeffne Browser sofort mit Ladeseite
+start "" "%~dp0app\static\loading_browser.html"
 
+REM Starte Server
 python -m app.main
 
 REM If app exits, wait for user input

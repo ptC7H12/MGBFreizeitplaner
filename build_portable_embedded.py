@@ -274,6 +274,9 @@ echo   Freizeit-Kassen-System
 echo ========================================
 echo.
 
+REM Wechsle ins Skript-Verzeichnis
+cd /d "%~dp0"
+
 REM Verwende embedded Python
 set PYTHON_EXE=%~dp0python\\python.exe
 
@@ -285,15 +288,12 @@ if not exist "%PYTHON_EXE%" (
 )
 
 echo [INFO] Verwende embedded Python
-echo [INFO] Python: %PYTHON_EXE%
 
 REM Check if .env file exists
 if not exist ".env" (
     if exist ".env.example" (
-        echo.
         echo [INFO] Erstelle .env Datei aus Vorlage...
         copy .env.example .env >nul
-        echo [OK] .env Datei erstellt
     )
 )
 
@@ -303,17 +303,13 @@ echo ========================================
 echo   Starte Anwendung...
 echo ========================================
 echo.
-echo Die Anwendung ist verfuegbar unter:
-echo   http://localhost:8000/auth
-echo.
 echo Druecke Ctrl+C um die Anwendung zu beenden
 echo.
-echo [INFO] Browser wird automatisch geoeffnet...
-echo.
 
-REM Start browser in background after 3 seconds using PowerShell
-start /b powershell -WindowStyle Hidden -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:8000/auth'"
+REM Oeffne Browser sofort mit Ladeseite
+start "" "%~dp0app\\static\\loading_browser.html"
 
+REM Starte Server
 "%PYTHON_EXE%" -m app.main
 
 REM If app exits, wait for user input
@@ -351,8 +347,11 @@ echo -e "${CYAN}   Freizeit-Kassen-System${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 
-# Verwende embedded Python
+# Wechsle ins Skript-Verzeichnis
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
+
+# Verwende embedded Python
 PYTHON_EXE="$SCRIPT_DIR/python/bin/python3"
 
 if [ ! -f "$PYTHON_EXE" ]; then
@@ -363,15 +362,12 @@ if [ ! -f "$PYTHON_EXE" ]; then
 fi
 
 echo -e "${GREEN}[INFO] Verwende embedded Python${NC}"
-echo -e "${GREEN}[INFO] Python: $PYTHON_EXE${NC}"
 
 # Check if .env file exists
 if [ ! -f ".env" ]; then
     if [ -f ".env.example" ]; then
-        echo ""
         echo -e "${YELLOW}[INFO] Erstelle .env Datei aus Vorlage...${NC}"
         cp .env.example .env
-        echo -e "${GREEN}[OK] .env Datei erstellt${NC}"
     fi
 fi
 
@@ -381,12 +377,17 @@ echo -e "${CYAN}========================================${NC}"
 echo -e "${CYAN}   Starte Anwendung...${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
-echo -e "${GREEN}Die Anwendung ist verfügbar unter:${NC}"
-echo -e "${CYAN}  http://localhost:8000/auth${NC}"
-echo ""
 echo -e "${YELLOW}Drücke Ctrl+C um die Anwendung zu beenden${NC}"
 echo ""
 
+# Oeffne Browser sofort mit Ladeseite
+if command -v xdg-open &> /dev/null; then
+    xdg-open "$SCRIPT_DIR/app/static/loading_browser.html" &
+elif command -v open &> /dev/null; then
+    open "$SCRIPT_DIR/app/static/loading_browser.html" &
+fi
+
+# Starte Server
 "$PYTHON_EXE" -m app.main
 
 # If app exits with error
