@@ -192,6 +192,12 @@ def run_nuitka():
         "--include-data-dir=app/static=app/static",
         "--include-data-dir=rulesets=rulesets",
 
+        # Version file
+        "--include-data-files=version.txt=version.txt" if Path("version.txt").exists() else "",
+
+        # Package data (z.B. limits Lua scripts für Redis)
+        "--include-package-data=limits",
+
         # Alembic falls vorhanden
         "--include-data-dir=alembic=alembic" if Path("alembic").exists() else "",
 
