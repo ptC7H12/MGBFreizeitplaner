@@ -52,6 +52,15 @@ def check_platform():
 
 def check_nuitka():
     """Prüft ob Nuitka installiert ist"""
+    # Versuch 1: Als Modul importieren
+    try:
+        import nuitka
+        print(f"[OK] Nuitka gefunden: {nuitka.__version__}")
+        return True
+    except ImportError:
+        pass
+
+    # Versuch 2: Als Kommando ausführen
     try:
         result = subprocess.run(
             [sys.executable, "-m", "nuitka", "--version"],
@@ -64,6 +73,11 @@ def check_nuitka():
             return True
         else:
             print("[FEHLER] Nuitka nicht gefunden!")
+            print(f"[DEBUG] Return code: {result.returncode}")
+            if result.stdout:
+                print(f"[DEBUG] stdout: {result.stdout[:200]}")
+            if result.stderr:
+                print(f"[DEBUG] stderr: {result.stderr[:200]}")
             return False
     except Exception as e:
         print(f"[FEHLER] Nuitka nicht gefunden: {e}")
