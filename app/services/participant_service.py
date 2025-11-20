@@ -81,13 +81,14 @@ class ParticipantService:
         )
 
     @staticmethod
-    def export_to_excel(participants: List[Participant], event: Event) -> BytesIO:
+    def export_to_excel(participants: List[Participant], event: Event, db: Session) -> BytesIO:
         """
         Exportiert Teilnehmer als Excel-Datei.
 
         Args:
             participants: Liste der Teilnehmer
             event: Event-Objekt
+            db: Datenbank-Session für Familienzahlungs-Berechnung
 
         Returns:
             BytesIO-Stream mit Excel-Datei
@@ -126,7 +127,51 @@ class ParticipantService:
         # Daten schreiben
         for row_num, participant in enumerate(participants, 2):
             # Konvertiere zu float um Decimal/float Typ-Konflikte zu vermeiden
-            total_paid = float(sum((payment.amount for payment in participant.payments), 0))
+            direct_payments = float(sum((payment.amount for payment in participant.payments), 0))
+
+            # Anteilige Familienzahlungen berechnen
+            family_payment_share = 0.0
+            if participant.family_id:
+                # Lade Familie mit Zahlungen und Teilnehmern
+                from sqlalchemy.orm import joinedload
+                family = db.query(Family).filter(Family.id == participant.family_id).options(
+                    joinedload(Family.payments),
+                    joinedload(Family.participants).joinedload(Participant.payments)
+                ).first()
+
+                if family:
+                    # Gesamtzahlungen der Familie
+                    family_total_payments = float(sum((payment.amount for payment in family.payments), 0))
+
+                    # Berechne für jedes Familienmitglied die direkten Zahlungen und offenen Beträge
+                    family_members_outstanding = []
+                    total_outstanding = 0.0
+
+                    for member in family.participants:
+                        member_direct_payments = float(sum((payment.amount for payment in member.payments), 0))
+                        member_outstanding = max(0.0, float(member.final_price) - member_direct_payments)
+                        family_members_outstanding.append({
+                            'participant_id': member.id,
+                            'outstanding': member_outstanding
+                        })
+                        total_outstanding += member_outstanding
+
+                    # Verteile die Familienzahlung proportional auf die offenen Beträge
+                    if total_outstanding > 0:
+                        # Finde den aktuellen Teilnehmer in der Liste
+                        for member_data in family_members_outstanding:
+                            if member_data['participant_id'] == participant.id:
+                                # Anteilige Verteilung basierend auf offenen Beträgen
+                                family_payment_share = (member_data['outstanding'] / total_outstanding) * family_total_payments
+                                break
+                    elif family_total_payments > 0:
+                        # Wenn alle Beträge bezahlt sind, aber noch Familienzahlungen da sind,
+                        # verteile proportional nach Sollpreis
+                        family_total_price = float(sum((p.final_price for p in family.participants), 0))
+                        if family_total_price > 0:
+                            family_payment_share = (float(participant.final_price) / family_total_price) * family_total_payments
+
+            total_paid = direct_payments + family_payment_share
             outstanding = float(participant.final_price) - total_paid
 
             ws.cell(row=row_num, column=1, value=participant.last_name)
