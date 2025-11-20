@@ -183,16 +183,19 @@ def run_nuitka():
         # Standalone Mode
         "--standalone",
 
-        # Windows-spezifisch - Im Debug-Modus Konsole sichtbar lassen
-        "--windows-console-mode=disable" if not debug_mode else "--windows-console-mode=attach",
-
         # Icon
         "--windows-icon-from-ico=app_icon.ico",
 
         # Output
         "--output-dir=dist",
         "--output-filename=MGBFreizeitplaner.exe",
+    ]
 
+    # Windows-spezifisch - Im Debug-Modus Konsole sichtbar lassen
+    if not debug_mode and platform.system() == "Windows":
+        cmd.append("--disable-console")
+
+    cmd.extend([
         # Includes - Pakete die eingebunden werden müssen
         "--include-package=app",
         "--include-package=webview",
@@ -253,7 +256,7 @@ def run_nuitka():
 
         # Hauptdatei
         "desktop_app.py",
-    ]
+    ])
 
     # Leere Strings entfernen
     cmd = [c for c in cmd if c]
