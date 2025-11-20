@@ -179,6 +179,7 @@
                 <div class="flex-1 min-w-[200px]">
                     <input
                         type="text"
+                        id="family-search-input"
                         name="family_search"
                         placeholder="Familienname oder Ansprechpartner suchen..."
                         value="{{ family_search if family_search else '' }}"
@@ -213,7 +214,7 @@
 
         {% if family_data %}
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+            <table id="families-table" class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
@@ -356,6 +357,66 @@ function updateNoResultsMessage(visibleCount) {
     }
 }
 
+// Live-Filter für Familien-Suche
+function filterFamilies() {
+    const searchInput = document.getElementById('family-search-input');
+    const table = document.getElementById('families-table');
+
+    if (!searchInput || !table) return;
+
+    const searchTerm = searchInput.value.toLowerCase();
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+    let visibleCount = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const nameCell = row.getElementsByTagName('td')[0];  // Familienname
+        const contactCell = row.getElementsByTagName('td')[1];  // Ansprechpartner
+
+        if (!nameCell) continue;
+
+        // Suche in Familienname und Ansprechpartner
+        const nameText = nameCell.textContent || nameCell.innerText;
+        const contactText = contactCell ? (contactCell.textContent || contactCell.innerText) : '';
+
+        if (nameText.toLowerCase().indexOf(searchTerm) > -1 ||
+            contactText.toLowerCase().indexOf(searchTerm) > -1) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    }
+
+    // Optional: Zeige Nachricht wenn keine Ergebnisse
+    updateFamilyNoResultsMessage(visibleCount);
+}
+
+function updateFamilyNoResultsMessage(visibleCount) {
+    const table = document.getElementById('families-table');
+    if (!table) return;
+
+    const tableContainer = table.parentElement;
+    let noResultsMsg = document.getElementById('no-family-search-results');
+
+    if (visibleCount === 0) {
+        if (!noResultsMsg) {
+            noResultsMsg = document.createElement('div');
+            noResultsMsg.id = 'no-family-search-results';
+            noResultsMsg.className = 'px-6 py-8 text-center text-gray-500';
+            noResultsMsg.innerHTML = '<p>Keine Familien gefunden, die der Suche entsprechen.</p>';
+            tableContainer.appendChild(noResultsMsg);
+        }
+        table.style.display = 'none';
+    } else {
+        if (noResultsMsg) {
+            noResultsMsg.remove();
+        }
+        table.style.display = '';
+    }
+}
+
 // Initialize tabs on page load
 document.addEventListener('DOMContentLoaded', function() {
     // Set initial styling for inactive tabs
@@ -379,6 +440,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('search-input');
     if (searchInput) {
         searchInput.addEventListener('input', filterParticipants);
+    }
+
+    // Live-Filter für Familien aktivieren
+    const familySearchInput = document.getElementById('family-search-input');
+    if (familySearchInput) {
+        familySearchInput.addEventListener('input', filterFamilies);
     }
 });
 </script>
