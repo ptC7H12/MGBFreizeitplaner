@@ -32,12 +32,16 @@ def check_python_version():
         print(f"[FEHLER] Python 3.11+ erforderlich, aber {version.major}.{version.minor} gefunden!")
         return False
 
-    if version.minor == 13:
-        print(f"\n[WARNUNG] Python 3.13 wird noch nicht vollständig unterstützt!")
+    if version.minor == 12:
+        print(f"[OK] Python {version.major}.{version.minor}.{version.micro}")
+        print(f"[INFO] Python 3.12 wird mit Nuitka 2.1+ vollständig unterstützt")
+    elif version.minor == 13:
+        print(f"\n[WARNUNG] Python 3.13 wird möglicherweise noch nicht vollständig unterstützt!")
         print(f"[WARNUNG] Empfohlen: Python 3.11 oder 3.12")
         print(f"[INFO] Build wird trotzdem versucht...\n")
+    else:
+        print(f"[OK] Python {version.major}.{version.minor}.{version.micro}")
 
-    print(f"[OK] Python {version.major}.{version.minor}.{version.micro}")
     return True
 
 
@@ -102,9 +106,11 @@ def install_requirements():
             check=True
         )
 
-        # Installiere Nuitka falls nicht vorhanden
+        # Installiere neueste Nuitka-Version für Python 3.12+ Unterstützung
+        # Nuitka 2.1+ unterstützt Python 3.12 vollständig
+        print("[INFO] Installiere/Aktualisiere Nuitka auf neueste Version...")
         subprocess.run(
-            [sys.executable, "-m", "pip", "install", "nuitka", "ordered-set", "zstandard"],
+            [sys.executable, "-m", "pip", "install", "--upgrade", "nuitka>=2.1", "ordered-set", "zstandard"],
             check=True
         )
 
