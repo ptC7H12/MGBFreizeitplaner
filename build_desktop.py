@@ -258,7 +258,8 @@ def run_nuitka():
         "--nofollow-import-to=jupyter",
 
         # Reduziere parallele Kompilierung um RAM zu sparen
-        "--jobs=2",
+	    "--lto=no",
+        "--jobs=5",
 
         # Hauptdatei
         "desktop_app.py",
