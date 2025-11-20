@@ -146,7 +146,8 @@ def create_icon_if_missing():
 def run_nuitka():
     """Führt Nuitka Build aus"""
     print("\n[INFO] Starte Nuitka Build...")
-    print("[INFO] Dies kann 10-30 Minuten dauern (Kompilierung zu C)...\n")
+    print("[INFO] Mit --lto=no und --jobs=4 sollte dies 5-15 Minuten dauern...")
+    print("[INFO] (Erster Build dauert länger, nachfolgende Builds sind schneller)\n")
 
     # Debug-Modus prüfen (Konsole bleibt sichtbar für Fehlersuche)
     debug_mode = "--debug" in sys.argv or "-d" in sys.argv
@@ -225,8 +226,9 @@ def run_nuitka():
         "--nofollow-import-to=IPython",
         "--nofollow-import-to=jupyter",
 
-        # Reduziere parallele Kompilierung um RAM zu sparen
-        "--jobs=2",
+        # Performance-Optimierungen für C-Kompilierung
+        "--lto=no",  # Link Time Optimization deaktivieren - spart VIEL Build-Zeit
+        "--jobs=4",  # Parallele Jobs (bei 16+ GB RAM auch --jobs=6 oder --jobs=8 möglich)
 
         # Hauptdatei
         "desktop_app.py",
