@@ -198,8 +198,11 @@ def run_nuitka():
     ]
 
     # Windows-spezifisch - Im Debug-Modus Konsole sichtbar lassen
-    if not debug_mode and platform.system() == "Windows":
-        cmd.append("--disable-console")
+    if platform.system() == "Windows":
+        if debug_mode:
+            cmd.append("--windows-console-mode=attach")
+        else:
+            cmd.append("--windows-console-mode=disable")
 
     cmd.extend([
         # Includes - Pakete die eingebunden werden müssen
