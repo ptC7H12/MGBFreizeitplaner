@@ -32,12 +32,16 @@ def check_python_version():
         print(f"[FEHLER] Python 3.11+ erforderlich, aber {version.major}.{version.minor} gefunden!")
         return False
 
-    if version.minor == 13:
-        print(f"\n[WARNUNG] Python 3.13 wird noch nicht vollständig unterstützt!")
+    if version.minor == 12:
+        print(f"[OK] Python {version.major}.{version.minor}.{version.micro}")
+        print(f"[INFO] Python 3.12 wird mit Nuitka 2.1+ vollständig unterstützt")
+    elif version.minor == 13:
+        print(f"\n[WARNUNG] Python 3.13 wird möglicherweise noch nicht vollständig unterstützt!")
         print(f"[WARNUNG] Empfohlen: Python 3.11 oder 3.12")
         print(f"[INFO] Build wird trotzdem versucht...\n")
+    else:
+        print(f"[OK] Python {version.major}.{version.minor}.{version.micro}")
 
-    print(f"[OK] Python {version.major}.{version.minor}.{version.micro}")
     return True
 
 
@@ -52,21 +56,30 @@ def check_platform():
 
 def check_nuitka():
     """Prüft ob Nuitka installiert ist"""
+    # Versuch 1: Als Modul importieren
     try:
-        result = subprocess.run(
-            [sys.executable, "-m", "nuitka", "--version"],
-            capture_output=True,
-            text=True
-        )
-        if result.returncode == 0:
-            version = result.stdout.strip().split('\n')[0]
-            print(f"[OK] Nuitka gefunden: {version}")
+        import nuitka
+        # Modul gefunden, jetzt Version über Kommando holen
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "nuitka", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0 and result.stdout:
+                version = result.stdout.strip().split('\n')[0]
+                print(f"[OK] Nuitka gefunden: {version}")
+            else:
+                print(f"[OK] Nuitka Modul gefunden")
             return True
-        else:
-            print("[FEHLER] Nuitka nicht gefunden!")
-            return False
-    except Exception as e:
-        print(f"[FEHLER] Nuitka nicht gefunden: {e}")
+        except:
+            # Import funktioniert, auch wenn Version-Check fehlschlägt
+            print(f"[OK] Nuitka Modul gefunden")
+            return True
+    except ImportError:
+        print("[FEHLER] Nuitka nicht gefunden!")
+        print("[INFO] Installieren Sie Nuitka mit: pip install nuitka")
         return False
 
 
@@ -93,9 +106,11 @@ def install_requirements():
             check=True
         )
 
-        # Installiere Nuitka falls nicht vorhanden
+        # Installiere neueste Nuitka-Version für Python 3.12+ Unterstützung
+        # Nuitka 2.1+ unterstützt Python 3.12 vollständig
+        print("[INFO] Installiere/Aktualisiere Nuitka auf neueste Version...")
         subprocess.run(
-            [sys.executable, "-m", "pip", "install", "nuitka", "ordered-set", "zstandard"],
+            [sys.executable, "-m", "pip", "install", "--upgrade", "nuitka>=2.1", "ordered-set", "zstandard"],
             check=True
         )
 
@@ -174,16 +189,19 @@ def run_nuitka():
         # Standalone Mode
         "--standalone",
 
-        # Windows-spezifisch - Im Debug-Modus Konsole sichtbar lassen
-        "--windows-console-mode=disable" if not debug_mode else "--windows-console-mode=attach",
-
         # Icon
         "--windows-icon-from-ico=app_icon.ico",
 
         # Output
         "--output-dir=dist",
         "--output-filename=MGBFreizeitplaner.exe",
+    ]
 
+    # Windows-spezifisch - Im Debug-Modus Konsole sichtbar lassen
+    if not debug_mode and platform.system() == "Windows":
+        cmd.append("--disable-console")
+
+    cmd.extend([
         # Includes - Pakete die eingebunden werden müssen
         "--include-package=app",
         "--include-package=webview",
@@ -244,7 +262,7 @@ def run_nuitka():
 
         # Hauptdatei
         "desktop_app.py",
-    ]
+    ])
 
     # Leere Strings entfernen
     cmd = [c for c in cmd if c]
