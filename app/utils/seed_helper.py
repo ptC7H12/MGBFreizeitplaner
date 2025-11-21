@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Event, Family, Participant, Role, Ruleset, Payment, Expense, Income, Setting
 from app.services.ruleset_parser import RulesetParser
+from app.services.price_calculator import PriceCalculator
 
 
 def create_demo_data(db: Session) -> None:
@@ -122,7 +123,7 @@ def create_demo_data(db: Session) -> None:
             role=roles["kind"],
             family=family_mueller,
             event=event,
-            calculated_price=150.00
+            calculated_price=0.0  # Wird am Ende neu berechnet
         ),
         Participant(
             first_name="Lisa",
@@ -131,7 +132,7 @@ def create_demo_data(db: Session) -> None:
             role=roles["kind"],
             family=family_mueller,
             event=event,
-            calculated_price=140.00
+            calculated_price=0.0  # Wird am Ende neu berechnet
         )
     ]
     for p in participants_mueller:
@@ -156,7 +157,7 @@ def create_demo_data(db: Session) -> None:
         role=roles["kind"],
         family=family_schmidt,
         event=event,
-        calculated_price=150.00
+        calculated_price=0.0  # Wird am Ende neu berechnet
     )
     db.add(participant_schmidt)
     db.commit()
@@ -180,7 +181,7 @@ def create_demo_data(db: Session) -> None:
             role=roles["kind"],
             family=family_weber,
             event=event,
-            calculated_price=120.00
+            calculated_price=0.0  # Wird am Ende neu berechnet
         ),
         Participant(
             first_name="Noah",
@@ -189,7 +190,7 @@ def create_demo_data(db: Session) -> None:
             role=roles["kind"],
             family=family_weber,
             event=event,
-            calculated_price=140.00
+            calculated_price=0.0  # Wird am Ende neu berechnet
         ),
         Participant(
             first_name="Mia",
@@ -198,7 +199,7 @@ def create_demo_data(db: Session) -> None:
             role=roles["kind"],
             family=family_weber,
             event=event,
-            calculated_price=150.00
+            calculated_price=0.0  # Wird am Ende neu berechnet
         )
     ]
     for p in participants_weber:
@@ -215,7 +216,7 @@ def create_demo_data(db: Session) -> None:
             phone="0555-123456",
             role=roles["betreuer"],
             event=event,
-            calculated_price=75.00
+            calculated_price=0.0  # Wird am Ende neu berechnet
         ),
         Participant(
             first_name="Michael",
@@ -225,7 +226,7 @@ def create_demo_data(db: Session) -> None:
             phone="0172-2345678",
             role=roles["betreuer"],
             event=event,
-            calculated_price=75.00
+            calculated_price=0.0  # Wird am Ende neu berechnet
         ),
         Participant(
             first_name="Julia",
@@ -235,7 +236,7 @@ def create_demo_data(db: Session) -> None:
             phone="0160-7654321",
             role=roles["kueche"],
             event=event,
-            calculated_price=50.00
+            calculated_price=0.0  # Wird am Ende neu berechnet
         )
     ]
     for ep in einzelpersonen:
@@ -411,3 +412,30 @@ def create_demo_data(db: Session) -> None:
     for income in incomes:
         db.add(income)
     db.commit()
+
+    # 9. Preise für alle Teilnehmer neu berechnen (basierend auf Regelwerk)
+    # Lade alle Teilnehmer des Events
+    all_participants = db.query(Participant).filter(
+        Participant.event_id == event.id
+    ).all()
+
+    recalculated_count = 0
+    for participant in all_participants:
+        try:
+            # Preis mit PriceCalculator neu berechnen
+            new_price = PriceCalculator.calculate_price_from_db(
+                db=db,
+                event_id=event.id,
+                role_id=participant.role_id,
+                birth_date=participant.birth_date,
+                family_id=participant.family_id
+            )
+            participant.calculated_price = new_price
+            recalculated_count += 1
+        except Exception as e:
+            # Falls Preisberechnung fehlschlägt, Preis auf 0 belassen
+            print(f"⚠️  Warnung: Preisberechnung für {participant.full_name} fehlgeschlagen: {e}")
+            pass
+
+    db.commit()
+    print(f"✅ {recalculated_count} Teilnehmerpreise automatisch berechnet")
