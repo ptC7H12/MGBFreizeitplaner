@@ -390,7 +390,7 @@ def create_demo_data(db: Session) -> None:
             description="Förderung für Kinder- und Jugendarbeit (Quelle: Jugendamt Stadt Beispielstadt)",
             amount=500.00,
             date=date(2024, 6, 1),
-            role_id=roles["kind"].id,
+            role_id=None,  # Keine spezifische Rolle
             event_id=event.id
         ),
         Income(
@@ -405,7 +405,7 @@ def create_demo_data(db: Session) -> None:
             description="Förderung kirchliche Jugendarbeit (Quelle: Ev. Kirchengemeinde Beispielstadt)",
             amount=300.00,
             date=date(2024, 6, 10),
-            role_id=roles["jugendlicher"].id,
+            role_id=None,  # Keine spezifische Rolle
             event_id=event.id
         )
     ]
