@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Event, Family, Participant, Role, Ruleset, Payment, Expense, Income, Setting
 from app.services.ruleset_parser import RulesetParser
+from app.services.price_calculator import PriceCalculator
 
 
 def create_demo_data(db: Session) -> None:
@@ -30,8 +31,8 @@ def create_demo_data(db: Session) -> None:
     # 1. Event erstellen
     event = Event(
         name="Sommerfreizeit 2024",
-        description="Kinderfreizeit im Sommer 2024",
-        event_type="kinder",
+        description="Familienfreizeit im Sommer 2024",
+        event_type="familie",
         start_date=date(2024, 7, 15),
         end_date=date(2024, 7, 28),
         location="Freizeitheim Waldblick",
@@ -58,8 +59,6 @@ def create_demo_data(db: Session) -> None:
 
     # 3. Rollen erstellen
     roles_data = [
-        {"name": "kind", "display_name": "Kind", "color": "#3B82F6"},
-        {"name": "jugendlicher", "display_name": "Jugendlicher", "color": "#8B5CF6"},
         {"name": "betreuer", "display_name": "Betreuer", "color": "#10B981"},
         {"name": "kueche", "display_name": "Küchenpersonal", "color": "#F59E0B"},
         {"name": "leitung", "display_name": "Freizeitleitung", "color": "#EF4444"},
@@ -78,7 +77,7 @@ def create_demo_data(db: Session) -> None:
     db.commit()
 
     # 4. Regelwerk importieren
-    yaml_file = Path("rulesets/examples/kinder_2024.yaml")
+    yaml_file = Path("rulesets/examples/familie_rabatt_2024.yaml")
     if yaml_file.exists():
         try:
             parser = RulesetParser()
@@ -119,19 +118,15 @@ def create_demo_data(db: Session) -> None:
             first_name="Max",
             last_name="Müller",
             birth_date=date(2012, 5, 15),
-            role=roles["kind"],
             family=family_mueller,
-            event=event,
-            calculated_price=150.00
+            event=event
         ),
         Participant(
             first_name="Lisa",
             last_name="Müller",
             birth_date=date(2014, 8, 22),
-            role=roles["kind"],
             family=family_mueller,
-            event=event,
-            calculated_price=140.00
+            event=event
         )
     ]
     for p in participants_mueller:
@@ -153,10 +148,8 @@ def create_demo_data(db: Session) -> None:
         first_name="Tom",
         last_name="Schmidt",
         birth_date=date(2011, 3, 10),
-        role=roles["kind"],
         family=family_schmidt,
-        event=event,
-        calculated_price=150.00
+        event=event
     )
     db.add(participant_schmidt)
     db.commit()
@@ -177,28 +170,22 @@ def create_demo_data(db: Session) -> None:
             first_name="Emma",
             last_name="Weber",
             birth_date=date(2019, 2, 10),  # 5 Jahre
-            role=roles["kind"],
             family=family_weber,
-            event=event,
-            calculated_price=120.00
+            event=event
         ),
         Participant(
             first_name="Noah",
             last_name="Weber",
             birth_date=date(2016, 9, 18),  # 8 Jahre
-            role=roles["kind"],
             family=family_weber,
-            event=event,
-            calculated_price=140.00
+            event=event
         ),
         Participant(
             first_name="Mia",
             last_name="Weber",
             birth_date=date(2009, 6, 25),  # 15 Jahre
-            role=roles["kind"],
             family=family_weber,
-            event=event,
-            calculated_price=150.00
+            event=event
         )
     ]
     for p in participants_weber:
@@ -214,8 +201,7 @@ def create_demo_data(db: Session) -> None:
             email="sarah.meyer@example.com",
             phone="0555-123456",
             role=roles["betreuer"],
-            event=event,
-            calculated_price=75.00
+            event=event
         ),
         Participant(
             first_name="Michael",
@@ -223,9 +209,8 @@ def create_demo_data(db: Session) -> None:
             birth_date=date(2003, 4, 15),  # 21 Jahre
             email="michael.fischer@example.com",
             phone="0172-2345678",
-            role=roles["betreuer"],
-            event=event,
-            calculated_price=75.00
+            role=roles["leitung"],
+            event=event
         ),
         Participant(
             first_name="Julia",
@@ -234,8 +219,15 @@ def create_demo_data(db: Session) -> None:
             email="julia.becker@example.com",
             phone="0160-7654321",
             role=roles["kueche"],
-            event=event,
-            calculated_price=50.00
+            event=event
+        ),
+        Participant(
+            first_name= "Fritz",
+            last_name= "Mauser",
+            birth_date= date(1965, 4, 1),  # 46 Jahre (41+ Gruppe)
+            email= "fritz.mauser@example.com",
+            phone= "0162-1234567",
+            event=event
         )
     ]
     for ep in einzelpersonen:
@@ -246,7 +238,7 @@ def create_demo_data(db: Session) -> None:
     payments = [
         # Familie Müller
         Payment(
-            amount=200.00,
+            amount=50.00,
             payment_date=date(2024, 5, 15),
             payment_method="Überweisung",
             reference="Anzahlung Sommerfreizeit",
@@ -254,7 +246,7 @@ def create_demo_data(db: Session) -> None:
             event_id=event.id
         ),
         Payment(
-            amount=90.00,
+            amount=167.50,
             payment_date=date(2024, 7, 1),
             payment_method="Bar",
             reference="Restzahlung",
@@ -263,7 +255,7 @@ def create_demo_data(db: Session) -> None:
         ),
         # Familie Schmidt
         Payment(
-            amount=150.00,
+            amount=127.50,
             payment_date=date(2024, 5, 20),
             payment_method="Überweisung",
             reference="Freizeit Tom Schmidt",
@@ -280,7 +272,7 @@ def create_demo_data(db: Session) -> None:
             event_id=event.id
         ),
         Payment(
-            amount=150.00,
+            amount=100.00,
             payment_date=date(2024, 6, 10),
             payment_method="Überweisung",
             reference="2. Rate Weber",
@@ -288,7 +280,7 @@ def create_demo_data(db: Session) -> None:
             event_id=event.id
         ),
         Payment(
-            amount=160.00,
+            amount=92.50,
             payment_date=date(2024, 6, 28),
             payment_method="Bar",
             reference="Restzahlung Weber",
@@ -297,7 +289,7 @@ def create_demo_data(db: Session) -> None:
         ),
         # Einzelpersonen
         Payment(
-            amount=75.00,
+            amount=40.00,
             payment_date=date(2024, 6, 5),
             payment_method="Überweisung",
             reference=f"Teilnahmegebühr {einzelpersonen[0].full_name}",
@@ -305,19 +297,11 @@ def create_demo_data(db: Session) -> None:
             event_id=event.id
         ),
         Payment(
-            amount=75.00,
+            amount=30.00,
             payment_date=date(2024, 6, 12),
             payment_method="PayPal",
             reference=f"Teilnahmegebühr {einzelpersonen[1].full_name}",
             participant_id=einzelpersonen[1].id,
-            event_id=event.id
-        ),
-        Payment(
-            amount=50.00,
-            payment_date=date(2024, 6, 18),
-            payment_method="Bar",
-            reference=f"Teilnahmegebühr {einzelpersonen[2].full_name}",
-            participant_id=einzelpersonen[2].id,
             event_id=event.id
         )
     ]
@@ -385,14 +369,6 @@ def create_demo_data(db: Session) -> None:
     # 8. Beispiel-Einnahmen
     incomes = [
         Income(
-            name="Zuschuss Jugendamt",
-            description="Förderung für Kinder- und Jugendarbeit (Quelle: Jugendamt Stadt Beispielstadt)",
-            amount=500.00,
-            date=date(2024, 6, 1),
-            role_id=roles["kind"].id,
-            event_id=event.id
-        ),
-        Income(
             name="Spende Förderverein",
             description="Spende des Fördervereins für Freizeitaktivitäten (Quelle: Förderverein Jugendarbeit e.V.)",
             amount=250.00,
@@ -402,12 +378,43 @@ def create_demo_data(db: Session) -> None:
         Income(
             name="Zuschuss Kirchengemeinde",
             description="Förderung kirchliche Jugendarbeit (Quelle: Ev. Kirchengemeinde Beispielstadt)",
-            amount=300.00,
+            amount=322.50,
             date=date(2024, 6, 10),
-            role_id=roles["jugendlicher"].id,
+            role_id=None,
             event_id=event.id
         )
     ]
     for income in incomes:
         db.add(income)
     db.commit()
+
+    # 9. Preise für alle Teilnehmer neu berechnen (basierend auf Regelwerk)
+    # Lade alle Teilnehmer des Events
+
+    all_participants = db.query(Participant).filter(
+        Participant.event_id == event.id
+    ).all()
+
+    recalculated_count = 0
+    for participant in all_participants:
+
+        try:
+            # Preis mit PriceCalculator neu berechnen
+            new_price = PriceCalculator.calculate_price_from_db(
+                db=db,
+                event_id=event.id,
+                role_id=participant.role_id,
+                birth_date=participant.birth_date,
+                family_id=participant.family_id
+            )
+
+            participant.calculated_price = new_price
+            recalculated_count += 1
+
+        except Exception as e:
+            # Falls Preisberechnung fehlschlägt, Preis auf 0 belassen
+            print(f"⚠️  Warnung: Preisberechnung für {participant.full_name} fehlgeschlagen: {e}")
+            pass
+
+    db.commit()
+    print(f"✅ {recalculated_count} Teilnehmerpreise automatisch berechnet")

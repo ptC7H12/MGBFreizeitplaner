@@ -376,7 +376,7 @@ async def create_participant(
     discount_percent: str = Form("0.0"),  # Als String empfangen
     discount_reason: Optional[str] = Form(None),
     manual_price_override: str = Form(""),  # Als String empfangen
-    role_id: str = Form(...),  # Als String empfangen
+    role_id: Optional[str] = Form(None),  # Als String empfangen optional
     family_id: Optional[str] = Form(None),  # Als String empfangen
     create_as_family: Optional[str] = Form(None)
 ):
@@ -386,7 +386,7 @@ async def create_participant(
         email_val = None if not email or email.strip() == "" else email
         manual_price_override_val = None if not manual_price_override or manual_price_override.strip() == "" else float(manual_price_override)
         discount_percent_val = 0.0 if not discount_percent or discount_percent.strip() == "" else float(discount_percent)
-        role_id_val = int(role_id)  # Pflichtfeld, muss immer eine Zahl sein
+        role_id_val = None if not role_id or role_id.strip() == "" else int(role_id)
         family_id_val = None if not family_id or family_id.strip() == "" else int(family_id)
 
         # Pydantic-Validierung

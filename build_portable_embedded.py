@@ -55,7 +55,6 @@ PYTHON_VERSIONS = {
 INCLUDE_ITEMS = [
     "app/",
     "rulesets/",
-    "seed_data.py",
     "requirements.txt",
     "version.txt",
     ".env.example",

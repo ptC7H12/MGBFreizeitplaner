@@ -40,7 +40,6 @@ PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
 INCLUDE_ITEMS = [
     "app/",
     "rulesets/",
-    "seed_data.py",
     "requirements.txt",
     "version.txt",
     ".env.example",

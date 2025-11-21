@@ -28,7 +28,6 @@ except Exception:
 INCLUDE_ITEMS = [
     "app/",
     "rulesets/",
-    "seed_data.py",
     "requirements.txt",
     "version.txt",
     ".env.example",
