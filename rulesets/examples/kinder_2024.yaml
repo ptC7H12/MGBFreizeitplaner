@@ -10,6 +10,9 @@ age_groups:
   - min_age: 10
     max_age: 12
     price: 150.00
+  - min_age: 13
+    max_age: 99
+    price: 200.00
 
 role_discounts:
   betreuer:
