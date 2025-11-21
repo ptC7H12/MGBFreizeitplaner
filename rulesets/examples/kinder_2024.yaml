@@ -10,6 +10,9 @@ age_groups:
   - min_age: 10
     max_age: 12
     price: 150.00
+  - min_age: 13
+    max_age: 99
+    price: 200.00
 
 role_discounts:
   betreuer:
@@ -22,7 +25,7 @@ role_discounts:
     subsidy_eligible: false  # NICHT zuschussberechtigt (Umlage auf Gruppe)
 
 family_discount:
-  enabled: true
+  enabled: false
   first_child_percent: 0      # Optional: Rabatt für das erste Kind (Standard: 0%)
   second_child_percent: 10    # Rabatt für das zweite Kind
   third_plus_child_percent: 20  # Rabatt für das dritte und alle weiteren Kinder

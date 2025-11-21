@@ -106,14 +106,14 @@
                     <select
                         id="role_id"
                         name="role_id"
-                        required
+                        <!--required-->
                         class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                         hx-post="/participants/calculate-price"
                         hx-trigger="change delay:300ms"
                         hx-target="#price-preview"
                         hx-include="[name='birth_date'],[name='family_id']"
                     >
-                        <option value="">Bitte wählen</option>
+                        <option value="">Keine Rolle</option>
                         {% for role in roles %}
                         <option value="{{ role.id }}">{{ role.display_name }}</option>
                         {% endfor %}
