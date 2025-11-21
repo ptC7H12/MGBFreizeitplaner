@@ -334,3 +334,78 @@ class PriceCalculator:
         )
 
         return breakdown
+
+    @staticmethod
+    def recalculate_all_prices(db: Session, event_id: int) -> Tuple[int, int]:
+        """
+        Berechnet die Preise für alle Teilnehmer eines Events neu.
+
+        Diese Methode wird aufgerufen, wenn ein Ruleset aktiviert wird,
+        um sicherzustellen, dass alle Preise mit den neuen Regelwerk-Daten
+        übereinstimmen.
+
+        WICHTIG: Teilnehmer mit manual_price_override werden NICHT neu berechnet,
+        da der manuelle Preis erhalten bleiben soll.
+
+        Args:
+            db: Datenbank-Session
+            event_id: ID der Veranstaltung
+
+        Returns:
+            Tuple[int, int]: (Anzahl aktualisierter Teilnehmer, Anzahl übersprungener Teilnehmer)
+        """
+        # Lazy imports to avoid circular dependencies
+        from app.models.participant import Participant
+
+        # Alle aktiven Teilnehmer des Events laden
+        participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True
+        ).all()
+
+        updated_count = 0
+        skipped_count = 0
+
+        logger.info(f"Recalculating prices for {len(participants)} participants in event {event_id}")
+
+        for participant in participants:
+            # Überspringe Teilnehmer mit manuell gesetztem Preis
+            if participant.manual_price_override is not None:
+                logger.debug(f"Skipping participant {participant.id} ({participant.full_name}) - has manual price override")
+                skipped_count += 1
+                continue
+
+            try:
+                # Preis neu berechnen
+                new_price = PriceCalculator.calculate_price_from_db(
+                    db=db,
+                    event_id=event_id,
+                    role_id=participant.role_id,
+                    birth_date=participant.birth_date,
+                    family_id=participant.family_id
+                )
+
+                # Preis aktualisieren (nur wenn sich etwas geändert hat)
+                if participant.calculated_price != new_price:
+                    old_price = participant.calculated_price
+                    participant.calculated_price = new_price
+                    logger.info(f"Updated price for participant {participant.id} ({participant.full_name}): {old_price}€ → {new_price}€")
+                    updated_count += 1
+                else:
+                    logger.debug(f"Price unchanged for participant {participant.id} ({participant.full_name}): {new_price}€")
+
+            except Exception as e:
+                logger.error(f"Error recalculating price for participant {participant.id}: {e}", exc_info=True)
+                # Weitermachen mit nächstem Teilnehmer
+                continue
+
+        # Änderungen speichern
+        try:
+            db.commit()
+            logger.info(f"Price recalculation completed: {updated_count} updated, {skipped_count} skipped (manual override)")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error committing price updates: {e}", exc_info=True)
+            raise
+
+        return updated_count, skipped_count
