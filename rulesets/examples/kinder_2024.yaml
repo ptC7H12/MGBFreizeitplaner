@@ -25,7 +25,7 @@ role_discounts:
     subsidy_eligible: false  # NICHT zuschussberechtigt (Umlage auf Gruppe)
 
 family_discount:
-  enabled: true
+  enabled: false
   first_child_percent: 0      # Optional: Rabatt für das erste Kind (Standard: 0%)
   second_child_percent: 10    # Rabatt für das zweite Kind
   third_plus_child_percent: 20  # Rabatt für das dritte und alle weiteren Kinder
