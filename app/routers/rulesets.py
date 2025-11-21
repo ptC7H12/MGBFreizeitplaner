@@ -16,6 +16,7 @@ from app.models import Ruleset, Event
 from app.services.ruleset_parser import RulesetParser
 from app.services.role_manager import RoleManager
 from app.services.ruleset_scanner import RulesetScanner
+from app.services.price_calculator import PriceCalculator
 from app.dependencies import get_current_event_id
 from app.utils.error_handler import handle_db_exception
 from app.utils.flash import flash
@@ -670,12 +671,6 @@ async def toggle_ruleset(
 
             # Dieses Ruleset aktivieren
             ruleset.is_active = True
-
-            # Flash-Message mit Info über deaktivierte Rulesets
-            if deactivated_count > 0:
-                flash(request, f"Regelwerk '{ruleset.name}' aktiviert. {deactivated_count} andere(s) Regelwerk(e) wurde(n) deaktiviert.", "success")
-            else:
-                flash(request, f"Regelwerk '{ruleset.name}' aktiviert", "success")
         else:
             # Ruleset deaktivieren
             ruleset.is_active = False
@@ -683,6 +678,29 @@ async def toggle_ruleset(
 
         db.commit()
         logger.info(f"Successfully toggled ruleset {ruleset_id} to {new_status}")
+
+        # Wenn ein Ruleset aktiviert wurde, alle Preise neu berechnen
+        if new_status is True:
+            try:
+                logger.info(f"Recalculating all prices for event {event_id} after ruleset activation")
+                updated_count, skipped_count = PriceCalculator.recalculate_all_prices(db, event_id)
+                logger.info(f"Price recalculation completed: {updated_count} updated, {skipped_count} skipped")
+
+                # Flash-Message mit Info über deaktivierte Rulesets und Preisaktualisierung
+                message_parts = [f"Regelwerk '{ruleset.name}' aktiviert"]
+                if deactivated_count > 0:
+                    message_parts.append(f"{deactivated_count} andere(s) Regelwerk(e) wurde(n) deaktiviert")
+                if updated_count > 0:
+                    message_parts.append(f"{updated_count} Teilnehmerpreise wurden neu berechnet")
+                flash(request, ". ".join(message_parts) + ".", "success")
+            except Exception as e:
+                logger.error(f"Error recalculating prices after ruleset activation: {e}", exc_info=True)
+                # Flash-Message trotzdem mit Info über Aktivierung, aber mit Warnung
+                if deactivated_count > 0:
+                    flash(request, f"Regelwerk '{ruleset.name}' aktiviert. {deactivated_count} andere(s) Regelwerk(e) wurde(n) deaktiviert. Fehler bei Preisneuberechnung: {str(e)}", "warning")
+                else:
+                    flash(request, f"Regelwerk '{ruleset.name}' aktiviert. Fehler bei Preisneuberechnung: {str(e)}", "warning")
+
         return RedirectResponse(url=f"/rulesets/{ruleset_id}", status_code=303)
     except Exception as e:
         db.rollback()
