@@ -1354,11 +1354,10 @@ async def subsidies_overview(
             if not participants:
                 continue
 
-            # Für jeden Teilnehmer: Basispreis, Zuschuss und Endpreis berechnen
+            # Für jeden Teilnehmer: Basispreis und Zuschuss berechnen
             participants_data = []
             total_base_price = 0.0
             total_subsidy = 0.0
-            total_final_price = 0.0
 
             for participant in participants:
                 # Alter berechnen
@@ -1376,22 +1375,16 @@ async def subsidies_overview(
                 discount_percent = role_config.get("discount_percent", 0)
                 subsidy_amount = base_price * (discount_percent / 100)
 
-                # Endpreis (nach Rollenrabatt, aber VOR Familienrabatt)
-                # Wichtig: Wir zeigen hier nur den Rollenrabatt-Zuschuss
-                final_price = float(participant.final_price)
-
                 participants_data.append({
                     "full_name": participant.full_name,
                     "birth_date": participant.birth_date,
                     "age": age,
                     "base_price": base_price,
-                    "subsidy_amount": subsidy_amount,
-                    "final_price": final_price
+                    "subsidy_amount": subsidy_amount
                 })
 
                 total_base_price += base_price
                 total_subsidy += subsidy_amount
-                total_final_price += final_price
 
             role_subsidies.append({
                 "role_id": role.id,
@@ -1399,8 +1392,7 @@ async def subsidies_overview(
                 "role_display_name": role.display_name,
                 "participants": participants_data,
                 "total_base_price": round(total_base_price, 2),
-                "total_subsidy": round(total_subsidy, 2),
-                "total_final_price": round(total_final_price, 2)
+                "total_subsidy": round(total_subsidy, 2)
             })
 
     # === Kinderrabatt (Familienrabatt) ===
@@ -1417,7 +1409,6 @@ async def subsidies_overview(
         participants_data = []
         total_base_price = 0.0
         total_subsidy = 0.0
-        total_final_price = 0.0
 
         for participant in participants:
             # Alter berechnen
@@ -1470,22 +1461,18 @@ async def subsidies_overview(
                 "birth_date": participant.birth_date,
                 "age": age,
                 "family_name": family_name,
-                "child_position": child_position,
                 "base_price": base_price,
-                "subsidy_amount": subsidy_amount,
-                "final_price": float(participant.final_price)
+                "subsidy_amount": subsidy_amount
             })
 
             total_base_price += base_price
             total_subsidy += subsidy_amount
-            total_final_price += float(participant.final_price)
 
         if participants_data:
             family_subsidies = {
                 "participants": participants_data,
                 "total_base_price": round(total_base_price, 2),
-                "total_subsidy": round(total_subsidy, 2),
-                "total_final_price": round(total_final_price, 2)
+                "total_subsidy": round(total_subsidy, 2)
             }
 
     logger.info(f"Loaded {len(role_subsidies)} role subsidies and family subsidies: {family_subsidies is not None}")
