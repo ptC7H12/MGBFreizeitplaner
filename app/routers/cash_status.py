@@ -1378,7 +1378,7 @@ async def subsidies_overview(
 
                 # Endpreis (nach Rollenrabatt, aber VOR Familienrabatt)
                 # Wichtig: Wir zeigen hier nur den Rollenrabatt-Zuschuss
-                final_price = participant.final_price
+                final_price = float(participant.final_price)
 
                 participants_data.append({
                     "full_name": participant.full_name,
@@ -1473,12 +1473,12 @@ async def subsidies_overview(
                 "child_position": child_position,
                 "base_price": base_price,
                 "subsidy_amount": subsidy_amount,
-                "final_price": participant.final_price
+                "final_price": float(participant.final_price)
             })
 
             total_base_price += base_price
             total_subsidy += subsidy_amount
-            total_final_price += participant.final_price
+            total_final_price += float(participant.final_price)
 
         if participants_data:
             family_subsidies = {
