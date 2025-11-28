@@ -1344,11 +1344,12 @@ async def subsidies_overview(
             if not role:
                 continue
 
-            # Teilnehmer mit dieser Rolle laden
+            # Teilnehmer mit dieser Rolle laden (ohne manuelle Preisanpassungen)
             participants = db.query(Participant).filter(
                 Participant.event_id == event_id,
                 Participant.is_active == True,
-                Participant.role_id == role.id
+                Participant.role_id == role.id,
+                Participant.manual_price_override.is_(None)
             ).all()
 
             if not participants:
@@ -1399,11 +1400,12 @@ async def subsidies_overview(
     family_subsidies = None
 
     if ruleset.family_discount and ruleset.family_discount.get("enabled", False):
-        # Alle Kinder (unter 18) mit Familienrabatt laden
+        # Alle Kinder (unter 18) mit Familienrabatt laden (ohne manuelle Preisanpassungen)
         participants = db.query(Participant).filter(
             Participant.event_id == event_id,
             Participant.is_active == True,
-            Participant.family_id.isnot(None)
+            Participant.family_id.isnot(None),
+            Participant.manual_price_override.is_(None)
         ).all()
 
         participants_data = []
@@ -1540,11 +1542,12 @@ async def export_subsidy_pdf(
         if not role_config:
             return Response(content="Rollenkonfiguration nicht gefunden", status_code=404)
 
-        # Teilnehmer mit dieser Rolle laden
+        # Teilnehmer mit dieser Rolle laden (ohne manuelle Preisanpassungen)
         participants = db.query(Participant).filter(
             Participant.event_id == event_id,
             Participant.is_active == True,
-            Participant.role_id == role.id
+            Participant.role_id == role.id,
+            Participant.manual_price_override.is_(None)
         ).all()
 
         # Daten für PDF vorbereiten
@@ -1583,14 +1586,15 @@ async def export_subsidy_pdf(
         filename = f"Zuschussliste_{role.display_name}_{event.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
 
     elif type == "family":
-        # Alle Kinder mit Familienrabatt laden
+        # Alle Kinder mit Familienrabatt laden (ohne manuelle Preisanpassungen)
         if not ruleset.family_discount or not ruleset.family_discount.get("enabled", False):
             return Response(content="Familienrabatt nicht aktiviert", status_code=404)
 
         participants = db.query(Participant).filter(
             Participant.event_id == event_id,
             Participant.is_active == True,
-            Participant.family_id.isnot(None)
+            Participant.family_id.isnot(None),
+            Participant.manual_price_override.is_(None)
         ).all()
 
         participants_data = []
@@ -1713,11 +1717,12 @@ async def export_subsidy_excel(
         if not role_config:
             return Response(content="Rollenkonfiguration nicht gefunden", status_code=404)
 
-        # Teilnehmer mit dieser Rolle laden
+        # Teilnehmer mit dieser Rolle laden (ohne manuelle Preisanpassungen)
         participants = db.query(Participant).filter(
             Participant.event_id == event_id,
             Participant.is_active == True,
-            Participant.role_id == role.id
+            Participant.role_id == role.id,
+            Participant.manual_price_override.is_(None)
         ).all()
 
         # Daten für Excel vorbereiten
@@ -1756,14 +1761,15 @@ async def export_subsidy_excel(
         filename = f"Zuschussliste_{role.display_name}_{event.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
 
     elif type == "family":
-        # Alle Kinder mit Familienrabatt laden
+        # Alle Kinder mit Familienrabatt laden (ohne manuelle Preisanpassungen)
         if not ruleset.family_discount or not ruleset.family_discount.get("enabled", False):
             return Response(content="Familienrabatt nicht aktiviert", status_code=404)
 
         participants = db.query(Participant).filter(
             Participant.event_id == event_id,
             Participant.is_active == True,
-            Participant.family_id.isnot(None)
+            Participant.family_id.isnot(None),
+            Participant.manual_price_override.is_(None)
         ).all()
 
         participants_data = []
