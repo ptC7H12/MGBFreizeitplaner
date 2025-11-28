@@ -1,0 +1,75 @@
+name: mgb_freizeitplaner
+description: Freizeit-Kassen-System - Standalone Flutter App für iOS, macOS und Windows
+publish_to: 'none'
+version: 2.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Datenbank (lokal)
+  drift: ^2.25.0
+  drift_flutter: ^0.2.0
+  sqlite3_flutter_libs: ^0.5.0
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+
+  # File Storage
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+  # YAML Parser für Regelwerke
+  yaml: ^3.1.2
+
+  # PDF Generation (lokal!)
+  pdf: ^3.11.1
+  printing: ^5.13.4
+
+  # QR Codes
+  qr_flutter: ^4.1.0
+  barcode: ^2.2.8
+
+  # Excel Import/Export
+  excel: ^4.0.6
+
+  # File Picker
+  file_picker: ^8.1.6
+
+  # Charts für Dashboard
+  fl_chart: ^0.70.4
+
+  # Formulare & Validierung
+  flutter_form_builder: ^10.1.0
+  form_builder_validators: ^11.1.0
+
+  # DateTime Utilities
+  intl: ^0.20.2
+
+  # Icons
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Code Generation für Drift
+  drift_dev: ^2.25.0
+  build_runner: ^2.4.14
+
+  # Linting
+  flutter_lints: ^5.0.0
+
+  # Testing
+  mockito: ^5.4.5
+
+flutter:
+  uses-material-design: true
+
+  # Assets
+  # assets:
+  #   - assets/images/
+  #   - rulesets/
