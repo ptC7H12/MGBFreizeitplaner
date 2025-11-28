@@ -19,7 +19,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.pdfgen import canvas as pdf_canvas
 
 from app.database import get_db
-from app.models import Payment, Expense, Income, Participant, Family, Event, Ruleset
+from app.models import Payment, Expense, Income, Participant, Family, Event, Ruleset, Role
 from app.dependencies import get_current_event_id
 from app.templates_config import templates
 from app.services.excel_service import ExcelService
@@ -162,6 +162,140 @@ def calculate_non_subsidy_discount_sum(db: Session, event_id: int) -> float:
     return round(total_non_subsidy_discount, 2)
 
 
+def calculate_expected_subsidies(db: Session, event_id: int) -> float:
+    """
+    Berechnet die erwarteten Zuschüsse (rollenbasiert + Familienrabatt).
+    Diese Berechnung ist identisch mit der Summe im Zuschüsse-Tab.
+
+    Berücksichtigt nur:
+    - Rollen mit subsidy_eligible=true
+    - Teilnehmer ohne manual_price_override
+    - Kinder unter 18 für Familienrabatte
+
+    Args:
+        db: Datenbank-Session
+        event_id: ID des Events
+
+    Returns:
+        Summe aller erwarteten Zuschüsse in Euro
+    """
+    # Event laden
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        return 0.0
+
+    # Aktives Ruleset für das Event finden
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.event_id == event_id,
+        Ruleset.is_active == True,
+        Ruleset.valid_from <= event.start_date,
+        Ruleset.valid_until >= event.start_date
+    ).first()
+
+    if not ruleset:
+        return 0.0
+
+    total_subsidies = 0.0
+
+    # === Rollenbasierte Zuschüsse ===
+    if ruleset.role_discounts:
+        for role_name, role_config in ruleset.role_discounts.items():
+            subsidy_eligible = role_config.get("subsidy_eligible", True)
+
+            if not subsidy_eligible:
+                continue
+
+            # Rolle aus Datenbank laden
+            role = db.query(Role).filter(
+                Role.event_id == event_id,
+                Role.is_active == True,
+                func.lower(Role.name) == role_name.lower()
+            ).first()
+
+            if not role:
+                continue
+
+            # Teilnehmer mit dieser Rolle laden (ohne manuelle Preisanpassungen)
+            participants = db.query(Participant).filter(
+                Participant.event_id == event_id,
+                Participant.is_active == True,
+                Participant.role_id == role.id,
+                Participant.manual_price_override.is_(None)
+            ).all()
+
+            discount_percent = role_config.get("discount_percent", 0)
+
+            for participant in participants:
+                # Alter berechnen
+                age = event.start_date.year - participant.birth_date.year
+                if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+                    age -= 1
+
+                # Basispreis ermitteln
+                base_price = PriceCalculator._get_base_price_by_age(
+                    age,
+                    ruleset.age_groups or []
+                )
+
+                # Rollenrabatt berechnen
+                subsidy_amount = base_price * (discount_percent / 100)
+                total_subsidies += subsidy_amount
+
+    # === Familienrabatte (Kinderrabatt) ===
+    if ruleset.family_discount and ruleset.family_discount.get("enabled", False):
+        # Alle Kinder (unter 18) mit Familienrabatt laden (ohne manuelle Preisanpassungen)
+        participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True,
+            Participant.family_id.isnot(None),
+            Participant.manual_price_override.is_(None)
+        ).all()
+
+        for participant in participants:
+            # Alter berechnen
+            age = event.start_date.year - participant.birth_date.year
+            if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+                age -= 1
+
+            # Nur Kinder unter 18
+            if age >= 18:
+                continue
+
+            # Basispreis ermitteln
+            base_price = PriceCalculator._get_base_price_by_age(
+                age,
+                ruleset.age_groups or []
+            )
+
+            # Position in Familie ermitteln
+            siblings = db.query(Participant).filter(
+                Participant.family_id == participant.family_id,
+                Participant.is_active == True,
+                Participant.event_id == event_id
+            ).order_by(Participant.birth_date).all()
+
+            # Position des Kindes bestimmen
+            child_position = 1
+            for idx, sibling in enumerate(siblings, start=1):
+                if sibling.id == participant.id:
+                    child_position = idx
+                    break
+
+            # Familienrabatt berechnen
+            family_discount_percent = PriceCalculator._get_family_discount(
+                age,
+                child_position,
+                ruleset.family_discount
+            )
+
+            subsidy_amount = base_price * (family_discount_percent / 100)
+
+            if subsidy_amount > 0:
+                total_subsidies += subsidy_amount
+
+    return round(total_subsidies, 2)
+
+
 @router.get("/", response_class=HTMLResponse)
 async def cash_status(
     request: Request,
@@ -183,6 +317,10 @@ async def cash_status(
     ).all()
     expected_income_participants = float(sum((p.final_price for p in participants), 0))
 
+    # Erwartete Zuschüsse berechnen (rollenbasiert + Familienrabatt)
+    # WICHTIG: Diese Berechnung muss identisch sein mit der Summe im Zuschüsse-Tab!
+    expected_subsidies = calculate_expected_subsidies(db, event_id)
+
     # Rabatte für nicht-zuschussberechtigte Rollen berechnen (werden auf Gruppe umgelegt)
     non_subsidy_discounts = calculate_non_subsidy_discount_sum(db, event_id)
 
@@ -190,9 +328,9 @@ async def cash_status(
     # (Nicht-zuschussberechtigte Rabatte sind Umlagen auf die Gruppe, keine erwarteten Einnahmen)
     expected_total_income = base_prices_sum - non_subsidy_discounts
 
-    # Sonstige Einnahmen = Differenz zwischen erwarteten Gesamteinnahmen und Zahlungseingängen
-    # Dies sind die erwarteten Zuschüsse (nur zuschussberechtigte Rabatte)
-    other_income = expected_total_income - expected_income_participants
+    # Sonstige Einnahmen (SOLL) = Erwartete Zuschüsse
+    # Diese Summe muss identisch sein mit der Summe aller Zuschüsse im Zuschüsse-Tab
+    other_income = expected_subsidies
 
     # Alle Ausgaben (gesamt)
     total_expenses = float(db.query(func.sum(Expense.amount)).filter(
@@ -1274,3 +1412,820 @@ async def export_history_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+@router.get("/subsidies", response_class=HTMLResponse)
+async def subsidies_overview(
+    request: Request,
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id)
+):
+    """
+    Zeigt die Zuschuss-Übersicht mit rollenbasierten Zuschüssen und Kinderrabatten
+    """
+    logger.info(f"Loading subsidies overview for event {event_id}")
+
+    # Event laden
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        logger.warning(f"Event {event_id} not found")
+        return templates.TemplateResponse(
+            "cash_status/overview.html",
+            {
+                "request": request,
+                "title": "Zuschüsse",
+                "show_subsidies": True,
+                "role_subsidies": [],
+                "family_subsidies": None
+            }
+        )
+
+    # Aktives Ruleset für das Event finden
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.event_id == event_id,
+        Ruleset.is_active == True,
+        Ruleset.valid_from <= event.start_date,
+        Ruleset.valid_until >= event.start_date
+    ).first()
+
+    if not ruleset:
+        logger.warning(f"No active ruleset found for event {event_id}")
+        return templates.TemplateResponse(
+            "cash_status/overview.html",
+            {
+                "request": request,
+                "title": "Zuschüsse",
+                "show_subsidies": True,
+                "role_subsidies": [],
+                "family_subsidies": None
+            }
+        )
+
+    # === Rollenbasierte Zuschüsse ===
+    role_subsidies = []
+
+    # Alle Rollen mit subsidy_eligible = true finden
+    if ruleset.role_discounts:
+        for role_name, role_config in ruleset.role_discounts.items():
+            subsidy_eligible = role_config.get("subsidy_eligible", True)
+
+            if not subsidy_eligible:
+                continue
+
+            # Rolle aus Datenbank laden
+            role = db.query(Role).filter(
+                Role.event_id == event_id,
+                Role.is_active == True,
+                func.lower(Role.name) == role_name.lower()
+            ).first()
+
+            if not role:
+                continue
+
+            # Teilnehmer mit dieser Rolle laden (ohne manuelle Preisanpassungen)
+            participants = db.query(Participant).filter(
+                Participant.event_id == event_id,
+                Participant.is_active == True,
+                Participant.role_id == role.id,
+                Participant.manual_price_override.is_(None)
+            ).all()
+
+            if not participants:
+                continue
+
+            # Für jeden Teilnehmer: Basispreis und Zuschuss berechnen
+            participants_data = []
+            total_base_price = 0.0
+            total_subsidy = 0.0
+
+            for participant in participants:
+                # Alter berechnen
+                age = event.start_date.year - participant.birth_date.year
+                if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+                    age -= 1
+
+                # Basispreis ermitteln
+                base_price = PriceCalculator._get_base_price_by_age(
+                    age,
+                    ruleset.age_groups or []
+                )
+
+                # Rollenrabatt berechnen
+                discount_percent = role_config.get("discount_percent", 0)
+                subsidy_amount = base_price * (discount_percent / 100)
+
+                participants_data.append({
+                    "full_name": participant.full_name,
+                    "birth_date": participant.birth_date,
+                    "age": age,
+                    "base_price": base_price,
+                    "subsidy_amount": subsidy_amount
+                })
+
+                total_base_price += base_price
+                total_subsidy += subsidy_amount
+
+            role_subsidies.append({
+                "role_id": role.id,
+                "role_name": role.name,
+                "role_display_name": role.display_name,
+                "participants": participants_data,
+                "total_base_price": round(total_base_price, 2),
+                "total_subsidy": round(total_subsidy, 2)
+            })
+
+    # === Kinderrabatt (Familienrabatt) ===
+    family_subsidies = None
+
+    if ruleset.family_discount and ruleset.family_discount.get("enabled", False):
+        # Alle Kinder (unter 18) mit Familienrabatt laden (ohne manuelle Preisanpassungen)
+        participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True,
+            Participant.family_id.isnot(None),
+            Participant.manual_price_override.is_(None)
+        ).all()
+
+        participants_data = []
+        total_base_price = 0.0
+        total_subsidy = 0.0
+
+        for participant in participants:
+            # Alter berechnen
+            age = event.start_date.year - participant.birth_date.year
+            if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+                age -= 1
+
+            # Nur Kinder unter 18
+            if age >= 18:
+                continue
+
+            # Basispreis ermitteln
+            base_price = PriceCalculator._get_base_price_by_age(
+                age,
+                ruleset.age_groups or []
+            )
+
+            # Position in Familie ermitteln
+            siblings = db.query(Participant).filter(
+                Participant.family_id == participant.family_id,
+                Participant.is_active == True,
+                Participant.event_id == event_id
+            ).order_by(Participant.birth_date).all()
+
+            # Position des Kindes bestimmen (nach Geburtsdatum sortiert)
+            child_position = 1
+            for idx, sibling in enumerate(siblings, start=1):
+                if sibling.id == participant.id:
+                    child_position = idx
+                    break
+
+            # Familienrabatt berechnen
+            family_discount_percent = PriceCalculator._get_family_discount(
+                age,
+                child_position,
+                ruleset.family_discount
+            )
+
+            subsidy_amount = base_price * (family_discount_percent / 100)
+
+            # Wenn kein Familienrabatt, überspringe diesen Teilnehmer
+            if subsidy_amount == 0:
+                continue
+
+            # Familie-Name
+            family_name = participant.family.name if participant.family else None
+
+            participants_data.append({
+                "full_name": participant.full_name,
+                "birth_date": participant.birth_date,
+                "age": age,
+                "family_name": family_name,
+                "base_price": base_price,
+                "subsidy_amount": subsidy_amount
+            })
+
+            total_base_price += base_price
+            total_subsidy += subsidy_amount
+
+        if participants_data:
+            family_subsidies = {
+                "participants": participants_data,
+                "total_base_price": round(total_base_price, 2),
+                "total_subsidy": round(total_subsidy, 2)
+            }
+
+    logger.info(f"Loaded {len(role_subsidies)} role subsidies and family subsidies: {family_subsidies is not None}")
+
+    return templates.TemplateResponse(
+        "cash_status/overview.html",
+        {
+            "request": request,
+            "title": "Zuschüsse",
+            "show_subsidies": True,
+            "role_subsidies": role_subsidies,
+            "family_subsidies": family_subsidies
+        }
+    )
+
+
+@router.get("/subsidies/export/pdf")
+async def export_subsidy_pdf(
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
+    type: str = Query(..., description="Type of subsidy: 'role' or 'family'"),
+    role_id: Optional[int] = Query(None, description="Role ID for role-based subsidies")
+):
+    """
+    Exportiert Zuschusslisten als PDF
+    """
+    logger.info(f"Exporting subsidy PDF for event {event_id}, type={type}, role_id={role_id}")
+
+    # Event laden
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        logger.error(f"Event {event_id} not found")
+        return Response(content="Event nicht gefunden", status_code=404)
+
+    # Aktives Ruleset für das Event finden
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.event_id == event_id,
+        Ruleset.is_active == True,
+        Ruleset.valid_from <= event.start_date,
+        Ruleset.valid_until >= event.start_date
+    ).first()
+
+    if not ruleset:
+        logger.error(f"No active ruleset found for event {event_id}")
+        return Response(content="Kein aktives Regelwerk gefunden", status_code=404)
+
+    # PDF-Daten basierend auf Typ erstellen
+    if type == "role":
+        if not role_id:
+            return Response(content="Role ID fehlt", status_code=400)
+
+        # Rolle laden
+        role = db.query(Role).filter(Role.id == role_id).first()
+        if not role:
+            return Response(content="Rolle nicht gefunden", status_code=404)
+
+        # Rollenconfig aus Ruleset laden
+        role_config = None
+        role_name_lower = role.name.lower()
+        for key, value in (ruleset.role_discounts or {}).items():
+            if key.lower() == role_name_lower:
+                role_config = value
+                break
+
+        if not role_config:
+            return Response(content="Rollenkonfiguration nicht gefunden", status_code=404)
+
+        # Teilnehmer mit dieser Rolle laden (ohne manuelle Preisanpassungen)
+        participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True,
+            Participant.role_id == role.id,
+            Participant.manual_price_override.is_(None)
+        ).all()
+
+        # Daten für PDF vorbereiten
+        participants_data = []
+        total_base_price = 0.0
+        total_subsidy = 0.0
+
+        for participant in participants:
+            age = event.start_date.year - participant.birth_date.year
+            if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+                age -= 1
+
+            base_price = PriceCalculator._get_base_price_by_age(age, ruleset.age_groups or [])
+            discount_percent = role_config.get("discount_percent", 0)
+            subsidy_amount = base_price * (discount_percent / 100)
+
+            participants_data.append({
+                "name": participant.full_name,
+                "birth_date": participant.birth_date,
+                "base_price": base_price,
+                "subsidy_amount": subsidy_amount
+            })
+
+            total_base_price += base_price
+            total_subsidy += subsidy_amount
+
+        # PDF erstellen
+        buffer = _create_subsidy_pdf(
+            event=event,
+            subsidy_type=f"Rollenzuschuss: {role.display_name}",
+            participants=participants_data,
+            total_subsidy=total_subsidy,
+            total_base_price=total_base_price
+        )
+
+        filename = f"Zuschussliste_{role.display_name}_{event.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+    elif type == "family":
+        # Alle Kinder mit Familienrabatt laden (ohne manuelle Preisanpassungen)
+        if not ruleset.family_discount or not ruleset.family_discount.get("enabled", False):
+            return Response(content="Familienrabatt nicht aktiviert", status_code=404)
+
+        participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True,
+            Participant.family_id.isnot(None),
+            Participant.manual_price_override.is_(None)
+        ).all()
+
+        participants_data = []
+        total_base_price = 0.0
+        total_subsidy = 0.0
+
+        for participant in participants:
+            age = event.start_date.year - participant.birth_date.year
+            if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+                age -= 1
+
+            if age >= 18:
+                continue
+
+            base_price = PriceCalculator._get_base_price_by_age(age, ruleset.age_groups or [])
+
+            # Position in Familie
+            siblings = db.query(Participant).filter(
+                Participant.family_id == participant.family_id,
+                Participant.is_active == True,
+                Participant.event_id == event_id
+            ).order_by(Participant.birth_date).all()
+
+            child_position = 1
+            for idx, sibling in enumerate(siblings, start=1):
+                if sibling.id == participant.id:
+                    child_position = idx
+                    break
+
+            family_discount_percent = PriceCalculator._get_family_discount(
+                age, child_position, ruleset.family_discount
+            )
+
+            subsidy_amount = base_price * (family_discount_percent / 100)
+
+            if subsidy_amount == 0:
+                continue
+
+            participants_data.append({
+                "name": participant.full_name,
+                "birth_date": participant.birth_date,
+                "base_price": base_price,
+                "subsidy_amount": subsidy_amount
+            })
+
+            total_base_price += base_price
+            total_subsidy += subsidy_amount
+
+        # PDF erstellen
+        buffer = _create_subsidy_pdf(
+            event=event,
+            subsidy_type="Kinderrabatt (MGB-Zuschuss)",
+            participants=participants_data,
+            total_subsidy=total_subsidy,
+            total_base_price=total_base_price
+        )
+
+        filename = f"Zuschussliste_Kinderrabatt_{event.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+    else:
+        return Response(content="Ungültiger Typ", status_code=400)
+
+    logger.info(f"PDF export completed: {filename}")
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/subsidies/export/excel")
+async def export_subsidy_excel(
+    db: Session = Depends(get_db),
+    event_id: int = Depends(get_current_event_id),
+    type: str = Query(..., description="Type of subsidy: 'role' or 'family'"),
+    role_id: Optional[int] = Query(None, description="Role ID for role-based subsidies")
+):
+    """
+    Exportiert Zuschusslisten als Excel-Datei
+    """
+    logger.info(f"Exporting subsidy Excel for event {event_id}, type={type}, role_id={role_id}")
+
+    # Event laden
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        logger.error(f"Event {event_id} not found")
+        return Response(content="Event nicht gefunden", status_code=404)
+
+    # Aktives Ruleset für das Event finden
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.event_id == event_id,
+        Ruleset.is_active == True,
+        Ruleset.valid_from <= event.start_date,
+        Ruleset.valid_until >= event.start_date
+    ).first()
+
+    if not ruleset:
+        logger.error(f"No active ruleset found for event {event_id}")
+        return Response(content="Kein aktives Regelwerk gefunden", status_code=404)
+
+    # Excel-Daten basierend auf Typ erstellen
+    if type == "role":
+        if not role_id:
+            return Response(content="Role ID fehlt", status_code=400)
+
+        # Rolle laden
+        role = db.query(Role).filter(Role.id == role_id).first()
+        if not role:
+            return Response(content="Rolle nicht gefunden", status_code=404)
+
+        # Rollenconfig aus Ruleset laden
+        role_config = None
+        role_name_lower = role.name.lower()
+        for key, value in (ruleset.role_discounts or {}).items():
+            if key.lower() == role_name_lower:
+                role_config = value
+                break
+
+        if not role_config:
+            return Response(content="Rollenkonfiguration nicht gefunden", status_code=404)
+
+        # Teilnehmer mit dieser Rolle laden (ohne manuelle Preisanpassungen)
+        participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True,
+            Participant.role_id == role.id,
+            Participant.manual_price_override.is_(None)
+        ).all()
+
+        # Daten für Excel vorbereiten
+        participants_data = []
+        total_base_price = 0.0
+        total_subsidy = 0.0
+
+        for participant in participants:
+            age = event.start_date.year - participant.birth_date.year
+            if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+                age -= 1
+
+            base_price = PriceCalculator._get_base_price_by_age(age, ruleset.age_groups or [])
+            discount_percent = role_config.get("discount_percent", 0)
+            subsidy_amount = base_price * (discount_percent / 100)
+
+            participants_data.append({
+                "name": participant.full_name,
+                "birth_date": participant.birth_date,
+                "base_price": base_price,
+                "subsidy_amount": subsidy_amount
+            })
+
+            total_base_price += base_price
+            total_subsidy += subsidy_amount
+
+        # Excel erstellen
+        buffer = _create_subsidy_excel(
+            event=event,
+            subsidy_type=f"Rollenzuschuss: {role.display_name}",
+            participants=participants_data,
+            total_subsidy=total_subsidy,
+            total_base_price=total_base_price
+        )
+
+        filename = f"Zuschussliste_{role.display_name}_{event.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+
+    elif type == "family":
+        # Alle Kinder mit Familienrabatt laden (ohne manuelle Preisanpassungen)
+        if not ruleset.family_discount or not ruleset.family_discount.get("enabled", False):
+            return Response(content="Familienrabatt nicht aktiviert", status_code=404)
+
+        participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True,
+            Participant.family_id.isnot(None),
+            Participant.manual_price_override.is_(None)
+        ).all()
+
+        participants_data = []
+        total_base_price = 0.0
+        total_subsidy = 0.0
+
+        for participant in participants:
+            age = event.start_date.year - participant.birth_date.year
+            if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+                age -= 1
+
+            if age >= 18:
+                continue
+
+            base_price = PriceCalculator._get_base_price_by_age(age, ruleset.age_groups or [])
+
+            # Position in Familie
+            siblings = db.query(Participant).filter(
+                Participant.family_id == participant.family_id,
+                Participant.is_active == True,
+                Participant.event_id == event_id
+            ).order_by(Participant.birth_date).all()
+
+            child_position = 1
+            for idx, sibling in enumerate(siblings, start=1):
+                if sibling.id == participant.id:
+                    child_position = idx
+                    break
+
+            family_discount_percent = PriceCalculator._get_family_discount(
+                age, child_position, ruleset.family_discount
+            )
+
+            subsidy_amount = base_price * (family_discount_percent / 100)
+
+            if subsidy_amount == 0:
+                continue
+
+            participants_data.append({
+                "name": participant.full_name,
+                "birth_date": participant.birth_date,
+                "base_price": base_price,
+                "subsidy_amount": subsidy_amount
+            })
+
+            total_base_price += base_price
+            total_subsidy += subsidy_amount
+
+        # Excel erstellen
+        buffer = _create_subsidy_excel(
+            event=event,
+            subsidy_type="Kinderrabatt (MGB-Zuschuss)",
+            participants=participants_data,
+            total_subsidy=total_subsidy,
+            total_base_price=total_base_price
+        )
+
+        filename = f"Zuschussliste_Kinderrabatt_{event.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+
+    else:
+        return Response(content="Ungültiger Typ", status_code=400)
+
+    logger.info(f"Excel export completed: {filename}")
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+def _create_subsidy_excel(
+    event: Event,
+    subsidy_type: str,
+    participants: list,
+    total_subsidy: float,
+    total_base_price: float
+) -> BytesIO:
+    """
+    Erstellt eine Excel-Datei für eine Zuschussliste
+
+    Args:
+        event: Das Event
+        subsidy_type: Art des Zuschusses (z.B. "Rollenzuschuss: Betreuer")
+        participants: Liste mit Teilnehmerdaten
+        total_subsidy: Gesamtsumme der Zuschüsse
+        total_base_price: Gesamtsumme der Basispreise
+
+    Returns:
+        BytesIO mit Excel-Inhalt
+    """
+    # Workbook erstellen
+    wb, ws = ExcelService.create_workbook(f"{subsidy_type}")
+
+    # Header-Informationen
+    today = date.today()
+    ws['A1'] = event.name
+    ws['A1'].font = Font(size=16, bold=True, color='1e40af')
+
+    ws['E1'] = f"Beantragungsdatum: {today.strftime('%d.%m.%Y')}"
+    ws['E1'].font = Font(size=10)
+    ws['E1'].alignment = Alignment(horizontal='right')
+
+    ws['A2'] = f"Zeitraum: {event.start_date.strftime('%d.%m.%Y')} - {event.end_date.strftime('%d.%m.%Y')}"
+    ws['A2'].font = Font(size=10)
+
+    ws['A3'] = f"Art des Zuschusses: {subsidy_type}"
+    ws['A3'].font = Font(size=12, bold=True, color='1e40af')
+
+    # Tabellen-Header (Zeile 5)
+    headers = ["Name", "Geburtsdatum", "Regulärer Preis (€)", "Zuschuss (€)"]
+    column_widths = {1: 30, 2: 20, 3: 20, 4: 20}
+
+    ExcelService.apply_header_row(ws, headers, column_widths, start_row=5)
+
+    # Daten schreiben
+    row_num = 6
+    for participant in participants:
+        ws.cell(row=row_num, column=1, value=participant["name"])
+        ws.cell(row=row_num, column=2, value=participant["birth_date"].strftime('%d.%m.%Y'))
+        ws.cell(row=row_num, column=3, value=participant["base_price"])
+        ws.cell(row=row_num, column=4, value=participant["subsidy_amount"])
+
+        # Farbmarkierung für Zuschuss
+        ExcelService.apply_color_by_value(ws, row_num, 4, participant["subsidy_amount"])
+
+        row_num += 1
+
+    # Summenzeile
+    row_num += 1
+    summary_values = {
+        3: total_base_price,
+        4: total_subsidy
+    }
+    ExcelService.apply_summary_row(ws, row_num, summary_values)
+
+    ws.cell(row=row_num, column=1, value="Gesamt")
+    ws.cell(row=row_num, column=1).font = Font(bold=True)
+
+    # Unterschriftenfeld
+    row_num += 3
+    ws.cell(row=row_num, column=1, value="Unterschrift:")
+    ws.cell(row=row_num, column=1).font = Font(bold=True)
+
+    row_num += 1
+    ws.cell(row=row_num, column=1, value="_" * 50)
+    ws.cell(row=row_num, column=1).alignment = Alignment(horizontal='center')
+
+    # Datei als BytesIO zurückgeben
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return output
+
+
+def _create_subsidy_pdf(
+    event: Event,
+    subsidy_type: str,
+    participants: list,
+    total_subsidy: float,
+    total_base_price: float
+) -> BytesIO:
+    """
+    Erstellt ein PDF für eine Zuschussliste
+
+    Args:
+        event: Das Event
+        subsidy_type: Art des Zuschusses (z.B. "Rollenzuschuss: Betreuer")
+        participants: Liste mit Teilnehmerdaten
+        total_subsidy: Gesamtsumme der Zuschüsse
+        total_base_price: Gesamtsumme der Basispreise
+
+    Returns:
+        BytesIO mit PDF-Inhalt
+    """
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        topMargin=2*cm,
+        bottomMargin=2*cm,
+        leftMargin=2*cm,
+        rightMargin=2*cm
+    )
+    story = []
+
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        textColor=colors.HexColor('#1e40af'),
+        spaceAfter=10,
+        alignment=0  # Left
+    )
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=11,
+        textColor=colors.HexColor('#1e40af'),
+        spaceAfter=5,
+    )
+    normal_style = styles['Normal']
+    small_style = ParagraphStyle(
+        'Small',
+        parent=styles['Normal'],
+        fontSize=9,
+    )
+
+    # === Header ===
+    # Titel und Beantragungsdatum
+    today = date.today()
+    header_data = [
+        [Paragraph(event.name, title_style), Paragraph(f"Beantragungsdatum: {today.strftime('%d.%m.%Y')}", small_style)]
+    ]
+    header_table = Table(header_data, colWidths=[12*cm, 5*cm])
+    header_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    story.append(header_table)
+    story.append(Spacer(1, 0.3*cm))
+
+    # Zeitraum der Freizeit
+    period_text = f"Zeitraum: {event.start_date.strftime('%d.%m.%Y')} - {event.end_date.strftime('%d.%m.%Y')}"
+    story.append(Paragraph(period_text, small_style))
+    story.append(Spacer(1, 0.5*cm))
+
+    # Art des Zuschusses
+    story.append(Paragraph(f"<b>Art des Zuschusses:</b> {subsidy_type}", heading_style))
+    story.append(Spacer(1, 0.5*cm))
+
+    # === Teilnehmer-Tabelle ===
+    table_data = [
+        ["Name", "Geburtsdatum", "Regulärer Preis", "Zuschuss"]
+    ]
+
+    for participant in participants:
+        table_data.append([
+            participant["name"],
+            participant["birth_date"].strftime('%d.%m.%Y'),
+            f"{participant['base_price']:.2f} €",
+            f"{participant['subsidy_amount']:.2f} €"
+        ])
+
+    # Tabelle erstellen
+    participants_table = Table(table_data, colWidths=[6*cm, 3.5*cm, 3.5*cm, 3.5*cm])
+
+    # Tabellen-Style
+    table_style = [
+        # Header
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, 0), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+        # Daten
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+
+        # Gitter
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+
+        # Alternierende Zeilen
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F9FA')]),
+    ]
+
+    participants_table.setStyle(TableStyle(table_style))
+    story.append(participants_table)
+    story.append(Spacer(1, 0.8*cm))
+
+    # === Summe ===
+    summary_data = [
+        ["Gesamtsumme der Zuschüsse:", f"{total_subsidy:.2f} €"]
+    ]
+    summary_table = Table(summary_data, colWidths=[10*cm, 6.5*cm])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#E8F4F8')),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 12),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#1e40af')),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('TEXTCOLOR', (1, 0), (1, 0), colors.HexColor('#00B050')),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 1.5*cm))
+
+    # === Unterschriftenfeld ===
+    story.append(Paragraph("<b>Unterschrift:</b>", normal_style))
+    story.append(Spacer(1, 0.3*cm))
+
+    # Linie für Unterschrift
+    signature_line = Table([["_" * 80]], colWidths=[16.5*cm])
+    signature_line.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.grey),
+    ]))
+    story.append(signature_line)
+
+    # PDF generieren
+    doc.build(story)
+    buffer.seek(0)
+
+    return buffer
