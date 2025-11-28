@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/current_event_provider.dart';
-import '../../providers/database_provider.dart';
+import '../../providers/participant_provider.dart';
 import '../../data/database/app_database.dart';
+import '../../utils/date_utils.dart';
+import 'participant_form_screen.dart';
 
 /// Participants List Screen
 ///
@@ -12,14 +14,7 @@ class ParticipantsListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final database = ref.watch(databaseProvider);
-    final eventId = ref.watch(currentEventIdProvider);
-
-    if (eventId == null) {
-      return const Scaffold(
-        body: Center(child: Text('Kein Event ausgewählt')),
-      );
-    }
+    final participantsAsync = ref.watch(participantsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -33,19 +28,8 @@ class ParticipantsListScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: StreamBuilder<List<Participant>>(
-        stream: (database.select(database.participants)
-              ..where((tbl) => tbl.eventId.equals(eventId))
-              ..where((tbl) => tbl.isActive.equals(true))
-              ..orderBy([(tbl) => OrderingTerm.asc(tbl.lastName)]))
-            .watch(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final participants = snapshot.data ?? [];
-
+      body: participantsAsync.when(
+        data: (participants) {
           if (participants.isEmpty) {
             return _buildEmptyState(context);
           }
@@ -73,7 +57,7 @@ class ParticipantsListScreen extends ConsumerWidget {
                     children: [
                       const SizedBox(height: 4),
                       Text(
-                        'Geb.: ${_formatDate(participant.birthDate)} (${_calculateAge(participant.birthDate)} Jahre)',
+                        'Geb.: ${AppDateUtils.formatGerman(participant.birthDate)} (${AppDateUtils.calculateAge(participant.birthDate)} Jahre)',
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -87,17 +71,31 @@ class ParticipantsListScreen extends ConsumerWidget {
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
-                    // TODO: Detail Screen
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ParticipantFormScreen(
+                          participantId: participant.id,
+                        ),
+                      ),
+                    );
                   },
                 ),
               );
             },
           );
         },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Text('Fehler: $error'),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // TODO: Create Participant Screen
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const ParticipantFormScreen(),
+            ),
+          );
         },
         icon: const Icon(Icons.add),
         label: const Text('Teilnehmer'),
@@ -130,24 +128,7 @@ class ParticipantsListScreen extends ConsumerWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
-  }
-
-  int _calculateAge(DateTime birthDate) {
-    final now = DateTime.now();
-    int age = now.year - birthDate.year;
-    if (now.month < birthDate.month ||
-        (now.month == birthDate.month && now.day < birthDate.day)) {
-      age--;
-    }
-    return age;
-  }
-
   double _getDisplayPrice(Participant participant) {
-    if (participant.manualPriceOverride != null) {
-      return participant.manualPriceOverride!;
-    }
-    return participant.calculatedPrice;
+    return participant.manualPriceOverride ?? participant.calculatedPrice;
   }
 }
