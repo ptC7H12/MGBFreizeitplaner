@@ -162,6 +162,140 @@ def calculate_non_subsidy_discount_sum(db: Session, event_id: int) -> float:
     return round(total_non_subsidy_discount, 2)
 
 
+def calculate_expected_subsidies(db: Session, event_id: int) -> float:
+    """
+    Berechnet die erwarteten Zuschüsse (rollenbasiert + Familienrabatt).
+    Diese Berechnung ist identisch mit der Summe im Zuschüsse-Tab.
+
+    Berücksichtigt nur:
+    - Rollen mit subsidy_eligible=true
+    - Teilnehmer ohne manual_price_override
+    - Kinder unter 18 für Familienrabatte
+
+    Args:
+        db: Datenbank-Session
+        event_id: ID des Events
+
+    Returns:
+        Summe aller erwarteten Zuschüsse in Euro
+    """
+    # Event laden
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        return 0.0
+
+    # Aktives Ruleset für das Event finden
+    ruleset = db.query(Ruleset).filter(
+        Ruleset.event_id == event_id,
+        Ruleset.is_active == True,
+        Ruleset.valid_from <= event.start_date,
+        Ruleset.valid_until >= event.start_date
+    ).first()
+
+    if not ruleset:
+        return 0.0
+
+    total_subsidies = 0.0
+
+    # === Rollenbasierte Zuschüsse ===
+    if ruleset.role_discounts:
+        for role_name, role_config in ruleset.role_discounts.items():
+            subsidy_eligible = role_config.get("subsidy_eligible", True)
+
+            if not subsidy_eligible:
+                continue
+
+            # Rolle aus Datenbank laden
+            role = db.query(Role).filter(
+                Role.event_id == event_id,
+                Role.is_active == True,
+                func.lower(Role.name) == role_name.lower()
+            ).first()
+
+            if not role:
+                continue
+
+            # Teilnehmer mit dieser Rolle laden (ohne manuelle Preisanpassungen)
+            participants = db.query(Participant).filter(
+                Participant.event_id == event_id,
+                Participant.is_active == True,
+                Participant.role_id == role.id,
+                Participant.manual_price_override.is_(None)
+            ).all()
+
+            discount_percent = role_config.get("discount_percent", 0)
+
+            for participant in participants:
+                # Alter berechnen
+                age = event.start_date.year - participant.birth_date.year
+                if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+                    age -= 1
+
+                # Basispreis ermitteln
+                base_price = PriceCalculator._get_base_price_by_age(
+                    age,
+                    ruleset.age_groups or []
+                )
+
+                # Rollenrabatt berechnen
+                subsidy_amount = base_price * (discount_percent / 100)
+                total_subsidies += subsidy_amount
+
+    # === Familienrabatte (Kinderrabatt) ===
+    if ruleset.family_discount and ruleset.family_discount.get("enabled", False):
+        # Alle Kinder (unter 18) mit Familienrabatt laden (ohne manuelle Preisanpassungen)
+        participants = db.query(Participant).filter(
+            Participant.event_id == event_id,
+            Participant.is_active == True,
+            Participant.family_id.isnot(None),
+            Participant.manual_price_override.is_(None)
+        ).all()
+
+        for participant in participants:
+            # Alter berechnen
+            age = event.start_date.year - participant.birth_date.year
+            if (event.start_date.month, event.start_date.day) < (participant.birth_date.month, participant.birth_date.day):
+                age -= 1
+
+            # Nur Kinder unter 18
+            if age >= 18:
+                continue
+
+            # Basispreis ermitteln
+            base_price = PriceCalculator._get_base_price_by_age(
+                age,
+                ruleset.age_groups or []
+            )
+
+            # Position in Familie ermitteln
+            siblings = db.query(Participant).filter(
+                Participant.family_id == participant.family_id,
+                Participant.is_active == True,
+                Participant.event_id == event_id
+            ).order_by(Participant.birth_date).all()
+
+            # Position des Kindes bestimmen
+            child_position = 1
+            for idx, sibling in enumerate(siblings, start=1):
+                if sibling.id == participant.id:
+                    child_position = idx
+                    break
+
+            # Familienrabatt berechnen
+            family_discount_percent = PriceCalculator._get_family_discount(
+                age,
+                child_position,
+                ruleset.family_discount
+            )
+
+            subsidy_amount = base_price * (family_discount_percent / 100)
+
+            if subsidy_amount > 0:
+                total_subsidies += subsidy_amount
+
+    return round(total_subsidies, 2)
+
+
 @router.get("/", response_class=HTMLResponse)
 async def cash_status(
     request: Request,
@@ -183,6 +317,10 @@ async def cash_status(
     ).all()
     expected_income_participants = float(sum((p.final_price for p in participants), 0))
 
+    # Erwartete Zuschüsse berechnen (rollenbasiert + Familienrabatt)
+    # WICHTIG: Diese Berechnung muss identisch sein mit der Summe im Zuschüsse-Tab!
+    expected_subsidies = calculate_expected_subsidies(db, event_id)
+
     # Rabatte für nicht-zuschussberechtigte Rollen berechnen (werden auf Gruppe umgelegt)
     non_subsidy_discounts = calculate_non_subsidy_discount_sum(db, event_id)
 
@@ -190,9 +328,9 @@ async def cash_status(
     # (Nicht-zuschussberechtigte Rabatte sind Umlagen auf die Gruppe, keine erwarteten Einnahmen)
     expected_total_income = base_prices_sum - non_subsidy_discounts
 
-    # Sonstige Einnahmen = Differenz zwischen erwarteten Gesamteinnahmen und Zahlungseingängen
-    # Dies sind die erwarteten Zuschüsse (nur zuschussberechtigte Rabatte)
-    other_income = expected_total_income - expected_income_participants
+    # Sonstige Einnahmen (SOLL) = Erwartete Zuschüsse
+    # Diese Summe muss identisch sein mit der Summe aller Zuschüsse im Zuschüsse-Tab
+    other_income = expected_subsidies
 
     # Alle Ausgaben (gesamt)
     total_expenses = float(db.query(func.sum(Expense.amount)).filter(
