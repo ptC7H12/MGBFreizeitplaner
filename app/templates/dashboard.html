@@ -74,10 +74,12 @@
             <div class="bg-blue-50 p-4 rounded-lg">
                 <p class="text-sm text-gray-600">Soll Zahlungseingänge</p>
                 <p class="text-xl font-bold text-blue-600">{{ "%.2f"|format(stats.soll_zahlungseingaenge if stats else 0) }} €</p>
+                <p class="text-xs text-gray-500 mt-1">Teilnahmegebühren</p>
             </div>
             <div class="bg-teal-50 p-4 rounded-lg">
                 <p class="text-sm text-gray-600">Soll Sonstige Einnahmen</p>
                 <p class="text-xl font-bold text-teal-600">{{ "%.2f"|format(stats.soll_sonstige_einnahmen if stats else 0) }} €</p>
+                <p class="text-xs text-gray-500 mt-1">Zuschüsse</p>
             </div>
             <div class="bg-green-50 p-4 rounded-lg border-2 border-green-400">
                 <p class="text-sm font-medium text-gray-700">Ist Einnahmen (Gesamt)</p>
