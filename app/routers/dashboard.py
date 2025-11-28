@@ -10,6 +10,7 @@ from app.models import Participant, Payment, Expense, Event, Family, Role, Incom
 from app.dependencies import get_current_event_id
 from app.templates_config import templates
 from app.services.price_calculator import PriceCalculator
+from app.routers.cash_status import calculate_expected_subsidies
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -168,16 +169,12 @@ async def dashboard(request: Request, db: Session = Depends(get_db), event_id: i
     ).all()
     soll_zahlungseingaenge = float(sum((p.final_price for p in participants), 0))
 
-    # Rabatte für nicht-zuschussberechtigte Rollen berechnen (werden auf Gruppe umgelegt)
-    non_subsidy_discounts = calculate_non_subsidy_discount_sum(db, event_id)
+    # Erwartete Zuschüsse berechnen (rollenbasiert + Familienrabatt)
+    # WICHTIG: Diese Berechnung muss identisch sein mit der Summe im Zuschüsse-Tab!
+    soll_sonstige_einnahmen = calculate_expected_subsidies(db, event_id)
 
-    # Gesamteinnahmen (Soll) = Basispreise MINUS nicht-zuschussberechtigte Rabatte
-    # (Nicht-zuschussberechtigte Rabatte sind Umlagen auf die Gruppe, keine erwarteten Einnahmen)
-    soll_einnahmen_gesamt = base_prices_sum - non_subsidy_discounts
-
-    # Sonstige Einnahmen = Differenz zwischen erwarteten Gesamteinnahmen und Zahlungseingängen
-    # Dies sind die erwarteten Zuschüsse (nur zuschussberechtigte Rabatte)
-    soll_sonstige_einnahmen = soll_einnahmen_gesamt - soll_zahlungseingaenge
+    # Gesamteinnahmen (Soll) = Zahlungseingänge + Sonstige Einnahmen (Zuschüsse)
+    soll_einnahmen_gesamt = soll_zahlungseingaenge + soll_sonstige_einnahmen
 
     ist_zahlungseingaenge = float(db.query(func.sum(Payment.amount)).filter(Payment.event_id == event_id).scalar() or 0)
     # Sonstige Einnahmen (z.B. erhaltene Zuschüsse, Spenden)
