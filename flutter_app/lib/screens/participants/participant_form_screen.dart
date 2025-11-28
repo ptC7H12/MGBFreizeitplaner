@@ -7,6 +7,7 @@ import '../../providers/current_event_provider.dart';
 import '../../providers/database_provider.dart';
 import '../../utils/validators.dart';
 import '../../utils/date_utils.dart';
+import '../../widgets/forms/price_preview_widget.dart';
 
 /// Teilnehmer-Formular (Create/Edit)
 ///
@@ -493,7 +494,14 @@ class _ParticipantFormScreenState
   }
 
   Widget _buildPriceSection() {
-    // TODO: Live-Preisberechnung implementieren
+    final manualPrice = _hasManualPrice && _manualPriceController.text.isNotEmpty
+        ? double.tryParse(_manualPriceController.text.replaceAll(',', '.'))
+        : null;
+
+    final discountPercent = _discountPercentController.text.isNotEmpty
+        ? double.tryParse(_discountPercentController.text.replaceAll(',', '.')) ?? 0.0
+        : 0.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -515,7 +523,7 @@ class _ParticipantFormScreenState
           _buildTextField(
             controller: _manualPriceController,
             label: 'Preis (€) *',
-            keyboardType: TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             validator: Validators.positiveAmount,
           ),
         ],
@@ -523,7 +531,7 @@ class _ParticipantFormScreenState
         _buildTextField(
           controller: _discountPercentController,
           label: 'Zusätzlicher Rabatt (%)',
-          keyboardType: TextInputType.numberWithOptions(decimal: true),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           validator: Validators.percentage,
         ),
         const SizedBox(height: 16),
@@ -533,34 +541,16 @@ class _ParticipantFormScreenState
           maxLines: 2,
         ),
         const SizedBox(height: 16),
-        Card(
-          color: Colors.blue.shade50,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Berechneter Preis',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'TODO: Live-Berechnung',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Wird implementiert in nächstem Schritt',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
+        // Live-Preisberechnung (wie HTMX in Web-App!)
+        PricePreviewWidget(
+          birthDate: _birthDate,
+          roleId: _selectedRoleId,
+          familyId: _selectedFamilyId,
+          manualPriceOverride: manualPrice,
+          discountPercent: discountPercent,
+          discountReason: _discountReasonController.text.isNotEmpty
+              ? _discountReasonController.text
+              : null,
         ),
       ],
     );
