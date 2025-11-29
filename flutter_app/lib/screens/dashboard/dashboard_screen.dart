@@ -9,6 +9,7 @@ import '../families/families_list_screen.dart';
 import '../payments/payments_list_screen.dart';
 import '../expenses/expenses_list_screen.dart';
 import '../incomes/incomes_list_screen.dart';
+import '../rulesets/rulesets_list_screen.dart';
 
 /// Dashboard Screen
 ///
@@ -173,7 +174,12 @@ class DashboardScreen extends ConsumerWidget {
             leading: const Icon(Icons.rule),
             title: const Text('Regelwerke'),
             onTap: () {
-              // TODO: Rulesets Screen
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const RulesetsListScreen(),
+                ),
+              );
             },
           ),
           const Divider(),
@@ -445,9 +451,11 @@ class DashboardScreen extends ConsumerWidget {
                 'Regelwerke',
                 Icons.rule,
                 Colors.purple,
-                () {
-                  // TODO: Rulesets Screen
-                },
+                () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const RulesetsListScreen(),
+                  ),
+                ),
               ),
             ],
           ),
