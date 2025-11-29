@@ -10,6 +10,7 @@ import '../payments/payments_list_screen.dart';
 import '../expenses/expenses_list_screen.dart';
 import '../incomes/incomes_list_screen.dart';
 import '../rulesets/rulesets_list_screen.dart';
+import '../cash_status/cash_status_screen.dart';
 
 /// Dashboard Screen
 ///
@@ -167,7 +168,12 @@ class DashboardScreen extends ConsumerWidget {
             leading: const Icon(Icons.receipt_long),
             title: const Text('Kassenstand'),
             onTap: () {
-              // TODO: Cash Status Screen
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const CashStatusScreen(),
+                ),
+              );
             },
           ),
           ListTile(
