@@ -6,6 +6,7 @@ import '../../providers/current_event_provider.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/expense_provider.dart';
 import '../../providers/income_provider.dart';
+import '../../providers/pdf_export_provider.dart';
 import '../../data/database/app_database.dart';
 
 class CashStatusScreen extends ConsumerWidget {
@@ -33,10 +34,47 @@ class CashStatusScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
-            onPressed: () {
-              // TODO: Export to PDF
+            onPressed: () async {
+              final pdfService = ref.read(pdfExportServiceProvider);
+              final totalIncomesAsync = ref.read(totalIncomesProvider);
+              final totalExpensesAsync = ref.read(totalExpensesProvider);
+              final expensesByCategoryAsync = ref.read(expensesByCategoryProvider);
+              final incomesBySourceAsync = ref.read(incomesBySourceProvider);
+
+              final payments = await (database.select(database.payments)
+                    ..where((t) => t.eventId.equals(currentEvent.id) & t.isActive.equals(true)))
+                  .get();
+              final totalPayments = payments.fold<double>(0, (sum, p) => sum + p.amount);
+
+              final totalIncomes = await totalIncomesAsync.future;
+              final totalExpenses = await totalExpensesAsync.future;
+              final expensesByCategory = await expensesByCategoryAsync.future;
+              final incomesBySource = await incomesBySourceAsync.future;
+
+              try {
+                final filePath = await pdfService.exportFinancialReport(
+                  eventName: currentEvent.name,
+                  totalIncomes: totalIncomes,
+                  totalExpenses: totalExpenses,
+                  totalPayments: totalPayments,
+                  expensesByCategory: expensesByCategory,
+                  incomesBySource: incomesBySource,
+                );
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('PDF gespeichert: $filePath')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Fehler beim Export: $e')),
+                  );
+                }
+              }
             },
-            tooltip: 'Export',
+            tooltip: 'PDF Export',
           ),
         ],
       ),

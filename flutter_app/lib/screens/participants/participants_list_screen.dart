@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/current_event_provider.dart';
 import '../../providers/participant_provider.dart';
+import '../../providers/pdf_export_provider.dart';
 import '../../data/database/app_database.dart';
 import '../../utils/date_utils.dart';
 import 'participant_form_screen.dart';
@@ -221,6 +222,40 @@ class _ParticipantsListScreenState extends ConsumerState<ParticipantsListScreen>
               );
             },
             tooltip: 'Excel importieren',
+          ),
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: () async {
+              final participantsValue = ref.read(participantsProvider).value;
+              final currentEvent = ref.read(currentEventProvider);
+
+              if (participantsValue == null || participantsValue.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Keine Teilnehmer zum Exportieren')),
+                );
+                return;
+              }
+
+              final pdfService = ref.read(pdfExportServiceProvider);
+              try {
+                final filePath = await pdfService.exportParticipantsList(
+                  participants: participantsValue,
+                  eventName: currentEvent?.name ?? 'Veranstaltung',
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('PDF gespeichert: $filePath')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Fehler beim Export: $e')),
+                  );
+                }
+              }
+            },
+            tooltip: 'PDF Export',
           ),
         ],
       ),
