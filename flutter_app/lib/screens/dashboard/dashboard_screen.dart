@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../providers/current_event_provider.dart';
 import '../../providers/database_provider.dart';
 import '../../data/database/app_database.dart';
 import '../participants/participants_list_screen.dart';
 import '../families/families_list_screen.dart';
 import '../payments/payments_list_screen.dart';
+import '../expenses/expenses_list_screen.dart';
+import '../incomes/incomes_list_screen.dart';
 
 /// Dashboard Screen
 ///
@@ -138,14 +141,24 @@ class DashboardScreen extends ConsumerWidget {
             leading: const Icon(Icons.shopping_cart),
             title: const Text('Ausgaben'),
             onTap: () {
-              // TODO: Expenses Screen
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const ExpensesListScreen(),
+                ),
+              );
             },
           ),
           ListTile(
             leading: const Icon(Icons.attach_money),
             title: const Text('Einnahmen'),
             onTap: () {
-              // TODO: Incomes Screen
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const IncomesListScreen(),
+                ),
+              );
             },
           ),
           const Divider(),
@@ -247,10 +260,11 @@ class DashboardScreen extends ConsumerWidget {
 
           const SizedBox(height: 16),
 
-          // Financial Overview
+          // Financial Overview - Payments and Expenses
           StreamBuilder<List<Payment>>(
             stream: (database.select(database.payments)
-                  ..where((tbl) => tbl.eventId.equals(eventId)))
+                  ..where((tbl) => tbl.eventId.equals(eventId))
+                  ..where((tbl) => tbl.isActive.equals(true)))
                 .watch(),
             builder: (context, snapshot) {
               final payments = snapshot.data ?? [];
@@ -265,16 +279,17 @@ class DashboardScreen extends ConsumerWidget {
                     child: _buildStatCard(
                       context,
                       'Zahlungen',
-                      '${totalPayments.toStringAsFixed(2)} €',
+                      NumberFormat.currency(locale: 'de_DE', symbol: '€').format(totalPayments),
                       Icons.payment,
-                      Colors.orange,
+                      Colors.blue,
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: StreamBuilder<List<Expense>>(
                       stream: (database.select(database.expenses)
-                            ..where((tbl) => tbl.eventId.equals(eventId)))
+                            ..where((tbl) => tbl.eventId.equals(eventId))
+                            ..where((tbl) => tbl.isActive.equals(true)))
                           .watch(),
                       builder: (context, snapshot) {
                         final expenses = snapshot.data ?? [];
@@ -286,7 +301,7 @@ class DashboardScreen extends ConsumerWidget {
                         return _buildStatCard(
                           context,
                           'Ausgaben',
-                          '${totalExpenses.toStringAsFixed(2)} €',
+                          NumberFormat.currency(locale: 'de_DE', symbol: '€').format(totalExpenses),
                           Icons.shopping_cart,
                           Colors.red,
                         );
@@ -294,6 +309,62 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                   ),
                 ],
+              );
+            },
+          ),
+
+          const SizedBox(height: 16),
+
+          // Financial Overview - Incomes and Cash Balance
+          StreamBuilder<List<Income>>(
+            stream: (database.select(database.incomes)
+                  ..where((tbl) => tbl.eventId.equals(eventId))
+                  ..where((tbl) => tbl.isActive.equals(true)))
+                .watch(),
+            builder: (context, incomeSnapshot) {
+              final incomes = incomeSnapshot.data ?? [];
+              final totalIncomes = incomes.fold<double>(
+                0.0,
+                (sum, income) => sum + income.amount,
+              );
+
+              return StreamBuilder<List<Expense>>(
+                stream: (database.select(database.expenses)
+                      ..where((tbl) => tbl.eventId.equals(eventId))
+                      ..where((tbl) => tbl.isActive.equals(true)))
+                    .watch(),
+                builder: (context, expenseSnapshot) {
+                  final expenses = expenseSnapshot.data ?? [];
+                  final totalExpenses = expenses.fold<double>(
+                    0.0,
+                    (sum, expense) => sum + expense.amount,
+                  );
+                  final cashBalance = totalIncomes - totalExpenses;
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          'Einnahmen',
+                          NumberFormat.currency(locale: 'de_DE', symbol: '€').format(totalIncomes),
+                          Icons.attach_money,
+                          Colors.green,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildStatCard(
+                          context,
+                          'Kassenstand',
+                          NumberFormat.currency(locale: 'de_DE', symbol: '€').format(cashBalance),
+                          Icons.account_balance_wallet,
+                          cashBalance >= 0 ? Colors.teal : Colors.deepOrange,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -327,9 +398,20 @@ class DashboardScreen extends ConsumerWidget {
               ),
               _buildQuickActionCard(
                 context,
+                'Familien',
+                Icons.family_restroom,
+                Colors.green,
+                () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const FamiliesListScreen(),
+                  ),
+                ),
+              ),
+              _buildQuickActionCard(
+                context,
                 'Zahlungen',
                 Icons.payment,
-                Colors.green,
+                Colors.orange,
                 () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => const PaymentsListScreen(),
@@ -338,12 +420,25 @@ class DashboardScreen extends ConsumerWidget {
               ),
               _buildQuickActionCard(
                 context,
-                'Kassenstand',
-                Icons.receipt_long,
-                Colors.orange,
-                () {
-                  // TODO: Cash Status Screen
-                },
+                'Ausgaben',
+                Icons.shopping_cart,
+                Colors.red,
+                () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ExpensesListScreen(),
+                  ),
+                ),
+              ),
+              _buildQuickActionCard(
+                context,
+                'Einnahmen',
+                Icons.attach_money,
+                Colors.green[700]!,
+                () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const IncomesListScreen(),
+                  ),
+                ),
               ),
               _buildQuickActionCard(
                 context,
