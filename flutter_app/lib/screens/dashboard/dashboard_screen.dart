@@ -13,6 +13,7 @@ import '../rulesets/rulesets_list_screen.dart';
 import '../cash_status/cash_status_screen.dart';
 import '../roles/roles_list_screen.dart';
 import '../tasks/tasks_screen.dart';
+import '../settings/settings_screen.dart';
 
 /// Dashboard Screen
 ///
@@ -49,7 +50,11 @@ class DashboardScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              // TODO: Settings Screen
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const SettingsScreen(),
+                ),
+              );
             },
           ),
         ],
