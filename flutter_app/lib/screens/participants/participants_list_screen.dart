@@ -5,6 +5,7 @@ import '../../providers/participant_provider.dart';
 import '../../data/database/app_database.dart';
 import '../../utils/date_utils.dart';
 import 'participant_form_screen.dart';
+import 'participant_import_screen.dart';
 
 /// Participants List Screen
 ///
@@ -20,6 +21,18 @@ class ParticipantsListScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Teilnehmer'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.upload_file),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ParticipantImportScreen(),
+                ),
+              );
+            },
+            tooltip: 'Excel importieren',
+          ),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
