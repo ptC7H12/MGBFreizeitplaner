@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/payment_provider.dart';
 import '../../data/database/app_database.dart';
 import '../../utils/date_utils.dart';
+import 'payment_form_screen.dart';
 
 /// Payments List Screen
 class PaymentsListScreen extends ConsumerWidget {
@@ -69,7 +70,13 @@ class PaymentsListScreen extends ConsumerWidget {
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
-                    // TODO: Detail/Edit Screen (Sprint 2)
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => PaymentFormScreen(
+                          paymentId: payment.id,
+                        ),
+                      ),
+                    );
                   },
                 ),
               );
@@ -81,9 +88,10 @@ class PaymentsListScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // TODO: Create Payment Screen (Sprint 2)
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Zahlungs-Formular kommt in Sprint 2')),
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const PaymentFormScreen(),
+            ),
           );
         },
         icon: const Icon(Icons.add),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/family_provider.dart';
 import '../../data/database/app_database.dart';
+import 'family_form_screen.dart';
 
 /// Families List Screen
 class FamiliesListScreen extends ConsumerWidget {
@@ -58,7 +59,13 @@ class FamiliesListScreen extends ConsumerWidget {
                       : null,
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
-                    // TODO: Detail/Edit Screen (Sprint 2)
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => FamilyFormScreen(
+                          familyId: family.id,
+                        ),
+                      ),
+                    );
                   },
                 ),
               );
@@ -70,9 +77,10 @@ class FamiliesListScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          // TODO: Create Family Screen (Sprint 2)
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Familien-Formular kommt in Sprint 2')),
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const FamilyFormScreen(),
+            ),
           );
         },
         icon: const Icon(Icons.add),
