@@ -1,0 +1,32 @@
+name: Familienfreizeiten 2024
+type: Familie
+description: null
+valid_from: '2024-01-01'
+valid_until: '2025-12-31'
+age_groups:
+- min_age: 0
+  max_age: 2
+  price: 0.0
+- min_age: 3
+  max_age: 12
+  price: 150.0
+- min_age: 13
+  max_age: 17
+  price: 195.0
+- min_age: 18
+  max_age: 99
+  price: 230.0
+role_discounts:
+  Kinderstunde:
+    discount_percent: 40
+    max_count: 5
+    subsidy_eligible: true
+  Küchenteam:
+    discount_percent: 100
+    max_count: 6
+    subsidy_eligible: false
+family_discount:
+  enabled: true
+  first_child_percent: 25
+  second_child_percent: 25
+  third_plus_child_percent: 25
